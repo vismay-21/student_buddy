@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'screens/overview_screen.dart';
+import 'screens/attendance_screen.dart';
+import 'screens/timetable_screen.dart';
+import 'screens/finance_screen.dart';
+
 void main() {
   runApp(const StudentBuddyApp());
 }
@@ -9,28 +14,73 @@ class StudentBuddyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Student Buddy',
-      home: const HomePage(),
+      home: HomePage(),
     );
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _selectedIndex = 1; // Overview default
+  final PageController _pageController = PageController(initialPage: 1);
+
+  final List<Widget> _pages = const [
+    FinanceScreen(),
+    OverviewScreen(),
+    TimetableScreen(),
+    AttendanceScreen(),
+  ];
+
+  void _onItemTapped(int index) {
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Student Buddy'),
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        children: _pages,
       ),
-      body: const Center(
-        child: Text(
-          'App Skeleton Ready',
-          style: TextStyle(fontSize: 20),
-        ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_wallet),
+            label: "Finance",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: "Overview",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.schedule),
+            label: "Timetable",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.check_circle),
+            label: "Attendance",
+          ),
+        ],
       ),
     );
   }
