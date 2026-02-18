@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'data/database_helper.dart';
 
 import 'screens/overview_screen.dart';
 import 'screens/attendance_screen.dart';
 import 'screens/timetable_screen.dart';
 import 'screens/finance_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await DatabaseHelper.instance.database;
   runApp(const StudentBuddyApp());
 }
 
