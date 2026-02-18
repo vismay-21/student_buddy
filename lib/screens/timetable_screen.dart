@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import '../services/timetable_service.dart';
+import '../models/subject.dart';
+import '../models/class_session.dart';
 
 
 class TimetableScreen extends StatefulWidget {
@@ -10,8 +12,39 @@ class TimetableScreen extends StatefulWidget {
   State<TimetableScreen> createState() => _TimetableScreenState();
 }
 
+void testInsertData() async {
+  final service = TimetableService();
+
+  // Insert Subject
+  int subjectId = await service.insertSubject(
+    Subject(
+      name: "Mathematics",
+      teacher: "Dr. Shah",
+      room: "C-204",
+      color: Colors.blue.value,
+    ),
+  );
+
+  // Insert Class Session
+  await service.insertClassSession(
+    ClassSession(
+      subjectId: subjectId,
+      dayIndex: 0, // Monday
+      startTime: "09:00",
+      endTime: "10:00",
+    ),
+  );
+
+  print("Dummy data inserted successfully");
+}
+
+
+
+
 class _TimetableScreenState extends State<TimetableScreen> {
   late int _selectedDayIndex;
+
+  List<Map<String, dynamic>> _classes = [];
 
   final List<String> _days = [
     "Mon",
@@ -27,6 +60,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
   void initState() {
     super.initState();
     final now = DateTime.now();
+    
 
     // DateTime weekday:
     // Monday = 1
@@ -34,6 +68,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
     int todayIndex = now.weekday - 1;
 
     _selectedDayIndex = todayIndex;
+
+    testInsertData();
+    loadClasses();
+
   }
 
   String getFormattedDate() { //for the date shown on the top
@@ -81,6 +119,22 @@ String getFullDayName() { //to get the full name of the day on top bar
 }
 
 
+Future<void> loadClasses() async {
+  final service = TimetableService();
+  final result = await service.getClassesForDay(_selectedDayIndex);
+
+  setState(() {
+    _classes = result;
+  });
+  loadClasses();
+}
+
+
+
+
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -121,13 +175,34 @@ String getFullDayName() { //to get the full name of the day on top bar
           ),
         ),
 
-          const Expanded( //the main expanded body unique for each day (most probably not sure)
-            child: Center(
-              child: Text(
-                "No classes added yet",
-                style: TextStyle(fontSize: 20),
-              ),
-            ),
+          Expanded(
+            child: _classes.isEmpty
+                ? const Center(
+                    child: Text(
+                      "No classes added yet",
+                      style: TextStyle(fontSize: 20),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _classes.length,
+                    itemBuilder: (context, index) {
+                      final item = _classes[index];
+          
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        child: ListTile(
+                          leading: Container(
+                            width: 8,
+                            color: Color(item['color']),
+                          ),
+                          title: Text(item['name']),
+                          subtitle: Text(
+                              "${item['start_time']} - ${item['end_time']}\n${item['teacher']} • ${item['room']}"),
+                        ),
+                      );
+                    },
+                  ),
           ),
 
 
