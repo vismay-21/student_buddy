@@ -12,39 +12,13 @@ class TimetableScreen extends StatefulWidget {
   State<TimetableScreen> createState() => _TimetableScreenState();
 }
 
-void testInsertData() async {
-  final service = TimetableService();
-
-  // Insert Subject
-  int subjectId = await service.insertSubject(
-    Subject(
-      name: "Mathematics",
-      teacher: "Dr. Shah",
-      room: "C-204",
-      color: Colors.blue.value,
-    ),
-  );
-
-  // Insert Class Session
-  await service.insertClassSession(
-    ClassSession(
-      subjectId: subjectId,
-      dayIndex: 0, // Monday
-      startTime: "09:00",
-      endTime: "10:00",
-    ),
-  );
-
-  print("Dummy data inserted successfully");
-}
-
-
 
 
 class _TimetableScreenState extends State<TimetableScreen> {
   late int _selectedDayIndex;
+  late PageController _dayPageController;
+  late Map<int, Future<List<Map<String, dynamic>>>> _dayFutures;
 
-  List<Map<String, dynamic>> _classes = [];
 
   final List<String> _days = [
     "Mon",
@@ -60,6 +34,11 @@ class _TimetableScreenState extends State<TimetableScreen> {
   void initState() {
     super.initState();
     final now = DateTime.now();
+    _dayFutures = {
+      for (int i = 0; i < 7; i++)
+        i: TimetableService().getClassesForDay(i),
+    };
+
     
 
     // DateTime weekday:
@@ -69,10 +48,17 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
     _selectedDayIndex = todayIndex;
 
-    testInsertData();
-    loadClasses();
+    _dayPageController = PageController(initialPage: _selectedDayIndex);
+
 
   }
+
+  @override
+void dispose() {
+  _dayPageController.dispose();
+  super.dispose();
+}
+
 
   String getFormattedDate() { //for the date shown on the top
   final now = DateTime.now();
@@ -116,17 +102,6 @@ String getFullDayName() { //to get the full name of the day on top bar
   DateTime selectedDate = startOfWeek.add(Duration(days: _selectedDayIndex));
 
   return DateFormat('EEEE').format(selectedDate);
-}
-
-
-Future<void> loadClasses() async {
-  final service = TimetableService();
-  final result = await service.getClassesForDay(_selectedDayIndex);
-
-  setState(() {
-    _classes = result;
-  });
-  loadClasses();
 }
 
 
@@ -176,34 +151,59 @@ Future<void> loadClasses() async {
         ),
 
           Expanded(
-            child: _classes.isEmpty
-                ? const Center(
-                    child: Text(
-                      "No classes added yet",
-                      style: TextStyle(fontSize: 20),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _classes.length,
-                    itemBuilder: (context, index) {
-                      final item = _classes[index];
-          
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        child: ListTile(
-                          leading: Container(
-                            width: 8,
-                            color: Color(item['color']),
-                          ),
-                          title: Text(item['name']),
-                          subtitle: Text(
-                              "${item['start_time']} - ${item['end_time']}\n${item['teacher']} • ${item['room']}"),
+            child: PageView.builder(
+              controller: _dayPageController,
+              itemCount: 7,
+              onPageChanged: (index) {
+                setState(() {
+                  _selectedDayIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _dayFutures[index],
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          "No classes added yet",
+                          style: TextStyle(fontSize: 20),
                         ),
                       );
-                    },
-                  ),
+                    }
+
+                    final classes = snapshot.data!;
+
+                    return ListView.builder(
+                      itemCount: classes.length,
+                      itemBuilder: (context, i) {
+                        final item = classes[i];
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: ListTile(
+                            leading: Container(
+                              width: 8,
+                              color: Color(item['color']),
+                            ),
+                            title: Text(item['name']),
+                            subtitle: Text(
+                                "${item['start_time']} - ${item['end_time']}\n${item['teacher']} • ${item['room']}"),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
+
 
 
           SizedBox( //the days bar 
@@ -219,9 +219,11 @@ Future<void> loadClasses() async {
                   return Expanded(
                     child: GestureDetector(
                     onTap: () {
-                      setState(() {
-                        _selectedDayIndex = index;
-                      });
+                      _dayPageController.animateToPage(
+                        index,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
                     },
 
                     child: Container(
