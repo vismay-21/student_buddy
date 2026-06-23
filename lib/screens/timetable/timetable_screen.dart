@@ -152,7 +152,9 @@ class _TimetableScreenState extends State<TimetableScreen> {
                         duration: const Duration(milliseconds: 300),
                         curve: Curves.easeInOut,
                       ),
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           color: isSelected ? AppTheme.primary : AppTheme.surfaceLight,
@@ -160,15 +162,26 @@ class _TimetableScreenState extends State<TimetableScreen> {
                           border: Border.all(
                             color: isSelected ? Colors.transparent : const Color(0xFF1E293B),
                           ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: AppTheme.primary.withAlpha(60),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ]
+                              : null,
                         ),
                         alignment: Alignment.center,
-                        child: Text(
-                          _daysShort[index],
+                        child: AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeInOut,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: isSelected ? Colors.white : AppTheme.textSecondary,
                           ),
+                          child: Text(_daysShort[index]),
                         ),
                       ),
                     ),
@@ -238,24 +251,29 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
             // Time column (start & end)
             SizedBox(
-              width: 52,
+              width: 60,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     lecture.startTime,
                     style: TextStyle(
                       color: cardColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14.5,
+                      letterSpacing: 0.2,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     lecture.endTime,
-                    style: const TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 11,
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white54
+                          : Colors.black54,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11.5,
                     ),
                   ),
                 ],

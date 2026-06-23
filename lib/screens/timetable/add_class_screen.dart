@@ -80,7 +80,94 @@ class _AddClassScreenState extends State<AddClassScreen> {
     final picked = await showTimePicker(
       context: context,
       initialTime: initial,
-      initialEntryMode: TimePickerEntryMode.dial,
+      initialEntryMode: TimePickerEntryMode.dialOnly,
+      builder: (BuildContext context, Widget? child) {
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        return Theme(
+          data: ThemeData(
+            useMaterial3: true,
+            brightness: dark ? Brightness.dark : Brightness.light,
+            colorScheme: dark
+                ? const ColorScheme.dark(
+                    primary: AppTheme.primary,
+                    onPrimary: Colors.white,
+                    secondary: AppTheme.secondary,
+                    surface: AppTheme.surface,
+                    onSurface: AppTheme.textPrimary,
+                  )
+                : const ColorScheme.light(
+                    primary: AppTheme.primary,
+                    onPrimary: Colors.white,
+                    secondary: AppTheme.secondary,
+                    surface: AppTheme.lightSurface,
+                    onSurface: AppTheme.lightTextPrimary,
+                  ),
+            inputDecorationTheme: const InputDecorationTheme(
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              isDense: true,
+            ),
+            timePickerTheme: TimePickerThemeData(
+              hourMinuteShape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+              hourMinuteColor: WidgetStateColor.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return AppTheme.primary;
+                }
+                return dark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+              }),
+              hourMinuteTextColor: WidgetStateColor.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return Colors.white;
+                }
+                return dark ? AppTheme.textPrimary : AppTheme.lightTextPrimary;
+              }),
+              hourMinuteTextStyle: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
+              dayPeriodTextStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              dayPeriodShape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              dayPeriodColor: WidgetStateColor.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return AppTheme.primary.withAlpha(50);
+                }
+                return Colors.transparent;
+              }),
+              dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return AppTheme.primary;
+                }
+                return dark ? AppTheme.textSecondary : AppTheme.lightTextSecondary;
+              }),
+              dayPeriodBorderSide: BorderSide(
+                color: dark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                width: 1,
+              ),
+              dialBackgroundColor: dark ? const Color(0xFF121824) : const Color(0xFFF1F5F9),
+              dialHandColor: AppTheme.primary,
+              dialTextColor: WidgetStateColor.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return Colors.white;
+                }
+                return dark ? AppTheme.textSecondary : AppTheme.lightTextSecondary;
+              }),
+              cancelButtonStyle: TextButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                textStyle: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              confirmButtonStyle: TextButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                textStyle: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          child: Transform.scale(
+            scale: 1.15,
+            child: child!,
+          ),
+        );
+      },
     );
 
     if (picked != null && mounted) {
@@ -317,6 +404,8 @@ class _AddClassScreenState extends State<AddClassScreen> {
                   underline: const SizedBox.shrink(),
                   icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primary),
                   style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                  borderRadius: BorderRadius.circular(12),
+                  dropdownColor: Theme.of(context).cardColor,
                   items: templates.map((t) {
                     return DropdownMenuItem<SubjectTemplate>(
                       value: t,
@@ -384,6 +473,8 @@ class _AddClassScreenState extends State<AddClassScreen> {
             underline: const SizedBox.shrink(),
             icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primary),
             style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
+            borderRadius: BorderRadius.circular(12),
+            dropdownColor: Theme.of(context).cardColor,
             items: _days.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
             onChanged: (val) => setState(() => _selectedDay = val),
           ),
@@ -394,7 +485,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
 
   Widget _buildTimeRow() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
           const Icon(Icons.access_time_rounded, size: 20, color: AppTheme.primary),
@@ -425,22 +516,34 @@ class _AddClassScreenState extends State<AddClassScreen> {
     required TimeOfDay? time,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Text(
-            time != null ? _formatTime(time) : 'Tap to set',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: time != null ? AppTheme.primary : AppTheme.textMuted,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppTheme.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              time != null ? _formatTime(time) : 'Tap to set',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: time != null ? AppTheme.primary : AppTheme.textMuted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
