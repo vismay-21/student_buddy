@@ -1,0 +1,804 @@
+======================================================================
+
+STUDENT BUDDY - MASTER REQUIREMENTS DOCUMENT (MRD v2.0)
+
+Version: 2.0
+
+Project Type:
+AI-assisted Student Operating System
+
+======================================================================
+
+1. PRODUCT VISION
+
+Student Buddy is an integrated Student Operating System that combines academic management and optional personal finance management into a single ecosystem.
+
+The primary objective is NOT to add as many features as possible.
+
+The primary objective is:
+
+"Reduce the number of repetitive micro-decisions a student makes every day."
+
+The system will use:
+
+1. WhatsApp Chatbot
+2. Mobile Dashboard App
+
+The app is NOT WhatsApp-first.
+
+It is:
+
+"WhatsApp Assisted + Dashboard Driven Student Operating System"
+
+Users should be able to complete quick actions inside WhatsApp while using the app for visualization, analytics, review and configuration.
+
+The system is designed for a SINGLE USER and NOT for classrooms, CRs or collaborative usage.
+
+======================================================================
+
+2. CORE PRODUCT PHILOSOPHY
+
+The system should reduce daily friction.
+
+Students repeatedly:
+
+- Switch between multiple apps
+- Search for information
+- Ask friends for details
+- Search through WhatsApp groups
+- Track attendance manually
+- Track expenses manually
+- Remember assignment deadlines
+- Remember academic events
+
+Student Buddy should automate these repetitive tasks.
+
+AI should be used only when it genuinely adds value.
+
+The app should prioritize simplicity over feature quantity.
+
+======================================================================
+
+3. USER AUTHENTICATION
+
+Authentication Provider:
+
+Supabase Auth
+
+Login Method:
+
+Phone Number / WhatsApp Number OTP login
+
+No Google login.
+
+No social login.
+
+Single user account.
+
+======================================================================
+
+4. MAJOR MODULES
+
+There are two major modules.
+
+4.1 Academic Module (Mandatory)
+
+4.2 Finance Module (Optional)
+
+Finance can be completely disabled by the user.
+
+Academic module is always enabled.
+
+======================================================================
+
+5. ACADEMIC MODULE
+
+5.1 Timetable Management
+
+Features:
+
+- Weekly repeating timetable
+- Subject creation
+- Faculty information
+- Classroom information
+- Timetable visualization
+- Timetable notifications
+- Timetable OCR import
+- Timetable manual editing
+- Timetable updates
+
+Users should not upload timetables daily.
+
+Users upload once per semester.
+
+======================================================================
+
+5.2 Attendance Management
+
+Features:
+
+- Before lecture reminders
+- After lecture attendance logging
+- Present
+- Absent
+- Cancelled
+
+Attendance calculations:
+
+- Subject-wise attendance percentage
+- Attendance history
+- Attendance trends
+- Safe skip calculation
+- Attendance goal planner
+
+Examples:
+
+Current attendance: 82%
+
+If absent tomorrow:
+80.3%
+
+Safe to skip: Yes
+
+Target attendance: 85%
+
+Attend next 6 lectures continuously.
+
+Attendance is tracked subject-wise and NOT globally.
+
+Both WhatsApp and mobile app can update attendance.
+
+======================================================================
+
+5.3 Assignment Tracker
+
+Purpose:
+
+Simple reminder system.
+
+Not a task management application.
+
+Features:
+
+- Create assignment reminders
+- Due date reminders
+- Pending assignments
+- Completed assignments
+- WhatsApp queries
+
+Examples:
+
+"DBMS assignment due Friday"
+
+"How many assignments are pending?"
+
+The system should only focus on reminding.
+
+======================================================================
+
+5.4 Notes Repository
+
+Features:
+
+Store:
+
+- PDF
+- PPT
+- DOCX
+- Images
+
+User flow:
+
+User forwards file to WhatsApp.
+
+User mentions:
+
+- Subject
+- Unit
+
+System stores automatically.
+
+Retrieval methods:
+
+WhatsApp:
+
+"Send CN Unit 2 notes"
+
+App:
+
+Browse all notes visually.
+
+Notes are organized:
+
+Semester
+↓
+Subject
+↓
+Unit
+
+======================================================================
+
+5.5 Academic Calendar
+
+Features:
+
+Users can add:
+
+- Holidays
+- Semester events
+- Internal exams
+- External exams
+- Submission deadlines
+
+Purpose:
+
+Attendance calculations should ignore holidays.
+
+The calendar also feeds notification generation.
+
+======================================================================
+
+6. FINANCE MODULE (OPTIONAL)
+
+Users may disable this module entirely.
+
+======================================================================
+
+6.1 Finance Accounts
+
+Users can create multiple accounts.
+
+Examples:
+
+- UPI
+- Cash
+- Savings
+- Pocket Money
+
+Features:
+
+- Add account
+- Delete account
+- Edit account
+- Default account selection
+
+Balances are shared globally.
+
+Transfers between accounts are supported.
+
+======================================================================
+
+6.2 Expense Tracking
+
+Natural language supported.
+
+Examples:
+
+"Spent ₹250 on lunch"
+
+AI extracts:
+
+Amount
+Type
+Category
+Account
+
+======================================================================
+
+6.3 Income Tracking
+
+Examples:
+
+"Received ₹5000 stipend"
+
+AI extracts:
+
+Amount
+Source
+Account
+
+======================================================================
+
+6.4 Categories
+
+User can:
+
+- Create categories
+- Edit categories
+- Delete categories
+
+Both income and expense categories are customizable.
+
+======================================================================
+
+6.5 Analytics
+
+Features:
+
+- Monthly spending
+- Category breakdown
+- Expense history
+- Budget tracking
+
+Examples:
+
+"What did I spend most on this month?"
+
+======================================================================
+
+7. REVIEW QUEUE SYSTEM
+
+This is one of the most important features.
+
+Purpose:
+
+Human verification when confidence is low.
+
+Examples:
+
+"Spent ₹500"
+
+AI knows:
+
+Amount = 500
+
+AI does not know:
+
+Category
+
+======================================================================
+
+7.1 Rule 1
+
+If only a SMALL piece of information is missing:
+
+Ask immediately inside WhatsApp.
+
+Example:
+
+"Which account was used?
+
+1. UPI
+
+2. Cash
+
+3. Savings"
+
+======================================================================
+
+7.2 Rule 2
+
+If the user does not answer:
+
+Send to Review Queue.
+
+======================================================================
+
+7.3 Rule 3
+
+Complex ambiguities go directly to Review Queue.
+
+Examples:
+
+- OCR mistakes
+- File classification uncertainty
+- Multiple interpretations
+
+======================================================================
+
+7.4 Review Queue Location
+
+Review Queue is APP ONLY.
+
+Never inside WhatsApp.
+
+======================================================================
+
+8. NOTIFICATION SYSTEM
+
+Users can configure:
+
+ON/OFF
+
+Features:
+
+- Morning digest
+- Before lecture reminders
+- After lecture reminders
+- Assignment reminders
+- Night digest
+
+Notification timings should be customizable.
+
+======================================================================
+
+9. MORNING DIGEST
+
+Possible contents:
+
+Good Morning 👋
+
+Today's schedule
+
+09:00 DBMS (B-204)
+
+11:00 CN (A-102)
+
+Assignment:
+
+Maths assignment due tomorrow
+
+Attendance:
+
+DBMS 78%
+
+Can safely skip 1 lecture
+
+Finance:
+
+₹1200 remaining this month
+
+======================================================================
+
+10. NIGHT DIGEST
+
+Possible contents:
+
+Today's expenses
+
+Attendance updated
+
+Assignments due
+
+Tomorrow's lectures
+
+Other relevant summaries
+
+======================================================================
+
+11. SEMESTER MANAGEMENT
+
+This should be introduced AFTER explaining all major features to avoid confusion.
+
+Every major entity belongs to a semester.
+
+Examples:
+
+Semester 1
+
+Semester 2
+
+Semester 3
+
+Semester 4
+
+Features:
+
+- Semester selection
+- Semester switching
+- Semester summary
+
+Semester summary may include:
+
+Academic:
+
+- Attendance
+- Subjects
+- Assignments
+
+Finance:
+
+Optional
+
+Semester implementation should remain simple.
+
+======================================================================
+
+12. AI PHILOSOPHY
+
+AI MUST NOT be used everywhere.
+
+Rule:
+
+If deterministic logic can solve a problem, do NOT use AI.
+
+Use:
+
+- Arithmetic
+- SQL
+- Scheduling
+- Business logic
+
+before AI.
+
+======================================================================
+
+13. AREAS WHERE AI WILL NOT BE USED
+
+- Attendance calculations
+- Attendance prediction
+- Attendance goals
+- Timetable display
+- Dashboard generation
+- Finance calculations
+- Monthly summaries
+- Scheduled notifications
+- Morning digests
+- Night digests
+
+These are deterministic systems.
+
+======================================================================
+
+14. AREAS WHERE AI WILL BE USED
+
+14.1 Natural Language Understanding
+
+Examples:
+
+"Spent ₹250 on lunch"
+
+"Present in DBMS"
+
+"DBMS assignment due Friday"
+
+"Send CN Unit 2 notes"
+
+AI converts natural language into structured data.
+
+======================================================================
+
+14.2 Context Engine
+
+AI prioritizes information.
+
+Example:
+
+Tomorrow:
+
+3 lectures
+
+2 assignments
+
+Internal exam in 2 days
+
+AI decides priorities.
+
+======================================================================
+
+14.3 Semester Drift Detection
+
+AI detects long term patterns.
+
+Examples:
+
+- Falling attendance
+- Rising expenses
+- Delayed assignments
+
+======================================================================
+
+14.4 Cognitive Load Balancer
+
+AI detects heavy weeks.
+
+Example:
+
+5 submissions
+
+2 internals
+
+AI suggests priorities.
+
+======================================================================
+
+14.5 Decision Assistant
+
+Examples:
+
+"Should I attend today's lecture?"
+
+AI reasons using multiple data sources.
+
+======================================================================
+
+15. TECH STACK
+
+Mobile App: Flutter
+
+Language: Dart
+
+WhatsApp: Meta Cloud API
+
+Backend: Python
+
+Backend Framework: FastAPI
+
+Cloud Database: Supabase PostgreSQL
+
+Offline Database: SQLite
+
+Authentication: Supabase Auth
+
+Cloud Storage: Supabase Storage
+
+AI: Gemini API
+
+Vision AI: Gemini Vision
+
+Scheduler: APScheduler
+
+Deployment: Railway
+
+State Management: Riverpod
+
+======================================================================
+
+16. SYSTEM ARCHITECTURE
+
+Flutter App
+       │
+WhatsApp Bot
+       │
+           ▼
+FastAPI Backend
+       │
+ ┌─────┼───────┬─────────┬─────────┬──────────┐
+ │             │         │         │          │
+ ▼                      ▼              ▼               ▼                ▼
+PostgreSQL  Storage  Gemini AI  Scheduler  SQLite Sync
+
+======================================================================
+
+17. OFFLINE SUPPORT
+
+ASSUMPTION #1
+
+If internet is unavailable:
+
+Mobile app should continue to work.
+
+WhatsApp will not work.
+
+When internet returns:
+
+Auto synchronization should happen.
+
+======================================================================
+
+18. SINGLE SOURCE OF TRUTH
+
+Cloud Database:
+
+Supabase PostgreSQL
+
+Everything eventually syncs here.
+
+WhatsApp
+↓
+FastAPI
+↓
+Supabase
+
+Flutter
+↓
+FastAPI
+↓
+Supabase
+
+======================================================================
+
+19. ASSUMPTION #2
+
+The app and WhatsApp bot work together.
+
+Neither should function as a completely independent product.
+
+======================================================================
+
+20. RECOMMENDED FOLDER STRUCTURE (FLEXIBLE)
+
+This structure is NOT mandatory.
+
+AI coding tools may modify it if needed.
+
+Overall Project:
+
+student_buddy/
+
+mobile_app/
+
+backend/
+
+docs/
+
+------------------------------------------------
+
+Flutter (recommended)
+
+lib/
+
+core/
+
+models/
+
+services/
+
+repositories/
+
+providers/
+
+screens/
+
+widgets/
+
+utils/
+
+config/
+
+------------------------------------------------
+
+FastAPI (recommended)
+
+backend/
+
+app/
+
+api/
+
+models/
+
+schemas/
+
+services/
+
+repositories/
+
+scheduler/
+
+ai/
+
+utils/
+
+The structure should remain flexible and may evolve as the project grows.
+
+======================================================================
+
+21. FUTURE SCOPE
+
+- AI Study Planner
+- Exam Planner
+- Resume Tracker
+- Voice Support
+- Advanced Semester Analytics
+- More AI recommendations if genuinely useful
+
+======================================================================
+
+22. FINAL PRODUCT PRINCIPLE
+
+Student Buddy is NOT:
+
+An attendance app
+
+A finance app
+
+A timetable app
+
+A notes app
+
+A chatbot
+
+Student Buddy is:
+
+"A system that remembers things so students don't have to."
+
+The goal is not feature accumulation.
+
+The goal is friction reduction.
+
+======================================================================
+
+END OF MRD v2.0
+
+======================================================================

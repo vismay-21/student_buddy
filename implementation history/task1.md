@@ -1,0 +1,24 @@
+# Task List - Student Buddy Phase 1 Redesign
+
+- `[x]` Phase 1A: Setup & Auth & Core Shell
+  - `[x]` Clean up legacy files and remove widget_test.dart
+  - `[x]` Create core theme (app_theme.dart)
+  - `[x]` Create app state (app_state.dart) & mock data (dummy_data.dart)
+  - `[x]` Create Splash screen
+  - `[x]` Create Login screen
+  - `[x]` Create OTP screen
+  - `[x]` Create App drawer (right side)
+  - `[x]` Create Navigation Shell (bottom navigation with dynamic tabs + AppBar + drawer key)
+  - `[x]` Create Overview screen (dashboard cards)
+- `[x]` Phase 1B: Primary Screens
+  - `[x]` Create Timetable screen (top day/date, lecture cards, horizontal day selector, add dialog)
+  - `[x]` Create Attendance screen (goal/trend, CustomPainter circular progress rings, status buttons)
+  - `[x]` Create Finance screen (Account swipeable cards, monthly flows, recent transactions list, analytics charts, transaction add modals)
+- `[x]` Phase 1C: Drawer Screens & Settings
+  - `[x]` Create Assignments screen (tabbed status, priority levels)
+  - `[x]` Create Notes screen (subject accordion, Unit docs list)
+  - `[x]` Create Review Queue screen (Approve/Edit/Delete ambiguous items)
+  - `[x]` Create Settings screen (digests/notifications toggles, Default account selectors, Category managers, Semester Selection screen)
+- `[ ]` Verification
+  - `[x]` Clean up main.dart & test/widget_test.dart
+  - `[ ]` Run flutter analyze & verify compilation
