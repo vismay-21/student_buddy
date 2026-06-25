@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/app_state.dart';
-import '../core/widgets/app_drawer.dart';
 import 'attendance/attendance_screen.dart';
 import 'finance/finance_screen.dart';
+import 'notes/notes_screen.dart';
 import 'overview/overview_screen.dart';
 import 'settings/settings_screen.dart';
 import 'timetable/timetable_screen.dart';
+import 'todo/todo_screen.dart';
 
 class NavigationShell extends StatefulWidget {
   const NavigationShell({super.key});
@@ -16,25 +17,24 @@ class NavigationShell extends StatefulWidget {
 }
 
 class _NavigationShellState extends State<NavigationShell> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _selectedIndex = 0; // Overview tab by default (usually index 0)
+  int _selectedIndex = 1; // Default index is 1 (Overview)
 
   // Pages structure based on whether Finance is enabled
   List<Widget> _getPages(bool isFinanceEnabled) {
     if (isFinanceEnabled) {
       return const [
+        TodoScreen(),
         OverviewScreen(),
         TimetableScreen(),
         AttendanceScreen(),
         FinanceScreen(),
-        SettingsScreen(),
       ];
     } else {
       return const [
+        TodoScreen(),
         OverviewScreen(),
         TimetableScreen(),
         AttendanceScreen(),
-        SettingsScreen(),
       ];
     }
   }
@@ -44,28 +44,28 @@ class _NavigationShellState extends State<NavigationShell> {
     if (isFinanceEnabled) {
       switch (index) {
         case 0:
-          return 'Student Buddy';
+          return 'To Do';
         case 1:
-          return 'Timetable';
+          return 'Student Buddy';
         case 2:
-          return 'Attendance';
+          return 'Timetable';
         case 3:
-          return 'Finance';
+          return 'Attendance';
         case 4:
-          return 'Settings';
+          return 'Finance';
         default:
           return 'Student Buddy';
       }
     } else {
       switch (index) {
         case 0:
-          return 'Student Buddy';
+          return 'To Do';
         case 1:
-          return 'Timetable';
+          return 'Student Buddy';
         case 2:
-          return 'Attendance';
+          return 'Timetable';
         case 3:
-          return 'Settings';
+          return 'Attendance';
         default:
           return 'Student Buddy';
       }
@@ -85,44 +85,32 @@ class _NavigationShellState extends State<NavigationShell> {
         }
 
         return Scaffold(
-          key: _scaffoldKey,
-          endDrawer: const AppDrawer(),
           appBar: AppBar(
             automaticallyImplyLeading: false,
             title: Text(_getPageTitle(_selectedIndex, isFinanceEnabled)),
             actions: [
-              // Active Semester Badge
-              ValueListenableBuilder<String>(
-                valueListenable: AppState.instance.activeSemester,
-                builder: (context, semester, _) {
-                  return Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceLight,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF1E293B)),
-                    ),
-                    child: Text(
-                      semester,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+              _buildTopRightAction(
+                context,
+                icon: Icons.folder_shared_rounded,
+                label: 'Notes',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const NotesScreen()),
                   );
                 },
               ),
-              // Menu hamburger icon for endDrawer
-              IconButton(
-                icon: const Icon(Icons.menu_rounded),
-                tooltip: 'Open sidebar menu',
-                onPressed: () {
-                  _scaffoldKey.currentState?.openEndDrawer();
+              const SizedBox(width: 8),
+              _buildTopRightAction(
+                context,
+                icon: Icons.settings_rounded,
+                label: 'Settings',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  );
                 },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 16),
             ],
           ),
           body: pages[_selectedIndex],
@@ -140,9 +128,49 @@ class _NavigationShellState extends State<NavigationShell> {
     );
   }
 
+  Widget _buildTopRightAction(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: AppTheme.primary,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<BottomNavigationBarItem> _getBottomNavBarItems(bool isFinanceEnabled) {
     if (isFinanceEnabled) {
       return const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.assignment_turned_in_rounded),
+          label: 'To Do',
+        ),
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_rounded),
           label: 'Overview',
@@ -159,13 +187,13 @@ class _NavigationShellState extends State<NavigationShell> {
           icon: Icon(Icons.account_balance_wallet_rounded),
           label: 'Finance',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.settings_rounded),
-          label: 'Settings',
-        ),
       ];
     } else {
       return const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.assignment_turned_in_rounded),
+          label: 'To Do',
+        ),
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_rounded),
           label: 'Overview',
@@ -177,10 +205,6 @@ class _NavigationShellState extends State<NavigationShell> {
         BottomNavigationBarItem(
           icon: Icon(Icons.fact_check_rounded),
           label: 'Attendance',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.settings_rounded),
-          label: 'Settings',
         ),
       ];
     }

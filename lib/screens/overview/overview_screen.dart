@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/utils/dummy_data.dart';
-import '../assignments/assignments_screen.dart';
+import '../todo/todo_screen.dart';
 import '../notes/notes_screen.dart';
 import '../review_queue/review_queue_screen.dart';
 
@@ -41,10 +41,11 @@ class OverviewScreen extends StatelessWidget {
               children: [
                 Expanded(child: _buildAttendanceSummaryCard(context)),
                 const SizedBox(width: 12),
-                Expanded(child: _buildAssignmentsSummaryCard(context)),
+                Expanded(child: _buildTodoSummaryCard(context)),
               ],
             ),
             const SizedBox(height: 12),
+            _buildReviewQueueCard(context),
             _buildSafeSkipCard(context),
             const SizedBox(height: 24),
 
@@ -289,18 +290,18 @@ class OverviewScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAssignmentsSummaryCard(BuildContext context) {
-    final pendingCount = DummyData.assignments.where((a) => !a.isCompleted).length;
+  Widget _buildTodoSummaryCard(BuildContext context) {
+    final pendingCount = DummyData.todoItems.where((a) => !a.isCompleted).length;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.assignment_rounded, color: AppTheme.secondary, size: 24),
+            const Icon(Icons.assignment_turned_in_rounded, color: AppTheme.secondary, size: 24),
             const SizedBox(height: 12),
             const Text(
-              'Assignments',
+              'To Do',
               style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 4),
@@ -494,10 +495,10 @@ class OverviewScreen extends StatelessWidget {
       children: [
         _buildShortcutItem(
           context: context,
-          icon: Icons.assignment_rounded,
+          icon: Icons.assignment_turned_in_rounded,
           color: AppTheme.secondary,
-          label: 'Assignments',
-          destination: const AssignmentsScreen(),
+          label: 'To Do',
+          destination: const TodoScreen(),
         ),
         _buildShortcutItem(
           context: context,
@@ -580,6 +581,58 @@ class OverviewScreen extends StatelessWidget {
                   ),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+  Widget _buildReviewQueueCard(BuildContext context) {
+    final pendingReviews = DummyData.reviewQueue.length;
+    if (pendingReviews == 0) return const SizedBox.shrink();
+
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      color: AppTheme.danger.withOpacity(0.08),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppTheme.danger.withOpacity(0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '$pendingReviews item${pendingReviews > 1 ? "s" : ""} need your review',
+                style: const TextStyle(
+                  color: AppTheme.danger,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.danger,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ReviewQueueScreen()),
+                );
+              },
+              child: const Text(
+                'Review Now',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
       ),

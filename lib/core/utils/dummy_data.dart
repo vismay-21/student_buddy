@@ -76,21 +76,29 @@ class TransactionMock {
   });
 }
 
-class AssignmentMock {
+class TodoMock {
   final String id;
   final String title;
   final String subject;
   final String dueDateString;
   final String cognitiveLoad; // 'Low', 'Medium', 'High'
   final bool isCompleted;
+  final String? description;
+  final String? dueTime;
+  final bool repeatTask;
+  final String createdBy; // 'Manual', 'WhatsApp', 'AI', 'OCR'
 
-  const AssignmentMock({
+  const TodoMock({
     required this.id,
     required this.title,
     required this.subject,
     required this.dueDateString,
     required this.cognitiveLoad,
     required this.isCompleted,
+    this.description,
+    this.dueTime,
+    this.repeatTask = false,
+    this.createdBy = 'Manual',
   });
 }
 
@@ -205,11 +213,11 @@ class DummyData {
     TransactionMock(id: 't6', title: 'Movie Ticket', amount: 250.00, isIncome: false, category: 'Entertainment', account: 'UPI (GPay/PhonePe)', dateString: '15 Jun, 8:00 PM'),
   ];
 
-  static const List<AssignmentMock> assignments = [
-    AssignmentMock(id: 'asg1', title: 'DBMS Normalization Assignment', subject: 'Database Management Systems', dueDateString: 'Tomorrow, 11:59 PM', cognitiveLoad: 'High', isCompleted: false),
-    AssignmentMock(id: 'asg2', title: 'CN Socket Programming Lab', subject: 'Computer Networks', dueDateString: 'Fri, 26 Jun', cognitiveLoad: 'Medium', isCompleted: false),
-    AssignmentMock(id: 'asg3', title: 'DAA Red-Black Tree Coding', subject: 'Design & Analysis of Algorithms', dueDateString: 'Mon, 29 Jun', cognitiveLoad: 'High', isCompleted: false),
-    AssignmentMock(id: 'asg4', title: 'SE Requirement Specification', subject: 'Software Engineering', dueDateString: 'Completed 2 days ago', cognitiveLoad: 'Low', isCompleted: true),
+  static const List<TodoMock> todoItems = [
+    TodoMock(id: 'asg1', title: 'DBMS Normalization Assignment', subject: 'Database Management Systems', dueDateString: 'Tomorrow, 11:59 PM', cognitiveLoad: 'High', isCompleted: false),
+    TodoMock(id: 'asg2', title: 'CN Socket Programming Lab', subject: 'Computer Networks', dueDateString: 'Fri, 26 Jun', cognitiveLoad: 'Medium', isCompleted: false),
+    TodoMock(id: 'asg3', title: 'DAA Red-Black Tree Coding', subject: 'Design & Analysis of Algorithms', dueDateString: 'Mon, 29 Jun', cognitiveLoad: 'High', isCompleted: false),
+    TodoMock(id: 'asg4', title: 'SE Requirement Specification', subject: 'Software Engineering', dueDateString: 'Completed 2 days ago', cognitiveLoad: 'Low', isCompleted: true),
   ];
 
   static const List<NotesSubjectMock> notesRepo = [

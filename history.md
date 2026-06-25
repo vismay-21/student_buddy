@@ -52,3 +52,162 @@ This log tracks architectural decisions, feature implementations, and refinement
 
 ### Upcoming Session Focus
 * Transitioning to the **Attendance Module** to refine progress overlays, target tracking calculations, and log screens.
+
+---
+
+### Session: 2026-06-24 - Attendance Module Redesign (Phase 1 UI)
+
+1. **Attendance Screen Redesign**:
+   * Removed single-page subject listing. Introduced a 4-tab sub-navigation shell inside `AttendanceScreen` (Today, History, Subjects, Settings).
+   * Swapped views reactively using a custom container matching the glassmorphism theme.
+2. **Unified State Management**:
+   * Designed local, notifier-like state maps in `_AttendanceScreenState` storing date-wise logs (`_dateActions`), target configuration, semester dates, and holidays.
+   * Computed dynamic calculations on the fly for attended/total ratios, skip statuses, and target planner advice.
+3. **Sub-Navigation Tabs Implementation**:
+   * **Today Tab**: Interactive logging of today's classes from the timetable with a "Whole Day Actions" panel for batch modifications.
+   * **History Tab**: Monthly scrolling calendar displaying color-coded status dots (Green, Red, Orange, Purple, Grey) for days, accompanied by Month Day and Lecture summaries and selective log-modifier checklists.
+   * **Subjects Tab**: Read-only semester subjects dashboard with custom progress indicators and advice planner widgets.
+   * **Settings Tab**: Configuration tools for Target modes (Subject-Wise vs Overall), Target %, Semester Durations, and manual Holiday logging (with OCR import layout).
+4. **Riverpod Readiness**:
+   * Restructured all modules to run on pure callbacks and properties, ready to swap to a Riverpod Provider without altering components.
+5. **Layout Tweaks (Feedback Updates)**:
+   * Reversed the "Mark Whole Day" button sequence to: `[Clear]`, `[Day Off]`, `[Missed]`, `[Attended]`.
+   * Added corresponding icons to each "Mark Whole Day" button matched by text labels inside a scaling FittedBox container.
+   * Removed the redundant "TODAY'S LECTURES" title header from the Today tab view.
+   * Reduced the height of the bottom sub-navigation tab bar to 52 for a more compact and elegant layout.
+
+---
+
+### Session: 2026-06-24 - Attendance Module Enhancements (Layout, Navigation & Criteria Customization)
+
+* **History Tab Rearrangement**:
+  * Moved the Monthly Day Summary and Monthly Lecture Stats cards to the top of the History screen.
+  * Consolidated the Monthly Lecture Stats layout to present all 5 metrics (`Total`, `Attended`, `Missed`, `Off`, and `Attendance %`) side-by-side in a single row.
+  * Configured the Month Calendar swiping direction to `Axis.horizontal` for horizontal month-changing.
+* **Subjects Tab Navigation**:
+  * Made subject cards interactive. Tapping a card navigates to `SubjectHistoryScreen`.
+  * Built `SubjectHistoryScreen` with a custom stats header card (including a progress ring showing the criteria and a calculated advice text) and a reverse-chronological list of semester classes where users can manually log attendances.
+* **Settings Tab Criteria Modifications**:
+  * Renamed all occurrences of "Target" to "Criteria" across the UI.
+  * Set the Criteria slider divisions to `10` to enable jumps/increments of 5%.
+  * Added 3 Criteria Mode options: `Overall Average`, `Subject-Wise`, and `Subject-Wise Custom`.
+  * Built a custom subject-criteria configurator dialog that displays when `Subject-Wise Custom` is selected, letting users configure percentage criteria for each subject individually.
+  * Added a `Default Days Off` setting supporting `None`, `Sunday Only`, and `Saturday & Sunday` which automatically registers those days as off in statistics calculations.
+* **Verification & Compile Cleanliness**:
+  * Ran static analysis showing 0 compile errors. The Attendance Module layout, settings, and navigation redesign are fully complete.
+
+---
+
+### Session: 2026-06-24 - History Date Modals and Space Optimizations
+
+* **DayHistoryScreen Implementation**:
+  * Created `DayHistoryScreen` inside `day_history_screen.dart` to show a dedicated logs detail view for any calendar day.
+  * Tapping any calendar date cell in the `HistoryTab` now opens `DayHistoryScreen` showing the list of scheduled lectures and quick-toggle action cards.
+  * Removed the bottom scrolling logs list from the main `HistoryTab` view to eliminate scrolling and let all monthly stats fit on the screen.
+* **Settings Tab Professional Layout**:
+  * Replaced the previous choice chips for Criteria Mode selection with a sleek, custom Segmented Control containing `Overall`, `Subject-Wise`, and `Custom` segments on a single line.
+  * Removed the redundant "Select Default Days Off" text label from the default days off card, presenting only the choice chips to maximize vertical screen efficiency.
+* **Verification & Compilation Cleanliness**:
+  * Ran static analysis showing 0 compile errors or warnings in the newly added files.
+
+---
+
+### Session: 2026-06-24 - Attendance UI Refinements (Row Merging, DBMS Default, and Chevrons)
+
+* **Semester Duration Row Merging**:
+  * Merged Semester Start Date and Semester End Date selectors into a single row inside a unified card, separated by a vertical divider, saving massive vertical screen height.
+* **Custom Subject Criteria Dynamic Slider Defaulting**:
+  * Configured all custom criteria to dynamically default to the slider criteria percentage (e.g. 95%), treating all subjects equally without hardcoding.
+* **Day History Bulk Actions**:
+  * Implemented a "Mark Whole Day" button bar panel inside `DayHistoryScreen` matching the Today tab layout to quickly clear or log all classes for that selected date in bulk.
+* **Calendar Swipe & Chevron Navigation**:
+  * Configured `BouncingScrollPhysics` for PageView.builder to ensure horizontal month dragging is extremely light and responsive.
+  * Added left/right chevron buttons in the calendar header for instant month changes.
+
+---
+
+### Session: 2026-06-24 - Navigation Architecture Refactor
+
+* **Rename Assignments to To Do**:
+  * Renamed folders (`assignments/` -> `todo/`), files (`assignments_screen.dart` -> `todo_screen.dart`), classes (`AssignmentsScreen` -> `TodoScreen`), models (`AssignmentMock` -> `TodoMock`), mock variables (`assignments` -> `todoItems`), and descriptions across the codebase to unified "To Do" naming.
+* **Drawer Removal**:
+  * Deleted `lib/core/widgets/app_drawer.dart` completely.
+  * Removed hamburger menu references, keys, and icon buttons.
+* **AppBar Top-Right Actions**:
+  * Replaced active semester pill and hamburger icon in `NavigationShell` AppBar with two compact, custom-styled action items: Notes (📁 Notes) and Settings (⚙️ Settings).
+  * Clicking them opens the respective screen as a pushed page.
+* **Bottom Navigation Restructuring**:
+  * Reordered bottom navigation items to: `To Do` | `Overview` | `Timetable` | `Attendance` | `Finance` (optional/dynamic).
+  * Removed Settings from the bottom bar.
+  * Set default active tab to `1` (Overview tab).
+* **Settings Screen Refactoring**:
+  * Wrapped `SettingsScreen` in a Scaffold with its own AppBar featuring back chevron navigation.
+  * Cleaned up and removed all Finance category/account setup sections.
+  * Added new Activity Timeline and About cards.
+* **Review Queue Widget Integration**:
+  * Removed Review Queue from primary navigation and side drawer.
+  * Embedded a conditional warning card (`_buildReviewQueueCard`) into the `OverviewScreen` dashboard column which displays `X items need your review [Review Now]` only when pending reviews > 0.
+* **To Do Screen Double Header Fix**:
+  * Removed nested Scaffold and nested AppBar in `TodoScreen`. Rendered the TabBar and TabBarView directly inside a Column layout, resolving double title display.
+* **Top-Right Actions Size Tweaks**:
+  * Slightly increased the dimensions of the top-right Notes and Settings action buttons: updated icon sizes from 18 to 22, and font sizes from 10 to 12.
+* **Verification & Compilation Cleanliness**:
+  * Ran static analysis showing 0 compile errors. All navigation files are fully refactored and cleaned.
+
+---
+
+### Session: 2026-06-24 - To Do Module (Add Task Screen)
+
+* **Add To Do Screen Creation**:
+  * Created `AddTodoScreen` inside `add_todo_screen.dart` featuring input fields for Title, Description, and inline selectors for Due Date (DatePicker) and Due Time (TimePicker).
+  * Optimized vertical spacing by reducing margins, padding, and input heights to fit all form elements on a single page, eliminating the need to scroll when inputting tasks.
+  * Made Due Date fully optional: updated saving validation logic to fallback to "No due date" if none is selected, added clear buttons for Date/Time picker fields, and restricted time picking unless date is selected first.
+* **Priority & Category Selectors**:
+  * Integrated Priority selectors styled after existing colors (Low: Green/Accent, Medium: Orange/Warning, High: Red/Danger).
+  * Shifted the Priority selector card above the Due Schedule card.
+  * Added choice chips for categories (Academic, Personal, Event, Project, Finance, Other).
+  * Added a dynamic text field when "Other" is selected under Categories, enabling users to enter a custom category name.
+  * Added a dedicated **"Add" button** on the top-right of the Category card to add custom categories.
+  * Configured category chips as standard **ChoiceChips**. To prevent accidental deletions, the close button was removed, and categories (except "Other") can now be safely deleted by **holding down/long-pressing** them, which shows a confirmation dialog.
+* **Simplified Form Layout (Description Field Removal)**:
+  * Completely removed the Description field and controller to simplify the task creation/editing experience, preventing clutter.
+* **Due Schedule Enhancements**:
+  * Moved the "Clear" button to the top-right header of the "Due Schedule" card. This resolves tap collisions inside the date/time inkwells and allows clean reset of the due date/time settings.
+* **Future-Proof Placeholder Fields**:
+  * Designed a collapsible "Advanced (Future Features)" panel with disabled placeholders: a switch for "Repeat Task" and a locked dropdown showing "Manual" for task originators (Manual, WhatsApp, AI, OCR).
+* **Floating Action Button Integration**:
+  * Wrapped the main `TodoScreen` in a local Scaffold without an AppBar to cleanly present a Floating Action Button in the bottom right corner without creating double titles.
+  * Clicking the FAB navigates to the `AddTodoScreen` and inserts any returned tasks into the in-memory pending list.
+* **Task Editing Mode**:
+  * Configured `AddTodoScreen` to support editing when initialized with an optional `todoToEdit` parameter.
+  * Wrapped the details portion of each task item card in `TodoScreen` with an `InkWell` to navigate to edit mode, allowing users to modify properties (Title, Priority, Due Date, Time, and Category) and submit the changes back to the main list.
+* **Verification & Compilation Cleanliness**:
+  * Ran static analysis showing 0 compile errors or warnings in the newly added screens.
+
+---
+
+### Session: 2026-06-24 - Notes Repository Enhancements
+
+* **Add Resource Screen Creation**:
+  - Replaced the terminology of "Add File" with "Add Resource" to encompass future file formats (PDF, PPT, DOCX, ZIP, Links, etc.).
+  - Created a dedicated `AddResourceScreen` inside `add_resource_screen.dart` with dropdown fields for Semester, Subject, Unit/Subsection, and an upload button placeholder.
+  - Semester defaults to the active semester (read from `AppState.instance.activeSemester.value` or passed via navigation) and manual creation is blocked.
+  - **Dropdown Pre-selection Logic**: Updated Subject and Subsection fields so that they are left unselected (showing hints like `Select Subject` and `Select Unit / Subsection`) when adding a resource via the FAB, prompting the user to make a choice. Added validation checks requiring selections.
+  - Implemented popups via **"+ Create New Subject"** and **"+ Create New Subsection"** buttons, which dynamically update dropdown values and save custom entries into state.
+  - **Automated Type Detection**: Removed the Resource Type dropdown selector completely. The type is now automatically extracted from the resource name extension (e.g. `.pdf` -> `PDF`), defaulting to `Other` if no extension is matched.
+  - Included a placeholder upload button text showing `"Select Resource (Coming Soon)"`.
+* **Floating Action Button**:
+  - Embedded a custom Floating Action Button (+) in `NotesScreen` matching the existing theme to navigate to the resource creation form.
+* **Editing Existing Resources**:
+  - Extracted individual resource list tiles into a modular component `ResourceCard` inside `resource_card.dart`.
+  - Added an edit button next to the download button in `ResourceCard`. Clicking the edit button navigates to `AddResourceScreen` in edit mode (pre-populating all values).
+  - In edit mode, added actions to "Save Changes", "Delete Resource" (with a deletion confirmation dialog), or "Cancel".
+* **Semester Selection and Filtering**:
+  - Synced the top semester selection dropdown on `NotesScreen` with a `ValueListenableBuilder` listening to `AppState.instance.activeSemester`.
+  - Selecting a semester immediately filters and shows resources matching the active semester.
+  - Pre-seeded different semesters with different mock data sets to ensure switching semesters works dynamically.
+* **Future Storage Architecture**:
+  - Created `notes_config.dart` holding a placeholder setting for the default download folder path (`Downloads/StudentBuddy/`).
+  - Added detailed documentation and architecture block comments detailing future integration with Supabase Storage and lazy loading local file caching.
+* **Verification & Compilation Cleanliness**:
+  - Ran static analysis confirming 0 compile errors in the Notes module.

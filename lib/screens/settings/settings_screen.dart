@@ -11,74 +11,17 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final TextEditingController _categoryController = TextEditingController();
-  final TextEditingController _accountNameController = TextEditingController();
-  final TextEditingController _accountBalanceController = TextEditingController();
-
-  void _addNewCategory() {
-    final String text = _categoryController.text.trim();
-    if (text.isNotEmpty) {
-      AppState.instance.addCategory(text);
-      _categoryController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(backgroundColor: AppTheme.accent, content: Text('Mock category "$text" added!')),
-      );
-    }
-  }
-
-  void _addNewAccount() {
-    final String name = _accountNameController.text.trim();
-    final double? bal = double.tryParse(_accountBalanceController.text.trim());
-    if (name.isNotEmpty && bal != null) {
-      AppState.instance.addAccount(name, bal);
-      _accountNameController.clear();
-      _accountBalanceController.clear();
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(backgroundColor: AppTheme.accent, content: Text('Mock account "$name" added!')),
-      );
-    }
-  }
-
-  void _showAddAccountDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Account (Mock)'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _accountNameController,
-                decoration: const InputDecoration(labelText: 'Account Name'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _accountBalanceController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Initial Balance (₹)'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
-            ),
-            ElevatedButton(
-              onPressed: _addNewAccount,
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Settings'),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -106,32 +49,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildNotificationsCard(),
             const SizedBox(height: 24),
 
-            // Finance Settings (Conditionally shown if Finance module is enabled!)
-            ValueListenableBuilder<bool>(
-              valueListenable: AppState.instance.isFinanceEnabled,
-              builder: (context, financeEnabled, _) {
-                if (!financeEnabled) return const SizedBox.shrink();
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionHeader('FINANCE PREFERENCES'),
-                    const SizedBox(height: 10),
-                    _buildFinancePrefsCard(),
-                    const SizedBox(height: 24),
+            // Activity Timeline
+            _buildSectionHeader('ACTIVITY TIMELINE'),
+            const SizedBox(height: 10),
+            _buildActivityTimelineCard(),
+            const SizedBox(height: 24),
 
-                    _buildSectionHeader('MANAGE CATEGORIES'),
-                    const SizedBox(height: 10),
-                    _buildManageCategoriesCard(),
-                    const SizedBox(height: 24),
-
-                    _buildSectionHeader('MANAGE ACCOUNTS'),
-                    const SizedBox(height: 10),
-                    _buildManageAccountsCard(),
-                    const SizedBox(height: 24),
-                  ],
-                );
-              },
-            ),
+            // About Card
+            _buildSectionHeader('ABOUT'),
+            const SizedBox(height: 10),
+            _buildAboutCard(),
             const SizedBox(height: 20),
           ],
         ),
@@ -322,156 +249,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildFinancePrefsCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Default Finance Account',
-              style: TextStyle(
-                color: AppTheme.textPrimary,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-            ValueListenableBuilder<String>(
-              valueListenable: AppState.instance.defaultAccount,
-              builder: (context, defAcc, _) {
-                return ValueListenableBuilder<List<Map<String, dynamic>>>(
-                  valueListenable: AppState.instance.mockAccountsList,
-                  builder: (context, accounts, _) {
-                    final names = accounts.map((a) => a['name'] as String).toList();
-                    final selected = names.contains(defAcc) ? defAcc : names.first;
-
-                    return DropdownButton<String>(
-                      dropdownColor: AppTheme.surface,
-                      value: selected,
-                      underline: const SizedBox.shrink(),
-                      icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primary),
-                      style: const TextStyle(
-                        color: AppTheme.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                      items: names
-                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          AppState.instance.defaultAccount.value = val;
-                        }
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildManageCategoriesCard() {
+  Widget _buildActivityTimelineCard() {
+    final List<Map<String, String>> timeline = [
+      {'time': 'Today, 10:30 AM', 'event': 'Marked Attendance: DBMS (Attended)'},
+      {'time': 'Yesterday, 4:15 PM', 'event': 'Completed Task: CN Socket Programming Lab'},
+      {'time': '22 Jun, 11:00 AM', 'event': 'Changed Criteria Mode to Overall (85%)'},
+    ];
+    
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        child: ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: timeline.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final item = timeline[index];
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _categoryController,
-                    decoration: InputDecoration(
-                      hintText: 'New Category',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF1E293B), width: 1),
-                      ),
-                    ),
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.primary,
+                    shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _addNewCategory,
-                  icon: const Icon(Icons.add_box_rounded, color: AppTheme.primary, size: 36),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['event']!,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        item['time']!,
+                        style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            ValueListenableBuilder<List<String>>(
-              valueListenable: AppState.instance.categories,
-              builder: (context, cats, _) => Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: cats.map((cat) {
-                  return Chip(
-                    backgroundColor: AppTheme.surfaceLight,
-                    side: const BorderSide(color: Color(0xFF1E293B)),
-                    label: Text(
-                      cat,
-                      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildManageAccountsCard() {
+  Widget _buildAboutCard() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Active Accounts list',
-                  style: TextStyle(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 22),
                 ),
-                TextButton.icon(
-                  onPressed: _showAddAccountDialog,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Account', style: TextStyle(fontSize: 12)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Student Buddy',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'v1.0.0 (Phase 1 Refactored)',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            ValueListenableBuilder<List<Map<String, dynamic>>>(
-              valueListenable: AppState.instance.mockAccountsList,
-              builder: (context, accs, _) => ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: accs.length,
-                separatorBuilder: (context, index) => const Divider(color: Color(0xFF1E293B), height: 1),
-                itemBuilder: (context, index) {
-                  final acc = accs[index];
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(acc['name'], style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
-                    trailing: Text(
-                      '₹${acc['balance'].toStringAsFixed(0)}',
-                      style: const TextStyle(color: AppTheme.accent, fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  );
-                },
-              ),
+            const Text(
+              'Designed to reduce micro-decisions in a student\'s daily life. All your schedules, attendance targets, and task trackers in one unified place.',
+              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.4),
             ),
           ],
         ),

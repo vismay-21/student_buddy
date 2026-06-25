@@ -60,7 +60,7 @@ class _SemesterSelectionScreenState extends State<SemesterSelectionScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Selecting a semester changes the active lectures, attendance goals, assignments, and notes displayed across the entire app.',
+                'Selecting a semester changes the active lectures, attendance goals, tasks, and notes displayed across the entire app.',
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.4),
               ),
               const SizedBox(height: 32),
