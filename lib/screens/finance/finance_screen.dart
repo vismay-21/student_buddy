@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/utils/dummy_data.dart';
+import '../../core/widgets/app_snackbar.dart';
 
 class FinanceScreen extends StatefulWidget {
   const FinanceScreen({super.key});
@@ -78,12 +79,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
               onPressed: () {
                 if (formKey.currentState!.validate()) {
                   Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: AppTheme.accent,
-                      content: Text('Mock transaction "${title}" of ₹$amount successfully recorded!'),
-                    ),
-                  );
+                  AppSnackbar.success(context, 'Mock transaction "${title}" of ₹$amount successfully recorded!');
                 }
               },
               child: const Text('Add'),
@@ -151,12 +147,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
               onPressed: () {
                 if (formKey.currentState!.validate()) {
                   Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: AppTheme.accent,
-                      content: Text('Mock transferred ₹$amount from $fromAcc to $toAcc!'),
-                    ),
-                  );
+                  AppSnackbar.success(context, 'Mock transferred ₹$amount from $fromAcc to $toAcc!');
                 }
               },
               child: const Text('Transfer'),

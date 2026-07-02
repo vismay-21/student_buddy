@@ -139,62 +139,72 @@ student_buddy/
 ├── web/
 ├── backend/                  # Future FastAPI backend
 ├── docs/                     # Documentation files
+│   ├── database/             # Database design documents
+│   │   ├── 04_entity_relationship_diagram.md
+│   │   ├── 1_database_schema.md
+│   │   ├── 2_database_business_flow.md
+│   │   └── 3_database_sync_strategy.md
+│   ├── STUDENT BUDDY DEVELOPMENT ROADMAP DCOUMENT DRD.md
+│   ├── STUDENT BUDDY MASTER REQUIREMENTS DOCUMENT MRD.txt
+│   ├── backend_development_plan.md
+│   ├── context.md            # This file (Project Memory)
+│   └── history.md            # Project decisions & implementation history log
 ├── lib/                      # Flutter source directory
-├── main.dart
-├── core/
-│   ├── models/
-│   │   └── subject_template.dart   # Template model for pre-filling recurring classes
-│   ├── theme/
-│   │   └── app_theme.dart          # Light and Dark theme specifications
-│   ├── utils/
-│   │   ├── app_state.dart
-│   │   └── dummy_data.dart
-│   └── widgets/
-└── screens/
-    ├── attendance/
-    │   ├── widgets/
-    │   │   ├── attendance_calendar_legend.dart    # Colored dot visual indicator key for the monthly calendar view
-    │   │   ├── attendance_day_summary_card.dart   # Summary card showing class logging totals for the active month
-    │   │   ├── attendance_overview_card.dart      # Dashboard header element showing general attendance percentages and warnings
-    │   │   ├── attendance_subject_card.dart       # Detailed course indicator showing targets, log actions, and class metrics
-    │   ├── attendance_screen.dart        # Container hosting sub-navigation tabs (Today, History, Subjects, Settings)
-    │   ├── attendance_settings_tab.dart  # Preferences pane configuring criteria modes, percentages, semester ranges, and holidays
-    │   ├── day_history_screen.dart       # Dedicated logging details screen for a specific selected date
-    │   ├── history_tab.dart              # Month-view pageable calendar covering past school days
-    │   ├── subject_history_screen.dart   # Dedicated history log and action list for a specific academic course
-    │   ├── subjects_tab.dart             # Analytics dashboard list showing targets, rates, and recommendations for all subjects
-    │   └── today_tab.dart                # Current day class logging card layout and bulk whole-day logging actions
-    ├── auth/
-    │   ├── login_screen.dart             # Authentication gateway using phone/WhatsApp input
-    │   └── otp_screen.dart               # Verification page to confirm the user OTP code
-    ├── finance/
-    │   └── finance_screen.dart           # Wallet manager showing card layouts, transaction records, and budgets
-    ├── navigation_shell.dart             # Core layout scaffolding handling app navigation, tab routing, and top-right header actions
-    ├── notes/
-    │   ├── add_resource_screen.dart      # Dedicated screen to add/edit resources with dynamic subjects, units, types, and placeholders
-    │   ├── notes_config.dart             # Storage config and architecture placeholders detailing Supabase/local download caches
-    │   ├── notes_screen.dart             # Class materials organizer grouping resources by Semester, Subject, and Unit with a FAB
-    │   └── resource_card.dart            # Custom component displaying a resource item with download status and edit buttons
-    ├── overview/
-    │   └── overview_screen.dart          # Main dashboard summary showing lectures, attendance warnings, tasks, and financial updates
-    ├── review_queue/
-    │   └── review_queue_screen.dart      # Interface resolving OCR timetable parser conflicts and low-confidence logs
-    ├── settings/
-    │   ├── semester_selection_screen.dart # Preference selector updating the active school semester
-    │   └── settings_screen.dart          # Global toggles for theme selector, active modules, and notification settings
-    ├── splash/
-    │   └── splash_screen.dart            # Initial loading screen verifying configuration and theme choices
-    ├── timetable/
-    │   ├── add_class_screen.dart         # Dedicated screen to add class schedules with templates and clock pickers
-    │   └── timetable_screen.dart         # Interactive weekly calendar detailing daily classroom routines
-    ├── todo/
-    │   ├── add_todo_screen.dart          # Screen for creating new tasks with title, due dates, priority, and category
-    │   └── todo_screen.dart              # Screen listing, sorting, and managing due tasks and reminders
+│   ├── core/
+│   │   ├── models/
+│   │   │   └── subject_template.dart   # Template model for pre-filling recurring classes
+│   │   ├── theme/
+│   │   │   └── app_theme.dart          # Light and Dark theme specifications
+│   │   ├── utils/
+│   │   │   ├── app_state.dart
+│   │   │   └── dummy_data.dart
+│   │   └── widgets/
+│   │       ├── app_snackbar.dart                  # Premium global floating SnackBar notification helper
+│   │       ├── expandable_section.dart            # Reusable collapsible dashboard section widget
+│   │       └── attendance_ring_label.dart         # Custom percentage fraction indicator widget
+│   ├── screens/
+│   │   ├── attendance/
+│   │   │   ├── widgets/
+│   │   │   │   ├── attendance_calendar_legend.dart    # Colored dot visual indicator key for the monthly calendar view
+│   │   │   │   ├── attendance_analytics_card.dart     # Consolidated card displaying monthly day summary and lecture statistics
+│   │   │   │   ├── attendance_overview_card.dart      # Dashboard header element showing general attendance percentages
+│   │   │   │   └── lecture_card.dart                  # Reusable unified card displaying timetable layout and attendance metrics
+│   │   │   ├── attendance_screen.dart        # Container hosting sub-navigation tabs (History, Subjects, Settings)
+│   │   │   ├── attendance_settings_tab.dart  # Preferences pane configuring criteria modes, percentages, semester ranges, and holidays
+│   │   │   ├── day_history_screen.dart       # Dedicated logging details screen for a specific selected date
+│   │   │   ├── history_tab.dart              # Month-view pageable calendar covering past school days
+│   │   │   ├── subject_history_screen.dart   # Dedicated history log and action list for a specific academic course
+│   │   │   └── subjects_tab.dart             # Analytics dashboard list showing targets, rates, and recommendations
+│   │   ├── auth/
+│   │   │   ├── login_screen.dart             # Authentication gateway using phone/WhatsApp input
+│   │   │   └── otp_screen.dart               # Verification page to confirm the user OTP code
+│   │   ├── finance/
+│   │   │   └── finance_screen.dart           # Wallet manager showing card layouts, transaction records, and budgets
+│   │   ├── navigation_shell.dart             # Core layout scaffolding handling app navigation, tab routing, and top-right header actions
+│   │   ├── notes/
+│   │   │   ├── add_resource_screen.dart      # Dedicated screen to add/edit resources with dynamic subjects, units, types, and placeholders
+│   │   │   ├── notes_config.dart             # Storage config and architecture placeholders detailing Supabase/local download caches
+│   │   │   ├── notes_screen.dart             # Class materials organizer grouping resources by Semester, Subject, and Unit with a FAB
+│   │   │   └── resource_card.dart            # Custom component displaying a resource item with download status and edit buttons
+│   │   ├── overview/
+│   │   │   └── overview_screen.dart          # Main dashboard summary showing lectures, attendance warnings, tasks, and financial updates
+│   │   ├── review_queue/
+│   │   │   ├── review_queue_screen.dart      # Interface resolving OCR timetable parser conflicts and low-confidence logs
+│   │   │   └── review_queue_edit_screen.dart # Dedicated full-screen form-based editor for resolving low confidence items
+│   │   ├── settings/
+│   │   │   ├── semester_selection_screen.dart # Preference selector updating the active school semester
+│   │   │   └── settings_screen.dart          # Global toggles for theme selector, active modules, and notification settings
+│   │   ├── splash/
+│   │   │   └── splash_screen.dart            # Initial loading screen verifying configuration and theme choices
+│   │   ├── timetable/
+│   │   │   ├── add_class_screen.dart         # Dedicated screen to add class schedules with templates and clock pickers
+│   │   │   └── timetable_screen.dart         # Interactive weekly calendar detailing daily classroom routines
+│   │   └── todo/
+│   │       ├── add_todo_screen.dart          # Screen for creating new tasks with title, due dates, priority, and category
+│   │       └── todo_screen.dart              # Screen listing, sorting, and managing due tasks and reminders
+│   └── main.dart
 ├── pubspec.yaml
-├── STUDENT BUDDY DEVELOPMENT.md        # Development phase details & roadmap
-├── STUDENT BUDDY MASTER REQUIREMENTS.txt # Master product requirements documentation
-├── context.md                          # This file (Project Memory)
-└── history.md                          # Project decisions & implementation history log
+└── README.md
 ```
 
 ---
@@ -218,14 +228,34 @@ We are currently refining the **UI Skeleton (Phase 1)**.
   * **Day Selector Bar Animations**: Swapped standard container boxes for `AnimatedContainer` and `AnimatedDefaultTextStyle` elements in the weekly day selector strip.
   * **Lecture Card Design Improvements**: Expanded time column width to 60px and updated ending time text style/contrast (using dynamic brightness colors) to guarantee text readability in both Light and Dark mode variations.
   * **Attendance Redesign (Phase 1 UI)**:
-    * Replaced the simple attendance screen with a 4-tab sub-navigation shell (Today, History, Subjects, Settings) with a reduced height of 52px.
-    * Replaced the "Mark Whole Day" button sequence on the Today tab with a reversed sequence `[Clear]`, `[Day Off]`, `[Missed]`, `[Attended]` along with matching icons.
-    * Reordered the History tab to place Monthly Day Summary and Monthly Lecture Stats (re-laid out into a 5-column single-row alignment containing attendance percentages) at the top of the screen.
+    * Replaced the simple attendance screen with a 3-tab sub-navigation shell (History, Subjects, Settings) with a reduced height of 52px, removing the redundant Today tab.
+    * Centralized all attendance calculations, logs, and state properties into a reactive `AppState` singleton class.
+    * Created a unified, reusable `LectureCard` component replacing local timetable card builders and the custom subject cards, containing read-only weekly rendering and interactive attendance logging.
+    * Reordered the History tab to place the overall status card (`AttendanceOverviewCard`) and Monthly Day Summary at the top of the history screen.
     * Converted calendar Month page swiping to horizontal.
-    * Made Subject Cards in the Subjects tab clickable, navigating to a new, fully interactive `SubjectHistoryScreen` showing dynamic calculations and a class history log.
+    * Made Subject Cards in the Subjects tab clickable, navigating to a new, fully interactive `SubjectHistoryScreen` showing dynamic calculations and a class history log using `LectureCard`.
     * Renamed settings from "Target" to "Criteria", implemented 3 criteria modes (Overall, Subject-Wise, Subject-Wise Custom) with a per-subject configuration dialog, and added Default Days Off chips.
+    * Refactored `OverviewScreen` into a stateful panel displaying today's lectures via `LectureCard`, providing a "Mark Whole Day" quick-action bar, positioning the Review Queue warning card at the top of the dashboard (only shown if there are reviews pending), and removing the redundant Academic Status (with its To Do summary), Upcoming Events, Quick Shortcuts, and safe skip widgets to achieve a clean, focused layout.
+  * **UI/UX Polish, Review Queue Forms & SnackBar Integration**:
+    * Created a unified floating SnackBar component (`AppSnackbar` in `lib/core/widgets/app_snackbar.dart`) and migrated all 10 screen modules to use it.
+    * Polished the `LectureCard` vertically to occupy 20-25% less height, and updated progress rings to display current/target ratios (e.g. `X/Y%`).
+    * Added clear header labels "TODAY'S CLASSES" and "MARK WHOLE DAY" inside the `OverviewScreen`.
+    * Merged the Monthly Day Summary and Monthly Lecture Stats cards inside `HistoryTab` into a single, compact `AttendanceAnalyticsCard` to prevent vertical scrolling and make the calendar immediately visible.
+    * Overhauled the Review Queue module: removed the "Delete" action, implemented immediate default assignments for "Approve" with descriptive SnackBar confirmations, and built a dedicated full-screen editor (`ReviewQueueEditScreen`) with fields customized to Finance, OCR, and Class Cancellation review items.
+  * **Collapsible Sections, Compact Rings & Clickable Semester Dialogs**:
+    * Created a reusable `ExpandableSection` widget supporting an optional glassmorphic outer frame (`showFrame: true`) wrapping both the header and child list to create card-like accordions. Wrapped Today's Classes and Finance Summary dashboard sections inside `ExpandableSection(showFrame: true)`.
+    * Developed `AttendanceRingLabel` to display current vs target criteria percentages in a vertical fraction format (`current/target %`) inside progress rings, and centered the fraction text block inside the ring using a balanced Row layout with larger font sizes (13) and wider divider lines.
+    * Simplified `LectureCard` by removing duplicate Criteria and Attended metrics, merging the status message (font size: 13) and action buttons into a single row, and animating slightly larger action buttons to expand text only when selected.
+    * Polished details inside `LectureCard`: set time column width to 44, subject name font size to 15.5, room text size to 13, and ensured start time uses a uniform primary text color.
+    * Formatted safe skip status messages specifically: `"can skip X lectures"`, `"can't skip next lecture"`, and `"need to attend next X lectures"`.
+    * Reordered `HistoryTab` layout, merging the Calendar Month View and the Color Legend into the same outer card container (height: 395, page change animation: 500ms), separated by a Divider.
+    * Implemented semester-wide stats aggregation and custom stats popup dialog showing detailed day and lecture statistics when tapping the Overall Attendance Card.
+    * Redesigned `AppSnackbar` to be extremely lightweight: reduced heights, padding, font sizes, corner radius, and lowered floating margins (bottom: 8 when nav bar is present, 16 when not) to stay cleanly above navigation.
+    * Standardized the bottom offset of the FloatingActionButton on the Timetable screen (padding: 60) to align with the main To Do FAB spacing.
+    * Tuned main dashboard spacing (reduced heights of vertical separators to 16).
 
 * **What was intentionally NOT implemented (postponed to future phases)**:
+  * **Finance Module (FROZEN)**: All Finance module development is officially frozen. It is now disabled by default on clean installs, and the toggle state is persisted via `SharedPreferences`.
   * Backend code
   * Supabase integration & authentication APIs
   * Riverpod state management implementation (pure Flutter components/state used for now)
@@ -251,7 +281,7 @@ We are currently refining the **UI Skeleton (Phase 1)**.
 ## 11. Important Notes For Future AI Sessions
 
 * **Never remove functionality**: Do not delete screens, features, or modules unless the user explicitly requests it.
-* **Never simplify the project by removing modules**: The balance between Academic and Finance must remain intact.
+* **Never simplify the project by removing modules**: The balance between Academic and Finance must remain intact, although Finance is officially frozen and disabled by default for current phases.
 * **Never merge Finance and Academic logic internally**: Keep finance accounts, transactions, and categories isolated from academic classes, assignments, and attendance logs.
 * **Finance must remain optional**: Ensure settings toggles completely hide or show finance metrics dynamically throughout the UI without throwing null errors.
 * **Always preserve scalability over aesthetics**: Do not let design choices corrupt structured data architectures.

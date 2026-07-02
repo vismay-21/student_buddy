@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
+import '../../core/widgets/app_snackbar.dart';
 
 class SemesterSelectionScreen extends StatefulWidget {
   const SemesterSelectionScreen({super.key});
@@ -28,12 +29,7 @@ class _SemesterSelectionScreenState extends State<SemesterSelectionScreen> {
   void _applySelection() {
     AppState.instance.activeSemester.value = _selectedSemester;
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppTheme.accent,
-        content: Text('Active semester changed to $_selectedSemester!'),
-      ),
-    );
+    AppSnackbar.success(context, 'Active semester changed to $_selectedSemester!');
 
     Navigator.of(context).pop();
   }

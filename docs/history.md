@@ -211,3 +211,111 @@ This log tracks architectural decisions, feature implementations, and refinement
   - Added detailed documentation and architecture block comments detailing future integration with Supabase Storage and lazy loading local file caching.
 * **Verification & Compilation Cleanliness**:
   - Ran static analysis confirming 0 compile errors in the Notes module.
+
+---
+
+## 2026-06-29 (Major UI/UX Refactor: Timetable, Attendance, & Overview Architecture)
+
+### Decisions
+1. **Centralize Attendance State**: Consolidate all logging states, holiday declarations, date action overlays, default day off parameters, and overall metric calculations directly inside a single reactive instance (`AppState` via `ValueNotifier` and helper mutation handlers).
+2. **Eliminate Tab Duplication**: Remove the redundant Today tab from `AttendanceScreen`, reducing sub-tabs to History, Subjects, and Settings.
+3. **Consolidate Lecture Cards**: Delete specialized attendance cards (`AttendanceSubjectCard`) in favor of a single unified `LectureCard` that renders in read-only mode for the timetable and edit/log mode for attendance records.
+4. **Interactive Dashboard**: Convert `OverviewScreen` into a stateful panel reacting live to attendance settings changes, presenting a "Mark Whole Day" bulk editor, and listing scheduled lectures with inline logging.
+
+### Implementation Details
+* **Centralized State Calculations (`AppState`)**:
+  - Implemented dynamic average attendance computation, criteria status checker, and custom subject threshold overrides.
+  - Added methods `setLectureAction`, `setWholeDayAction`, and `addHoliday` updating state reactively.
+* **Unified UI Components**:
+  - `LectureCard`: Features dual rendering modes. Timetable reads details statically; Attendance mode shows a circular percentage progress indicator, criteria warning status messages, and selective logging toggle keys.
+  - `AttendanceOverviewCard`: Integrated at the top of the `HistoryTab` (above calendar) to give immediate overview and warnings.
+* **Screen Refactoring**:
+  - `AttendanceScreen`: Reduced to a clean 3-tab layout (History, Subjects, Settings). Updates automatically on state notifiers.
+  - `TimetableScreen`: Replaced calendar date strings with static recurring weekdays, rendering read-only `LectureCard` components.
+  - `SubjectsTab`: Re-implemented beautiful, inline, and lightweight custom progress ring indicators, resolving dependency on the deleted card component.
+  - `DayHistoryScreen` & `SubjectHistoryScreen`: Migrated to the new `LectureCard` to log individual lectures directly.
+  - `OverviewScreen`: Re-architected as a stateful screen that displays today's lectures via `LectureCard` and offers a "Mark Whole Day" quick-action panel. Positioned the Review Queue warning card at the very top of the screen (visible only if there are items to review). Removed the obsolete Academic Status (including overall attendance status and To Do summary), Upcoming Events, Quick Shortcuts, and safe skip widgets to achieve a clean, focused dashboard workspace.
+* **Verification**:
+  - Ran full static analysis showing 0 compile errors and 0 warnings.
+
+---
+
+## 2026-06-29 (Session: UI/UX Polish, Review Queue Forms & SnackBar Integration)
+
+### Decisions
+1. **Premium Floating SnackBar Architecture**: Create a single unified, floating custom snackbar (`lib/core/widgets/app_snackbar.dart`) to replace default snackbars and eliminate UI boilerplate.
+2. **Space Optimization & Row Consolidation**: Merge historical attendance metrics cards into a side-by-side single row display in `HistoryTab` to eliminate vertical scrolling and keep the calendar immediately visible on load.
+3. **Review Queue Form-Based Refactoring**: Remove "Delete" capability from the Review Queue and design specialized input forms for low-confidence data (Finance, OCR Timetable, WhatsApp Cancellation).
+
+### Implementation Details
+* **AppSnackbar & Wide Integration**:
+  - Built custom floating SnackBar helper class with rounded aesthetics and success/warning/error/info styling.
+  - Replaced standard ScaffoldMessenger SnackBar calls in 10 screen files.
+* **Overview Dashboard Headers**:
+  - Updated main dashboard header to "TODAY'S CLASSES" and added "MARK WHOLE DAY" bulk header.
+* **Lecture Card & Progress Ring Polish**:
+  - Reduced vertical footprint of `LectureCard` by 20-25% and updated progress ring sizes to 44x44 and stroke width to 3.
+  - Rewrote percentage rendering inside circular progress indicators to display the current attendance / target ratio (e.g. `X/Y%`).
+* **Attendance Analytics Consolidation**:
+  - Created `AttendanceAnalyticsCard` displaying both "DAYS SUMMARY" and "LECTURE STATS" side-by-side.
+  - Replaced two separate summary cards in `HistoryTab` with the new analytics card.
+  - Removed duplicate overall status card from the top of `SubjectsTab`.
+* **Review Queue Screen Refactoring**:
+  - Deleted the "Delete" action button.
+  - Implemented instant default properties on "Approve" (Category = Other, Account = UPI) with custom SnackBar announcements.
+* **Review Queue Edit Screen**:
+  - Created `lib/screens/review_queue/review_queue_edit_screen.dart` with dedicated forms and validators for each item type.
+  - Wired navigation to dynamically refresh pending review counts on returning to the dashboard.
+* **Verification**:
+  - Ran full static analysis confirming 0 compile errors.
+
+---
+
+## 2026-06-29 (Session: Collapsible Sections, Fraction Rings & Semester Dialog Metrics)
+
+### Decisions
+1. **Dashboard Section Collapse**: Build a reusable, smooth height-expansion widget (`ExpandableSection`) supporting optional frames. The card frame wraps both the header and child content to create styled accordions.
+2. **Attendance Ring Layout Overhaul**: Redesign the progress ring text to present current vs target criteria as a clean vertical fraction (`AttendanceRingLabel`) perfectly centered, increasing the numbers/percent sizes, and simplify card metadata rows.
+3. **Comprehensive Semester Metrics Dialog & Calendar Legend**: Reorder widgets on the history tab and merge the calendar and color legend inside the same card (height: 395) separated by a Divider to save vertical space.
+4. **Lightweight Floating Pill SnackBar**: Shrink overall dimensions of `AppSnackbar` and lower margins to `bottom: 8` when a bottom navigation bar is present.
+
+### Implementation Details
+* **Collapsible Dashboards (`ExpandableSection`)**:
+  - Implemented `lib/core/widgets/expandable_section.dart` with a `showFrame` outer card outline wrapping both the toggle header and children.
+  - Wrapped `OverviewScreen` Today's Classes and Finance Summary in `ExpandableSection(showFrame: true)` to group elements elegantly.
+* **Redesigned Percentage Ring Labels (`AttendanceRingLabel`)**:
+  - Developed `lib/core/widgets/attendance_ring_label.dart` centering the fraction block inside the ring. Increased the calling font size to `13` on both `LectureCard` and `SubjectsTab` to make numbers and percentage signs larger.
+* **Lecture Card Metadata & Button Optimization**:
+  - Merged the status guidance text (font size: 13) and action buttons into a single row inside `LectureCard` to reduce card height.
+  - Increased the button sizing (vertical padding to 6, icon size to 15, and text to 10).
+  - Polished typography inside `LectureCard`: set time column width to 44, subject name font size to 15.5, room text size to 13, and ensured start time uses a uniform primary text color.
+  - Standardized specific safe-skip messages: `"can skip X lectures"`, `"can't skip next lecture"`, and `"need to attend next X lectures"`.
+* **History Tab Reordering & Calendar Legend Merge**:
+  - Embedded the monthly `AttendanceCalendarLegend(transparentBackground: true)` inside the calendar card at the bottom, separated by a Divider, reducing the overall card container height to `395` to lift the analytics card up, and setting transition speeds to `500ms`.
+* **SnackBar Dimensions Optimization**:
+  - Adjusted margins to `bottom: 8` (or `16` on pushed pages) to center and place the notification pill neatly above the bottom navigation bar without hovering too high.
+* **Timetable FAB Alignment**:
+  - Reduced the bottom padding of the FloatingActionButton on `timetable_screen.dart` to `60` so that it sits at the same offset relative to the weekday sub-navigation bar as the To Do FAB does relative to the main bottom bar.
+* **Verification**:
+  - Verified static compilation cleanliness using `flutter analyze`.
+
+---
+
+## 2026-06-29 (Session: Finance Module Freeze & Toggle Persistence)
+
+### Decisions
+1. **Official Finance Freeze**: All Finance module features and logic are officially frozen. Future development priorities will shift completely to the Academic workflow and backend implementation.
+2. **Disabled by Default**: Fresh installations of the application will start with the Finance module disabled (turned OFF) by default.
+3. **Persist the Toggle**: Save the "Enable Finance Module" settings switch state to local storage to maintain the state across hot restarts, app restarts, and app terminations.
+4. **App Initialization Hook**: Restore the persisted Finance module state during app startup before building any widgets to prevent UI flickering.
+
+### Implementation Details
+* **Dependency Addition**:
+  - Added `shared_preferences: ^2.2.0` package to `pubspec.yaml` and installed it via `flutter pub get`.
+* **State & Persistence Layer**:
+  - Updated `lib/core/utils/app_state.dart` to default `isFinanceEnabled` to `false`.
+  - Added `init()` method to `AppState` to fetch the persisted boolean value from `SharedPreferences` (defaulting to `false`) and set up an automatic listener on `isFinanceEnabled` to save any state changes immediately.
+* **App startup**:
+  - Adjusted the `main()` function in `lib/main.dart` to be asynchronous, ensuring `WidgetsFlutterBinding.ensureInitialized()` is called and `await AppState.instance.init()` completes before `runApp` executes.
+* **Verification**:
+  - Ran `flutter analyze` ensuring 0 compile errors or new warnings.

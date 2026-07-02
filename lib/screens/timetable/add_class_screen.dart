@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/models/subject_template.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
+import '../../core/widgets/app_snackbar.dart';
 
 /// Full-screen form for adding a lecture to the timetable.
 /// Supports:
@@ -267,22 +268,16 @@ class _AddClassScreenState extends State<AddClassScreen> {
     final begin = _formatTime(_beginTime!);
     final end   = _formatTime(_endTime!);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppTheme.accent,
-        content: Text(
-          '"${_subjectController.text.trim()}" added on $_selectedDay, $begin → $end (Mock)',
-        ),
-      ),
+    AppSnackbar.success(
+      context,
+      '"${_subjectController.text.trim()}" added on $_selectedDay, $begin → $end (Mock)',
     );
 
     Navigator.of(context).pop();
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(backgroundColor: AppTheme.danger, content: Text(msg)),
-    );
+    AppSnackbar.error(context, msg);
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────

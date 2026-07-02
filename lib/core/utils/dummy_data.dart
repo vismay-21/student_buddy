@@ -275,7 +275,7 @@ class DummyData {
     ),
   ];
 
-  static const List<ReviewItemMock> reviewQueue = [
+  static List<ReviewItemMock> reviewQueue = [
     ReviewItemMock(
       id: 'rev1',
       source: 'WhatsApp',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/dummy_data.dart';
+import '../../core/widgets/app_snackbar.dart';
 
 class AddTodoScreen extends StatefulWidget {
   final TodoMock? todoToEdit;
@@ -590,12 +591,7 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
                             child: InkWell(
                               onTap: _selectedDate == null
                                   ? () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Please select a date first'),
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
+                                      AppSnackbar.warning(context, 'Please select a date first');
                                     }
                                   : () => _selectTime(context),
                               borderRadius: BorderRadius.circular(8),

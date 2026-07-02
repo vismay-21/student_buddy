@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/utils/dummy_data.dart';
+import '../../core/widgets/app_snackbar.dart';
 import 'add_resource_screen.dart';
 import 'resource_card.dart';
 
@@ -80,12 +81,7 @@ class _NotesScreenState extends State<NotesScreen> {
         setState(() {
           _downloadingFiles.remove(filename);
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.accent,
-            content: Text('"$filename" downloaded successfully to local storage! (Mock)'),
-          ),
-        );
+        AppSnackbar.success(context, '"$filename" downloaded successfully to local storage! (Mock)');
       }
     });
   }
@@ -214,22 +210,12 @@ class _NotesScreenState extends State<NotesScreen> {
           }
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.accent,
-            content: Text('"${file.name}" saved successfully under $targetSemester.'),
-          ),
-        );
+        AppSnackbar.success(context, '"${file.name}" saved successfully under $targetSemester.');
       } else if (action == 'delete') {
         setState(() {
           _removeResourceFromSemester(file, activeSem, subjectName, subsectionName);
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.accent,
-            content: Text('"${file.name}" deleted successfully.'),
-          ),
-        );
+        AppSnackbar.success(context, '"${file.name}" deleted successfully.');
       }
     }
   }

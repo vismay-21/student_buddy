@@ -2,13 +2,36 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
 class AttendanceCalendarLegend extends StatelessWidget {
-  const AttendanceCalendarLegend({super.key});
+  final bool transparentBackground;
+
+  const AttendanceCalendarLegend({
+    super.key,
+    this.transparentBackground = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color cardBackground = isDark ? AppTheme.surface : AppTheme.lightSurface;
     final Color borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+
+    final Widget legendRow = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _legendItem('Attended', AppTheme.accent),
+        _legendItem('Missed', AppTheme.danger),
+        _legendItem('Off', AppTheme.warning),
+        _legendItem('Mixed', AppTheme.secondary),
+        _legendItem('No Data', AppTheme.textMuted),
+      ],
+    );
+
+    if (transparentBackground) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+        child: legendRow,
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
@@ -17,16 +40,7 @@ class AttendanceCalendarLegend extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _legendItem('Attended', AppTheme.accent),
-          _legendItem('Missed', AppTheme.danger),
-          _legendItem('Off', AppTheme.warning),
-          _legendItem('Mixed', AppTheme.secondary),
-          _legendItem('No Data', AppTheme.textMuted),
-        ],
-      ),
+      child: legendRow,
     );
   }
 

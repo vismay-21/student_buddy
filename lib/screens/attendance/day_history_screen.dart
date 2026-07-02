@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/dummy_data.dart';
-import 'widgets/attendance_subject_card.dart';
+import 'widgets/lecture_card.dart';
 
 class DayHistoryScreen extends StatefulWidget {
   final DateTime date;
@@ -212,33 +212,17 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(left: 4.0, bottom: 6.0),
-                              child: Text(
-                                'Time: ${lecture.startTime} - ${lecture.endTime} (Room ${lecture.room})',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textMuted,
-                                ),
-                              ),
-                            ),
-                            AttendanceSubjectCard(
-                              subjectName: lecture.name,
-                              attendancePercent: metrics['percent'],
-                              targetPercent: metrics['target'],
-                              attended: metrics['attended'],
-                              total: metrics['total'],
-                              statusMessage: metrics['statusMessage'],
-                              isAboveTarget: metrics['isAboveTarget'],
-                              showActions: true,
-                              currentAction: currentAction,
-                              onActionChanged: (action) => _onActionTapped(lecture, action),
-                            ),
-                          ],
+                        child: LectureCard(
+                          lecture: lecture,
+                          showAttendance: true,
+                          currentAction: currentAction,
+                          attendancePercent: metrics['percent'],
+                          targetPercent: metrics['target'],
+                          attended: metrics['attended'],
+                          total: metrics['total'],
+                          statusMessage: metrics['statusMessage'],
+                          isAboveTarget: metrics['isAboveTarget'],
+                          onActionChanged: (action) => _onActionTapped(lecture, action),
                         ),
                       );
                     },

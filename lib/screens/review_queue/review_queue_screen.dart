@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/dummy_data.dart';
+import '../../core/widgets/app_snackbar.dart';
+import 'review_queue_edit_screen.dart';
 
 class ReviewQueueScreen extends StatefulWidget {
   const ReviewQueueScreen({super.key});
@@ -19,22 +21,38 @@ class _ReviewQueueScreenState extends State<ReviewQueueScreen> {
     _localQueue = List.from(DummyData.reviewQueue);
   }
 
-  void _resolveItem(String id, String resolution) {
+  void _approveItem(ReviewItemMock item) {
     setState(() {
-      _localQueue.removeWhere((item) => item.id == id);
+      _localQueue.removeWhere((x) => x.id == item.id);
+      DummyData.reviewQueue.removeWhere((x) => x.id == item.id);
     });
 
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Item successfully resolved as "$resolution"! (Mock)'),
-        backgroundColor: resolution == 'Approve' 
-            ? AppTheme.accent 
-            : resolution == 'Delete' 
-                ? AppTheme.danger 
-                : AppTheme.warning,
+    String msg = 'Item approved successfully!';
+    if (item.id == 'rev1') {
+      msg = 'Approved expense: Category set to "Other", Account set to "UPI"';
+    } else if (item.id == 'rev2') {
+      msg = 'Approved OCR Timetable: DAA Lab added to Friday';
+    } else if (item.id == 'rev3') {
+      msg = 'DBMS class cancellation confirmed';
+    }
+
+    AppSnackbar.success(context, msg);
+  }
+
+  void _editItem(ReviewItemMock item) async {
+    final bool? result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReviewQueueEditScreen(item: item),
       ),
     );
+
+    if (result == true) {
+      setState(() {
+        _localQueue.removeWhere((x) => x.id == item.id);
+        DummyData.reviewQueue.removeWhere((x) => x.id == item.id);
+      });
+    }
   }
 
   Color _getSourceColor(String source) {
@@ -175,21 +193,14 @@ class _ReviewQueueScreenState extends State<ReviewQueueScreen> {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             TextButton.icon(
-                              onPressed: () => _resolveItem(item.id, 'Delete'),
-                              icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                              label: const Text('Delete'),
-                              style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
-                            ),
-                            const SizedBox(width: 8),
-                            TextButton.icon(
-                              onPressed: () => _resolveItem(item.id, 'Edit'),
+                              onPressed: () => _editItem(item),
                               icon: const Icon(Icons.edit_outlined, size: 16),
                               label: const Text('Edit'),
                               style: TextButton.styleFrom(foregroundColor: AppTheme.warning),
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton.icon(
-                              onPressed: () => _resolveItem(item.id, 'Approve'),
+                              onPressed: () => _approveItem(item),
                               icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
                               label: const Text('Approve'),
                               style: ElevatedButton.styleFrom(

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_snackbar.dart';
 import '../navigation_shell.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -43,9 +44,7 @@ class _OtpScreenState extends State<OtpScreen> {
   void _verifyOtp() {
     String code = _controllers.map((c) => c.text).join();
     if (code.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter all 6 digits of the OTP.')),
-      );
+      AppSnackbar.warning(context, 'Please enter all 6 digits of the OTP.');
       return;
     }
 
@@ -76,9 +75,7 @@ class _OtpScreenState extends State<OtpScreen> {
       });
       _focusNodes[0].requestFocus();
       _startTimer();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A new OTP has been sent to your WhatsApp.')),
-      );
+      AppSnackbar.success(context, 'A new OTP has been sent to your WhatsApp.');
     }
   }
 

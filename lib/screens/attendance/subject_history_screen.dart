@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/dummy_data.dart';
+import '../../core/utils/app_state.dart';
+import 'widgets/lecture_card.dart';
 
 class SubjectHistoryScreen extends StatefulWidget {
   final String subjectName;
@@ -40,143 +42,49 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
     };
   }
 
-  // Helper to check if a date is a default day off (we assume Sunday Only or Saturday & Sunday are default off)
-  // Let's default to Sunday Only inside this screen, or Saturday & Sunday based on standard weekends
-  bool _isDefaultDayOff(DateTime date) {
-    // For simplicity, we align with the standard weekend (Sunday only is typical, but let's check)
-    // Actually, to make it consistent, we can just treat Sundays as default off
-    return date.weekday == DateTime.sunday;
-  }
-
-  // Compile list of scheduled class dates and their logged actions
-  List<Map<String, dynamic>> _getHistoryRecords() {
-    final List<Map<String, dynamic>> records = [];
-    
-    // Find all weekdays where this subject has a lecture
-    final Map<int, List<LectureMock>> subjectLecturesByWeekday = {};
-    for (int weekday = 0; weekday < 7; weekday++) {
-      final lectures = DummyData.getLecturesForDay(weekday);
-      final matching = lectures.where((l) => l.name == widget.subjectName).toList();
-      if (matching.isNotEmpty) {
-        subjectLecturesByWeekday[weekday] = matching;
-      }
-    }
-
-    // Iterate through all days in semester duration
-    DateTime current = widget.semesterStartDate;
-    while (!current.isAfter(widget.semesterEndDate)) {
-      final int weekdayIndex = current.weekday - 1;
-      
-      if (subjectLecturesByWeekday.containsKey(weekdayIndex)) {
-        final dateKey = DateFormat('yyyy-MM-dd').format(current);
-        final dayActions = _localDateActions[dateKey] ?? {};
-        
-        final bool isHoliday = widget.holidays.any((h) {
-          final DateTime hDate = h['date'];
-          return hDate.year == current.year && hDate.month == current.month && hDate.day == current.day;
-        });
-
-        for (var lecture in subjectLecturesByWeekday[weekdayIndex]!) {
-          final action = dayActions[lecture.id] ?? 'clear';
-          records.add({
-            'date': current,
-            'lecture': lecture,
-            'action': action,
-            'isHoliday': isHoliday,
-            'isDefaultDayOff': _isDefaultDayOff(current),
-          });
-        }
-      }
-      current = current.add(const Duration(days: 1));
-    }
-
-    // Sort descending by date (newest first)
-    records.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
-    return records;
-  }
-
-  // Recalculates metrics for this subject locally
-  Map<String, dynamic> _getLocalMetrics() {
-    // Start with baseline totals
-    int attended = 0;
-    int total = 0;
-
-    // Find baseline attended/total
-    for (var baselineSub in DummyData.attendanceList) {
-      if (baselineSub.name == widget.subjectName) {
-        attended = baselineSub.attended;
-        total = baselineSub.total;
-        break;
-      }
-    }
-
-    // Scan local action modifications
-    _localDateActions.forEach((dateKey, dayActions) {
-      final date = DateTime.tryParse(dateKey);
-      if (date != null) {
-        final bool isHoliday = widget.holidays.any((h) {
-          final DateTime hDate = h['date'];
-          return hDate.year == date.year && hDate.month == date.month && hDate.day == date.day;
-        });
-
-        if (!isHoliday && !_isDefaultDayOff(date)) {
-          final weekdayIndex = date.weekday - 1;
-          final lectures = DummyData.getLecturesForDay(weekdayIndex);
-          for (var lec in lectures) {
-            if (lec.name == widget.subjectName) {
-              final action = dayActions[lec.id] ?? 'clear';
-              if (action == 'attended') {
-                attended++;
-                total++;
-              } else if (action == 'missed') {
-                total++;
-              }
-            }
-          }
-        }
-      }
-    });
-
-    final double percent = total == 0 ? 0.0 : (attended / total) * 100;
-    final int target = widget.criteriaPercentage;
-    final bool isAboveTarget = percent >= target;
-
-    String statusMessage = '';
-    if (isAboveTarget) {
-      int skip = 0;
-      if (target > 0) {
-        skip = (attended * 100 / target).floor() - total;
-        if (skip < 0) skip = 0;
-      }
-      statusMessage = 'Safe to skip: $skip classes';
-    } else {
-      int must = 0;
-      if (target < 100) {
-        must = ((target * total - 100 * attended) / (100 - target)).ceil();
-      } else {
-        must = 99;
-      }
-      statusMessage = 'Must attend next $must classes';
-    }
-
-    return {
-      'percent': percent,
-      'attended': attended,
-      'total': total,
-      'statusMessage': statusMessage,
-      'isAboveTarget': isAboveTarget,
-    };
-  }
-
   void _onActionTapped(DateTime date, LectureMock lecture, String action) {
     final dateKey = DateFormat('yyyy-MM-dd').format(date);
     setState(() {
       _localDateActions[dateKey] ??= {};
       _localDateActions[dateKey]![lecture.id] = action;
     });
-
-    // Notify parent state
     widget.onLectureActionChanged(date, lecture, action);
+  }
+
+  List<Map<String, dynamic>> _generateClassRecords() {
+    final List<Map<String, dynamic>> list = [];
+    DateTime current = widget.semesterStartDate;
+
+    while (current.isBefore(widget.semesterEndDate) ||
+        current.isAtSameMomentAs(widget.semesterEndDate)) {
+      final int dayIdx = current.weekday - 1;
+      final lectures = DummyData.getLecturesForDay(dayIdx);
+
+      final bool isHoliday = widget.holidays.any((h) {
+        final DateTime hDate = h['date'];
+        return hDate.year == current.year &&
+            hDate.month == current.month &&
+            hDate.day == current.day;
+      });
+
+      for (var lec in lectures) {
+        if (lec.name == widget.subjectName) {
+          final dateKey = DateFormat('yyyy-MM-dd').format(current);
+          final action = (_localDateActions[dateKey] ?? {})[lec.id] ?? 'clear';
+
+          list.add({
+            'date': current,
+            'lecture': lec,
+            'action': action,
+            'isHoliday': isHoliday,
+          });
+        }
+      }
+
+      current = current.add(const Duration(days: 1));
+    }
+
+    return list.reversed.toList();
   }
 
   @override
@@ -184,13 +92,26 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color cardBackground = isDark ? AppTheme.surface : AppTheme.lightSurface;
     final Color borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
-    
-    final metrics = _getLocalMetrics();
-    final double attendancePercent = metrics['percent'];
-    final bool isAboveTarget = metrics['isAboveTarget'];
-    final Color ringColor = isAboveTarget ? AppTheme.accent : AppTheme.danger;
-    
-    final records = _getHistoryRecords();
+    final Color ringColor = AppTheme.primary;
+
+    final records = _generateClassRecords();
+
+    // Fetch calculation metrics from AppState
+    final calculatedSubjects = AppState.instance.getCalculatedSubjects();
+    final metrics = calculatedSubjects.firstWhere(
+      (sub) => sub['name'] == widget.subjectName,
+      orElse: () => {
+        'percent': 0.0,
+        'target': widget.criteriaPercentage,
+        'attended': 0,
+        'total': 0,
+        'statusMessage': 'No logs',
+        'isAboveTarget': false,
+      },
+    );
+
+    final double attendancePercent = metrics['percent'] as double;
+    final bool isAboveTarget = metrics['isAboveTarget'] as bool;
 
     return Scaffold(
       appBar: AppBar(
@@ -232,10 +153,12 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
                             value: attendancePercent / 100,
                             strokeWidth: 6,
                             backgroundColor: ringColor.withOpacity(0.12),
-                            valueColor: AlwaysStoppedAnimation<Color>(ringColor),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isAboveTarget ? AppTheme.accent : AppTheme.danger,
+                            ),
                           ),
                           Text(
-                            '${attendancePercent.toInt()}%',
+                            '${alignmentPercentString(attendancePercent)}%',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -326,28 +249,22 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
                       
                       final String dateStr = DateFormat('EEEE, d MMMM yyyy').format(date);
 
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        color: cardBackground,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: borderColor),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4.0, bottom: 6.0),
+                              child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      dateStr,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
+                                  Text(
+                                    dateStr,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textMuted,
                                     ),
                                   ),
                                   if (isHoliday)
@@ -368,29 +285,20 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
                                     ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Time: ${lecture.startTime} - ${lecture.endTime} • Room: ${lecture.room} • Faculty: ${lecture.teacher}',
-                                style: const TextStyle(
-                                  color: AppTheme.textMuted,
-                                  fontSize: 11,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  _buildLogButton('clear', Icons.remove_circle_outline, AppTheme.textMuted, action, date, lecture),
-                                  const SizedBox(width: 8),
-                                  _buildLogButton('off', Icons.pause_circle_outline, AppTheme.warning, action, date, lecture),
-                                  const SizedBox(width: 8),
-                                  _buildLogButton('missed', Icons.highlight_off, AppTheme.danger, action, date, lecture),
-                                  const SizedBox(width: 8),
-                                  _buildLogButton('attended', Icons.check_circle_rounded, AppTheme.accent, action, date, lecture),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
+                            LectureCard(
+                              lecture: lecture,
+                              showAttendance: true,
+                              currentAction: action,
+                              attendancePercent: metrics['percent'],
+                              targetPercent: metrics['target'],
+                              attended: metrics['attended'],
+                              total: metrics['total'],
+                              statusMessage: metrics['statusMessage'],
+                              isAboveTarget: metrics['isAboveTarget'],
+                              onActionChanged: (newAction) => _onActionTapped(date, lecture, newAction),
+                            ),
+                          ],
                         ),
                       );
                     },
@@ -401,40 +309,7 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
     );
   }
 
-  Widget _buildLogButton(String logAction, IconData icon, Color color, String currentAction, DateTime date, LectureMock lecture) {
-    final bool isSelected = currentAction == logAction;
-    return GestureDetector(
-      onTap: () => _onActionTapped(date, lecture, logAction),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? color.withOpacity(0.5) : const Color(0xFF1E293B),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 12,
-              color: isSelected ? color : AppTheme.textMuted,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              logAction.toUpperCase(),
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? color : AppTheme.textMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  String alignmentPercentString(double val) {
+    return val.toInt().toString();
   }
 }

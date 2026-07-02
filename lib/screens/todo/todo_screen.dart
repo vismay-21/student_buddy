@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/dummy_data.dart';
+import '../../core/widgets/app_snackbar.dart';
 import 'add_todo_screen.dart';
 
 class TodoScreen extends StatefulWidget {
@@ -45,13 +46,7 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
       }
     });
 
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        duration: Duration(seconds: 1),
-        content: Text('Task status updated! (Mock Simulation)'),
-      ),
-    );
+    AppSnackbar.success(context, 'Task status updated! (Mock Simulation)');
   }
 
   Color _getCognitiveColor(String load) {

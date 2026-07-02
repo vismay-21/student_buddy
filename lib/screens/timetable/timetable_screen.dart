@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/dummy_data.dart';
+import '../attendance/widgets/lecture_card.dart';
 import 'add_class_screen.dart';
 
 class TimetableScreen extends StatefulWidget {
@@ -31,23 +32,6 @@ class _TimetableScreenState extends State<TimetableScreen> {
     super.dispose();
   }
 
-  String _getFormattedDate() {
-    final now = DateTime.now();
-    DateTime startOfWeek = now.subtract(Duration(days: (now.weekday - 1) % 7));
-    DateTime selectedDate = startOfWeek.add(Duration(days: _selectedDayIndex));
-
-    final day = selectedDate.day;
-    String suffix = 'th';
-    if (day < 11 || day > 13) {
-      switch (day % 10) {
-        case 1: suffix = 'st'; break;
-        case 2: suffix = 'nd'; break;
-        case 3: suffix = 'rd'; break;
-      }
-    }
-    return '$day$suffix ${DateFormat('MMMM').format(selectedDate)}';
-  }
-
   String _getFullDayName() {
     final now = DateTime.now();
     DateTime startOfWeek = now.subtract(Duration(days: (now.weekday - 1) % 7));
@@ -59,7 +43,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
     return Scaffold(
       body: Column(
         children: [
-          // ── Day / Date header ──────────────────────────────────────────────
+          // ── Day header ─────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Row(
@@ -71,14 +55,6 @@ class _TimetableScreenState extends State<TimetableScreen> {
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.textPrimary,
-                  ),
-                ),
-                Text(
-                  _getFormattedDate(),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary,
                   ),
                 ),
               ],
@@ -126,7 +102,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: lectures.length,
-                  itemBuilder: (context, index) => _buildLectureCard(lectures[index]),
+                  itemBuilder: (context, index) => LectureCard(
+                    lecture: lectures[index],
+                    showAttendance: false,
+                  ),
                 );
               },
             ),
@@ -195,7 +174,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
       // Navigate to full-screen AddClassScreen
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 75.0),
+        padding: const EdgeInsets.only(bottom: 60.0),
         child: FloatingActionButton(
           backgroundColor: AppTheme.primary,
           foregroundColor: Colors.white,
@@ -205,142 +184,6 @@ class _TimetableScreenState extends State<TimetableScreen> {
             );
           },
           child: const Icon(Icons.add_rounded),
-        ),
-      ),
-    );
-  }
-
-  // ── Lecture card ──────────────────────────────────────────────────────────
-  //
-  // Layout:
-  //   [colored bar] | [start↑ end↓] | [divider] | [Subject | Room | Teacher]
-  //
-  Widget _buildLectureCard(LectureMock lecture) {
-    final cardColor = Color(lecture.colorValue);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          // Stronger gradient — 0.28 opacity gives a clear wash without being
-          // too heavy on the dark background.
-          gradient: LinearGradient(
-            colors: [
-              cardColor.withAlpha(72),   // ≈ 0.28 opacity
-              cardColor.withAlpha(18),   // ≈ 0.07 fade out
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Colored accent bar
-            Container(
-              width: 5,
-              height: 60,
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Time column (start & end)
-            SizedBox(
-              width: 60,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    lecture.startTime,
-                    style: TextStyle(
-                      color: cardColor,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14.5,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    lecture.endTime,
-                    style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white54
-                          : Colors.black54,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Thin vertical separator
-            Container(
-              width: 1,
-              height: 50,
-              color: cardColor.withAlpha(80),
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-            ),
-
-            // Subject details: name → room → teacher
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lecture.name,
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.meeting_room_outlined,
-                          size: 12, color: AppTheme.textMuted),
-                      const SizedBox(width: 4),
-                      Text(
-                        lecture.room,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      const Icon(Icons.person_outline_rounded,
-                          size: 12, color: AppTheme.textMuted),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          lecture.teacher,
-                          style: const TextStyle(
-                            color: AppTheme.textMuted,
-                            fontSize: 11,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

@@ -1,8 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'widgets/attendance_overview_card.dart';
-import 'widgets/attendance_subject_card.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/dummy_data.dart';
+import '../../../core/widgets/attendance_ring_label.dart';
 import 'subject_history_screen.dart';
 
 class SubjectsTab extends StatelessWidget {
@@ -37,14 +38,6 @@ class SubjectsTab extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          // Overall Attendance Card
-          AttendanceOverviewCard(
-            overallPercentage: overallPercentage,
-            targetPercentage: targetPercentage,
-            isSubjectWise: criteriaMode == 'subject_wise',
-            belowTargetSubjects: belowTargetSubjects,
-          ),
-          const SizedBox(height: 20),
 
           // Subjects Title
           const Text(
@@ -82,21 +75,7 @@ class SubjectsTab extends StatelessWidget {
                     ),
                   );
                 },
-                child: Padding(
-                  padding: EdgeInsets.zero,
-                  child: IgnorePointer(
-                    child: AttendanceSubjectCard(
-                      subjectName: sub['name'],
-                      attendancePercent: sub['percent'],
-                      targetPercent: sub['target'],
-                      attended: sub['attended'],
-                      total: sub['total'],
-                      statusMessage: sub['statusMessage'],
-                      isAboveTarget: sub['isAboveTarget'],
-                      showActions: false,
-                    ),
-                  ),
-                ),
+                child: _buildSubjectCard(context, sub),
               ),
             );
           }),
@@ -104,5 +83,160 @@ class SubjectsTab extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildSubjectCard(BuildContext context, Map<String, dynamic> sub) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color cardBackground = isDark ? AppTheme.surface : AppTheme.lightSurface;
+    final Color borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+    final Color ringColor = sub['isAboveTarget'] as bool ? AppTheme.accent : AppTheme.danger;
+
+    // Find color from dummy data by subject name if possible
+    Color accentColor = AppTheme.primary;
+    bool found = false;
+    for (int i = 0; i < 5; i++) {
+      if (found) break;
+      for (var l in DummyData.getLecturesForDay(i)) {
+        if (l.name == sub['name']) {
+          accentColor = Color(l.colorValue);
+          found = true;
+          break;
+        }
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1),
+        gradient: LinearGradient(
+          colors: [
+            accentColor.withOpacity(0.08),
+            accentColor.withOpacity(0.01),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Left color bar
+          Container(
+            width: 5,
+            height: 50,
+            decoration: BoxDecoration(
+              color: accentColor,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // Middle: details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sub['name'] as String,
+                  style: TextStyle(
+                    color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Criteria: ${sub['target']}% • Attended: ${sub['attended']}/${sub['total']}',
+                  style: TextStyle(
+                    color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  sub['statusMessage'] as String,
+                  style: TextStyle(
+                    color: sub['isAboveTarget'] as bool ? AppTheme.accent : AppTheme.danger,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Right: circular progress
+          // Right: circular progress
+          SizedBox(
+            width: 44,
+            height: 44,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CustomPaint(
+                  size: const Size(44, 44),
+                  painter: _RingPainter(
+                    progress: (sub['percent'] as double) / 100,
+                    ringColor: ringColor,
+                    backgroundColor: ringColor.withOpacity(0.15),
+                  ),
+                ),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: AttendanceRingLabel(
+                      current: sub['percent'] as double,
+                      target: (sub['target'] as int).toDouble(),
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  final double progress;
+  final Color ringColor;
+  final Color backgroundColor;
+
+  _RingPainter({
+    required this.progress,
+    required this.ringColor,
+    required this.backgroundColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Offset.zero & size;
+    canvas.drawArc(rect, 0, math.pi * 2, false, stroke..color = backgroundColor);
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      math.pi * 2 * progress.clamp(0.0, 1.0),
+      false,
+      stroke..color = ringColor,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.ringColor != ringColor ||
+        oldDelegate.backgroundColor != backgroundColor;
   }
 }

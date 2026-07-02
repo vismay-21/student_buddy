@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/dummy_data.dart';
+import '../../../core/utils/app_state.dart';
 import 'widgets/attendance_calendar_legend.dart';
-import 'widgets/attendance_day_summary_card.dart';
+import 'widgets/attendance_analytics_card.dart';
+import 'widgets/attendance_overview_card.dart';
 import 'day_history_screen.dart';
 
 class HistoryTab extends StatefulWidget {
@@ -239,6 +241,224 @@ class _HistoryTabState extends State<HistoryTab> {
     };
   }
 
+  Map<String, dynamic> _calculateSemesterSummaries() {
+    int totalDays = 0;
+    
+    int attendedDays = 0;
+    int missedDays = 0;
+    int offDays = 0;
+    int mixedDays = 0;
+
+    int totalLectures = 0;
+    int attendedLectures = 0;
+    int missedLectures = 0;
+    int offLectures = 0;
+
+    DateTime current = DateTime(widget.semesterStartDate.year, widget.semesterStartDate.month, widget.semesterStartDate.day);
+    final DateTime end = DateTime(widget.semesterEndDate.year, widget.semesterEndDate.month, widget.semesterEndDate.day);
+
+    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+      totalDays++;
+      final status = _getDateStatus(current);
+      
+      switch (status) {
+        case 'attended': attendedDays++; break;
+        case 'missed': missedDays++; break;
+        case 'off': offDays++; break;
+        case 'mixed': mixedDays++; break;
+        default: break;
+      }
+
+      // Check if holiday
+      final bool isHoliday = widget.holidays.any((h) {
+        final DateTime hDate = h['date'];
+        return hDate.year == current.year && hDate.month == current.month && hDate.day == current.day;
+      });
+
+      // Check default days off
+      bool isDefaultDayOff = false;
+      if (widget.defaultDaysOff == 'Sunday Only' && current.weekday == DateTime.sunday) {
+        isDefaultDayOff = true;
+      } else if (widget.defaultDaysOff == 'Saturday & Sunday' && 
+          (current.weekday == DateTime.saturday || current.weekday == DateTime.sunday)) {
+        isDefaultDayOff = true;
+      }
+
+      if (!isHoliday && !isDefaultDayOff) {
+        final lectures = DummyData.getLecturesForDay(current.weekday - 1);
+        if (lectures.isNotEmpty) {
+          final dateKey = DateFormat('yyyy-MM-dd').format(current);
+          final dayActions = widget.dateActions[dateKey];
+          
+          for (var lec in lectures) {
+            final action = dayActions?[lec.id] ?? 'clear';
+            totalLectures++;
+            if (action == 'attended') {
+              attendedLectures++;
+            } else if (action == 'missed') {
+              missedLectures++;
+            } else if (action == 'off') {
+              offLectures++;
+            }
+          }
+        }
+      }
+
+      current = current.add(const Duration(days: 1));
+    }
+
+    final double attendancePercentage = (attendedLectures + missedLectures) == 0
+        ? 0.0
+        : (attendedLectures / (attendedLectures + missedLectures)) * 100;
+
+    return {
+      'totalDays': totalDays,
+      'attendedDays': attendedDays,
+      'missedDays': missedDays,
+      'offDays': offDays,
+      'mixedDays': mixedDays,
+      'totalLectures': totalLectures,
+      'attendedLectures': attendedLectures,
+      'missedLectures': missedLectures,
+      'offLectures': offLectures,
+      'attendancePercentage': attendancePercentage,
+    };
+  }
+
+  void _showSemesterStatsDialog(BuildContext context) {
+    final stats = _calculateSemesterSummaries();
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color subtextColor = isDark ? Colors.white70 : Colors.black54;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: isDark ? AppTheme.surface : AppTheme.lightSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+            ),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.analytics_rounded, color: AppTheme.primary, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Semester Statistics',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.85,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left Column: Day Summary
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'DAY SUMMARY',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textMuted,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildPopupStatRow('Total Days', '${stats['totalDays']}', textColor, subtextColor),
+                          _buildPopupStatRow('Attended', '${stats['attendedDays']}', textColor, subtextColor),
+                          _buildPopupStatRow('Missed', '${stats['missedDays']}', textColor, subtextColor),
+                          _buildPopupStatRow('Off', '${stats['offDays']}', textColor, subtextColor),
+                          _buildPopupStatRow('Mixed', '${stats['mixedDays']}', textColor, subtextColor),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Divider
+                    Container(
+                      width: 1,
+                      height: 160,
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                    ),
+                    const SizedBox(width: 16),
+                    // Right Column: Lecture Stats
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'LECTURE STATS',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textMuted,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildPopupStatRow('Total Lectures', '${stats['totalLectures']}', textColor, subtextColor),
+                          _buildPopupStatRow('Attended', '${stats['attendedLectures']}', textColor, subtextColor),
+                          _buildPopupStatRow('Missed', '${stats['missedLectures']}', textColor, subtextColor),
+                          _buildPopupStatRow('Off', '${stats['offLectures']}', textColor, subtextColor),
+                          _buildPopupStatRow('Attendance %', '${(stats['attendancePercentage'] as double).toStringAsFixed(1)}%', textColor, subtextColor, isBoldVal: true),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildPopupStatRow(String label, String value, Color textColor, Color subtextColor, {bool isBoldVal = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isBoldVal ? FontWeight.w800 : FontWeight.w600,
+              color: isBoldVal ? AppTheme.primary : textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
@@ -247,81 +467,30 @@ class _HistoryTabState extends State<HistoryTab> {
     
     final summaries = _calculateMonthlySummaries(_visibleMonth);
 
+    final calculatedSubjects = AppState.instance.getCalculatedSubjects();
+    final overallStats = AppState.instance.getOverallStats(calculatedSubjects);
+
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
           children: [
             const SizedBox(height: 16),
-            // 1. Monthly Day Summary Card
+            // 0. Overall Attendance Status card (Clickable)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: AttendanceDaySummaryCard(
-                totalDays: summaries['totalDays'],
-                attendedDays: summaries['attendedDays'],
-                missedDays: summaries['missedDays'],
-                offDays: summaries['offDays'],
-                mixedDays: summaries['mixedDays'],
+              child: AttendanceOverviewCard(
+                overallPercentage: overallStats['percent'],
+                targetPercentage: AppState.instance.targetPercentage.value,
+                isSubjectWise: AppState.instance.criteriaMode.value == 'subject_wise',
+                belowTargetSubjects: List<Map<String, dynamic>>.from(overallStats['belowTarget']),
+                onTap: () => _showSemesterStatsDialog(context),
               ),
             ),
             const SizedBox(height: 16),
 
-            // 2. Lecture Summary Card
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Card(
-                color: cardBackground,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: borderColor),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'MONTHLY LECTURE STATS',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textMuted,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(child: _buildLectureStat('Total', '${summaries['totalLectures']}')),
-                          Expanded(child: _buildLectureStat('Attended', '${summaries['attendedLectures']}', AppTheme.accent)),
-                          Expanded(child: _buildLectureStat('Missed', '${summaries['missedLectures']}', AppTheme.danger)),
-                          Expanded(child: _buildLectureStat('Off', '${summaries['offLectures']}', AppTheme.warning)),
-                          Expanded(
-                            child: _buildLectureStat(
-                              'Attendance',
-                              '${(summaries['attendancePercentage'] as double).toStringAsFixed(1)}%',
-                              AppTheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 3. Color Legend
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: AttendanceCalendarLegend(),
-            ),
-            const SizedBox(height: 16),
-
-            // 4. Calendar Month View Holder
+            // 1. Calendar Month View Holder
             Container(
-              height: 380,
+              height: 395,
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: cardBackground,
@@ -331,7 +500,7 @@ class _HistoryTabState extends State<HistoryTab> {
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -354,7 +523,7 @@ class _HistoryTabState extends State<HistoryTab> {
                                 if (currentPage > 0) {
                                   _pageController.animateToPage(
                                     currentPage - 1,
-                                    duration: const Duration(milliseconds: 300),
+                                    duration: const Duration(milliseconds: 500),
                                     curve: Curves.easeInOut,
                                   );
                                 }
@@ -370,7 +539,7 @@ class _HistoryTabState extends State<HistoryTab> {
                                 if (currentPage < _totalMonths - 1) {
                                   _pageController.animateToPage(
                                     currentPage + 1,
-                                    duration: const Duration(milliseconds: 300),
+                                    duration: const Duration(milliseconds: 500),
                                     curve: Curves.easeInOut,
                                   );
                                 }
@@ -401,7 +570,27 @@ class _HistoryTabState extends State<HistoryTab> {
                       },
                     ),
                   ),
+                  const Divider(height: 1),
+                  const AttendanceCalendarLegend(transparentBackground: true),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 2. Consolidated Analytics Card
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: AttendanceAnalyticsCard(
+                totalDays: summaries['totalDays'],
+                attendedDays: summaries['attendedDays'],
+                missedDays: summaries['missedDays'],
+                offDays: summaries['offDays'],
+                mixedDays: summaries['mixedDays'],
+                totalLectures: summaries['totalLectures'],
+                attendedLectures: summaries['attendedLectures'],
+                missedLectures: summaries['missedLectures'],
+                offLectures: summaries['offLectures'],
+                attendancePercentage: summaries['attendancePercentage'],
               ),
             ),
             const SizedBox(height: 20),
@@ -410,29 +599,6 @@ class _HistoryTabState extends State<HistoryTab> {
       ),
     );
   }
-
-  Widget _buildLectureStat(String label, String value, [Color? color]) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: color ?? AppTheme.textMuted,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 9, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
 
 
   Widget _buildCalendarGrid(DateTime monthDate) {

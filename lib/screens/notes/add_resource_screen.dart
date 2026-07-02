@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/utils/dummy_data.dart';
+import '../../core/widgets/app_snackbar.dart';
 
 class AddResourceScreen extends StatefulWidget {
   final NotesFileMock? resourceToEdit;
@@ -179,9 +180,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
     }
 
     if (_selectedSubject == null || _selectedSubsection == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Subject and Subsection first')),
-      );
+      AppSnackbar.warning(context, 'Please select a Subject and Subsection first');
       return;
     }
 
