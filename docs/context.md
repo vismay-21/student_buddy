@@ -137,7 +137,22 @@ student_buddy/
 ├── macos/
 ├── linux/
 ├── web/
-├── backend/                  # Future FastAPI backend
+├── backend/                  # FastAPI backend skeleton
+│   ├── app/                  # FastAPI application package
+│   │   ├── api/              # Routers (health check, and placeholders)
+│   │   ├── core/             # Configuration, database, exception handler, logging
+│   │   ├── dependencies/     # Dependency injection providers
+│   │   ├── models/           # Database SQLAlchemy models
+│   │   ├── schemas/          # Pydantic schemas (common responses)
+│   │   ├── repositories/     # Database CRUD repositories
+│   │   ├── services/         # Business logic services
+│   │   ├── utils/            # Helper utilities
+│   │   └── main.py           # Application entry point
+│   ├── alembic/              # Database migration tool configuration
+│   ├── tests/                # Test package (conftest, health test)
+│   ├── requirements.txt      # Python dependencies list
+│   ├── README.md             # Development documentation setup
+│   └── .env.example          # Environment variables template
 ├── docs/                     # Documentation files
 │   ├── database/             # Database design documents
 │   │   ├── 04_entity_relationship_diagram.md
@@ -211,7 +226,9 @@ student_buddy/
 
 ## 9. Current Development Phase
 
-We are currently refining the **UI Skeleton (Phase 1)**.
+We are currently developing the **FastAPI Backend (Sprint 0 — Backend Foundation)**.
+
+### 9.1. Frontend / UI (Phase 1 — Locked)
 
 * **What was implemented**:
   * Visually complete Flutter UI skeleton covering all user screens: Splash, Login, OTP, Overview, Timetable, Attendance, Finance, Assignments, Notes, Review Queue, Settings, and Semester Selection.
@@ -254,27 +271,48 @@ We are currently refining the **UI Skeleton (Phase 1)**.
     * Standardized the bottom offset of the FloatingActionButton on the Timetable screen (padding: 60) to align with the main To Do FAB spacing.
     * Tuned main dashboard spacing (reduced heights of vertical separators to 16).
 
-* **What was intentionally NOT implemented (postponed to future phases)**:
+* **What was intentionally NOT implemented (postponed/frozen)**:
   * **Finance Module (FROZEN)**: All Finance module development is officially frozen. It is now disabled by default on clean installs, and the toggle state is persisted via `SharedPreferences`.
-  * Backend code
-  * Supabase integration & authentication APIs
-  * Riverpod state management implementation (pure Flutter components/state used for now)
-  * FastAPI server endpoints
-  * AI integrations (NLU, Vision, Context engines)
-  * OCR engine and document parser
-  * WhatsApp webhook and Meta Cloud API integration
-  * Active background schedulers and Push notifications
-  * Core business logic functions (calculations, file storage uploads, direct API communication)
+  * Riverpod state management implementation (postponed to Sprint 14)
+
+### 9.2. Backend (Sprint 0 — Backend Foundation)
+
+* **What was implemented**:
+  * Established the complete FastAPI project skeleton with folder structure matching the architectural specification.
+  * Configured Pydantic settings loading from environmental files (`.env`), async database engine, and session maker in SQLAlchemy 2.x.
+  * Structured unified python console logging format and custom application exception hierarchy with global FastAPI interceptors.
+  * Designed standard API response formats (`ApiResponse` and `ApiErrorResponse`) and registered a testable health check router (`/api/v1/health`).
+  * Created empty Python package folders with `__init__.py` markers for all academic, settings, todo, notes, review queue, and log modules.
+
+* **What was intentionally NOT implemented (postponed)**:
+  * Database Models, Repositories, Services, and REST CRUD API endpoints (begins in Sprint 1 — Semester Module)
+  * Supabase integration & authentication APIs (postponed to Sprint 12)
+  * SQLite synchronization engine (postponed to Sprint 13)
+  * WhatsApp bot webhook and Meta Cloud API integration (postponed to Sprint 15)
+  * AI engine and OCR timetable parser (postponed to Sprint 16)
 
 ---
 
 ## 10. Future Development Roadmap
 
-* **Phase 2**: Supabase Authentication (OTP Login & User State integration)
-* **Phase 3**: Backend setup + PostgreSQL Database Design & CRUD
-* **Phase 4**: WhatsApp Bot Webhook & Meta Cloud API Integration
-* **Phase 5**: AI Engine, Gemini NLP Parsing, and OCR Timetable Extraction
-* **Phase 6**: Production Deployment (FastAPI, PostgreSQL database, and Cloud instances)
+* **Sprint 0**: Backend Foundation (Completed)
+* **Sprint 1**: Semester Module
+* **Sprint 2**: Subject Module
+* **Sprint 3**: Lecture Template Module
+* **Sprint 4**: Lecture Instance Module
+* **Sprint 5**: Attendance Settings Module
+* **Sprint 6**: Holiday Module
+* **Sprint 7**: App Settings Module
+* **Sprint 8**: Todo Module
+* **Sprint 9**: Notes Repository Module
+* **Sprint 10**: Review Queue Module
+* **Sprint 11**: Activity Logs Module
+* **Sprint 12**: Authentication
+* **Sprint 13**: SQLite Synchronization Engine
+* **Sprint 14**: Flutter Data Layer Integration
+* **Sprint 15**: WhatsApp Bot Integration
+* **Sprint 16**: AI Integration
+* **Sprint 17**: Finance Module (Frozen until core is stable)
 
 ---
 

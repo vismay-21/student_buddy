@@ -319,3 +319,30 @@ This log tracks architectural decisions, feature implementations, and refinement
   - Adjusted the `main()` function in `lib/main.dart` to be asynchronous, ensuring `WidgetsFlutterBinding.ensureInitialized()` is called and `await AppState.instance.init()` completes before `runApp` executes.
 * **Verification**:
   - Ran `flutter analyze` ensuring 0 compile errors or new warnings.
+
+---
+
+## 2026-07-02 (Phase 2: Sprint 0 — Backend Foundation)
+
+### Decisions
+1. **Initialize Backend Structure**: Build a clean and modular FastAPI architecture mirroring the exact layer pattern: API -> Service -> Repository -> SQLAlchemy 2.x -> PostgreSQL.
+2. **Standard API Protocol**: Define a uniform response payload format (`ApiResponse` and `ApiErrorResponse`) across all routers. Any validation failure, resource conflicts, or missing records must resolve into standard JSON structures.
+3. **Structured Logging and Exception Hierarchy**: Set up standard, clean console logging and register application-wide global error interceptors for handling `AppException` and `RequestValidationError`.
+4. **Asynchronous Alembic Environment**: Configure Alembic migration engine to run dynamically and asynchronously utilizing SQLAlchemy async engines and environment parameters.
+
+### Implementation Details
+* **Core Foundation & Config**:
+  - Configured `Settings` with Pydantic settings loading env values from `.env`.
+  - Set up async engines and session makers in `core/database.py`.
+  - Registered `get_db` async generator for dependency injection.
+* **API Routers & Schemas**:
+  - Implemented health check endpoint under `GET /api/v1/health` returning status and version info.
+  - Setup core FastAPI application in `main.py` configuring CORS, logging, exception handlers, and API prefix tags.
+* **Migrations and Folder skeleton**:
+  - Initialized Alembic configuration in `alembic.ini` and async configuration in `alembic/env.py`.
+  - Created directories and `__init__.py` markers for all 6 target modules (academic, settings, todo, notes, review_queue, activity_logs) across api, models, schemas, repositories, and services layers.
+* **Testing Suite**:
+  - Created `tests/conftest.py` setting up `pytest-asyncio` strictly-configured HTTP client fixtures.
+  - Added endpoint tests under `tests/test_health.py`.
+* **Verification**:
+  - Verified all tests passed successfully and verified manual health routing.
