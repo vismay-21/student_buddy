@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'api_constants.dart';
 import 'interceptors.dart';
@@ -5,6 +6,9 @@ import 'interceptors.dart';
 class DioClient {
   static final DioClient _instance = DioClient._internal();
   late final Dio dio;
+
+  // Configurable flag to enable/disable logging
+  static bool enableLogging = kDebugMode;
 
   factory DioClient() => _instance;
 
@@ -21,12 +25,14 @@ class DioClient {
     dio.interceptors.add(AppInterceptors());
     
     // Log requests/responses to terminal for easy debugging in development
-    dio.interceptors.add(LogInterceptor(
-      requestHeader: true,
-      requestBody: true,
-      responseHeader: false,
-      responseBody: true,
-      error: true,
-    ));
+    if (enableLogging) {
+      dio.interceptors.add(LogInterceptor(
+        requestHeader: true,
+        requestBody: true,
+        responseHeader: false,
+        responseBody: true,
+        error: true,
+      ));
+    }
   }
 }

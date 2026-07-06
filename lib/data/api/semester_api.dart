@@ -1,31 +1,36 @@
-import 'package:dio/dio.dart';
+import 'package:student_buddy/core/network/base_api.dart';
 import '../../core/network/api_constants.dart';
-import '../../core/network/dio_client.dart';
 import '../dto/semester/semester_dto.dart';
 
-class SemesterApi {
-  final Dio _dio = DioClient().dio;
-
+class SemesterApi extends BaseApi {
   Future<List<SemesterDto>> getSemesters() async {
-    final response = await _dio.get(ApiConstants.semesters);
-    final List<dynamic> data = response.data['data'] as List<dynamic>;
-    return data.map((json) => SemesterDto.fromJson(json as Map<String, dynamic>)).toList();
+    final response = await get<List<SemesterDto>>(
+      ApiConstants.semesters,
+      parser: (json) => (json as List)
+          .map((item) => SemesterDto.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+    return response.data ?? [];
   }
 
   Future<SemesterDto> createSemester(SemesterCreateRequest request) async {
-    final response = await _dio.post(
+    final response = await post<SemesterDto>(
       ApiConstants.semesters,
       data: request.toJson(),
+      parser: (json) => SemesterDto.fromJson(json as Map<String, dynamic>),
     );
-    return SemesterDto.fromJson(response.data['data'] as Map<String, dynamic>);
+    return response.data!;
   }
 
   Future<SemesterDto> getSemesterById(String semesterId) async {
-    final response = await _dio.get('${ApiConstants.semesters}/$semesterId');
-    return SemesterDto.fromJson(response.data['data'] as Map<String, dynamic>);
+    final response = await get<SemesterDto>(
+      '${ApiConstants.semesters}/$semesterId',
+      parser: (json) => SemesterDto.fromJson(json as Map<String, dynamic>),
+    );
+    return response.data!;
   }
 
   Future<void> deleteSemester(String semesterId) async {
-    await _dio.delete('${ApiConstants.semesters}/$semesterId');
+    await delete('${ApiConstants.semesters}/$semesterId');
   }
 }

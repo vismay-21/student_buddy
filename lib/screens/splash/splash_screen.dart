@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/app_state.dart';
+import '../../data/repositories/semester_repository.dart';
 import '../auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -35,19 +37,45 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    Timer(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 500),
-          ),
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    final startTime = DateTime.now();
+    try {
+      final list = await SemesterRepository().getSemesters();
+      if (list.isNotEmpty) {
+        final savedId = AppState.instance.savedActiveSemesterId;
+        final found = list.firstWhere(
+          (s) => s.semesterId == savedId,
+          orElse: () => list.first,
         );
+        AppState.instance.setActiveSemester(found);
+      } else {
+        AppState.instance.setActiveSemester(null);
       }
-    });
+    } catch (e) {
+      debugPrint('Failed to bootstrap semesters: $e');
+      AppState.instance.setActiveSemester(null);
+    }
+
+    final elapsed = DateTime.now().difference(startTime);
+    final remaining = const Duration(seconds: 2) - elapsed;
+    if (remaining > Duration.zero) {
+      await Future.delayed(remaining);
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+    }
   }
 
   @override

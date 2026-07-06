@@ -6,6 +6,7 @@ import '../../core/utils/dummy_data.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/widgets/expandable_section.dart';
 import '../review_queue/review_queue_screen.dart';
+import '../settings/semester_selection_screen.dart';
 import '../attendance/widgets/lecture_card.dart';
 
 class OverviewScreen extends StatefulWidget {
@@ -47,8 +48,89 @@ class _OverviewScreenState extends State<OverviewScreen> {
     super.dispose();
   }
 
+  Widget _buildNoSemesterState(BuildContext context) {
+    return Card(
+      color: AppTheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFF1E293B)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.school_rounded,
+                color: AppTheme.primary,
+                size: 48,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'No Active Semester',
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'To start tracking attendance, timetable schedule, tasks, and notes, please select or create an academic semester.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Configure Semester'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const SemesterSelectionScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: _buildNoSemesterState(context),
+          ),
+        ),
+      );
+    }
+
     final today = DateTime.now();
     final todayIndex = (today.weekday - 1) % 7;
     final todayLectures = DummyData.getLecturesForDay(todayIndex);
