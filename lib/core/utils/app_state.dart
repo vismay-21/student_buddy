@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:student_buddy/data/dto/semester/semester_dto.dart';
+import 'package:student_buddy/data/repositories/semester_repository.dart';
 import '../models/subject_template.dart';
 import 'dummy_data.dart';
 
@@ -28,15 +30,19 @@ class AppState {
   final ValueNotifier<ThemeMode> themeMode = ValueNotifier<ThemeMode>(ThemeMode.dark);
 
   // ── Semester ───────────────────────────────────────────────────────────────
-  final ValueNotifier<String> activeSemester = ValueNotifier<String>('Semester 4');
+  final ValueNotifier<String> activeSemester = ValueNotifier<String>('Semester 1');
+  final ValueNotifier<SemesterDto?> activeSemesterDto = ValueNotifier<SemesterDto?>(null);
 
   // ── Feature Toggles ────────────────────────────────────────────────────────
   final ValueNotifier<bool> isFinanceEnabled = ValueNotifier<bool>(false);
 
   // ── Initialization & Persistence ──────────────────────────────────────────
   static const String _keyFinanceEnabled = 'is_finance_enabled';
+  static const String _keyActiveSemesterId = 'active_semester_id';
   late final SharedPreferences _prefs;
   bool _isInitialized = false;
+
+  final SemesterRepository _semesterRepository = SemesterRepository();
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -49,8 +55,61 @@ class AppState {
     isFinanceEnabled.addListener(() {
       _prefs.setBool(_keyFinanceEnabled, isFinanceEnabled.value);
     });
+
+    // Bootstrap Semesters from backend
+    try {
+      await refreshSemesters();
+    } catch (e) {
+      debugPrint('Failed to load semesters from backend on init: $e');
+    }
     
     _isInitialized = true;
+  }
+
+  Future<void> refreshSemesters() async {
+    List<SemesterDto> list = [];
+    try {
+      list = await _semesterRepository.getSemesters();
+    } catch (e) {
+      debugPrint('Failed to get semesters: $e');
+    }
+
+    if (list.isEmpty) {
+      // Create a default Semester 1 if none exists
+      try {
+        final newSem = await _semesterRepository.createSemester(
+          SemesterCreateRequest(
+            semesterNumber: 1,
+            startDate: DateTime(2026, 6, 1),
+            endDate: DateTime(2026, 11, 30),
+          ),
+        );
+        list = [newSem];
+      } catch (e) {
+        debugPrint('Failed to create default semester: $e');
+      }
+    }
+
+    if (list.isNotEmpty) {
+      final savedId = _prefs.getString(_keyActiveSemesterId);
+      SemesterDto selected = list.first;
+      if (savedId != null) {
+        final found = list.firstWhere(
+          (s) => s.semesterId == savedId,
+          orElse: () => list.first,
+        );
+        selected = found;
+      }
+      setActiveSemester(selected);
+    }
+  }
+
+  void setActiveSemester(SemesterDto semester) {
+    activeSemesterDto.value = semester;
+    activeSemester.value = 'Semester ${semester.semesterNumber}';
+    semesterStartDate.value = semester.startDate;
+    semesterEndDate.value = semester.endDate;
+    _prefs.setString(_keyActiveSemesterId, semester.semesterId);
   }
 
   // ── Notification Toggles ───────────────────────────────────────────────────
