@@ -808,3 +808,30 @@ This log tracks architectural decisions, feature implementations, and refinement
 * **Testing**: Added `tests/activity_logs/test_activity_logs.py` covering logging success, transaction isolation, summary resolution, listing pagination/search, and get-by-id detail endpoint.
 * **Verification**:
   - All 160 tests across the entire test suite completed successfully.
+
+---
+
+## 2026-07-06 (Phase 3: Sprint 12 Implementation — Backend Verification & Flutter API Integration)
+
+### Decisions
+1. **MVP API Integration**: Set up clean frontend-backend interaction following the contract `Flutter → Dio → FastAPI → PostgreSQL` without introducing auth or database sync layers yet.
+2. **Standardized Error Interceptors**: Configured interceptors to handle standardized error parsing (translating FastAPI validations and HTTP exceptions to structured Dart `ApiException` payloads).
+3. **Graceful AppState Bootstrapping**: Refactored `AppState` to fetch semesters dynamically from the backend and select the active semester, defaulting to bootstrapping a clean `Semester 1` if no records exist.
+4. **Dynamic Semester Selection**: Removed the hardcoded list of semesters from the UI and added a validated dialog form allowing users to create new Semesters in the PostgreSQL database from the app interface.
+
+### Implementation Details
+* **Networking Layer**:
+  - Added `dio: ^5.4.0` dependency to `pubspec.yaml`.
+  - `lib/core/network/api_constants.dart`: Centralized local uvicorn host address (`http://127.0.0.1:8000/api/v1`) and API paths.
+  - `lib/core/network/interceptors.dart`: Structured API logs and parsed custom `ApiException` payloads.
+  - `lib/core/network/dio_client.dart`: Exposed pre-configured, singleton `Dio` client wrapper.
+* **Semester Module Integration**:
+  - `lib/data/dto/semester/semester_dto.dart`: Mapped Pydantic request/response structures to Dart serialization objects (`SemesterDto` and `SemesterCreateRequest`).
+  - `lib/data/api/semester_api.dart`: Implemented semester client endpoints (`GET`, `POST` to `/academic/semesters`).
+  - `lib/data/repositories/semester_repository.dart`: Exposed clean Repository pattern contract interfaces for fetching and saving semesters.
+* **UI Screen Integration**:
+  - `lib/core/utils/app_state.dart`: Modified to asynchronously boot/load active semesters on startup and persist selections.
+  - `lib/screens/settings/semester_selection_screen.dart`: Connected UI listing and selection to database. Created dialog form with date-pickers to insert new semesters directly via `SemesterRepository`.
+* **Verification**:
+  - Tested all endpoints manually in Swagger UI (Semester validation, Subject auto-notes sync, Lecture generation).
+  - Executed static code analysis (`flutter analyze`), which passed with `Exit code 0` (no errors).

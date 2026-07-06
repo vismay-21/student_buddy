@@ -344,6 +344,10 @@ student_buddy/
 │   │   ├── utils/
 │   │   │   ├── app_state.dart
 │   │   │   └── dummy_data.dart
+│   │   ├── network/                    # API Networking Layer
+│   │   │   ├── api_constants.dart      # Base URLs and API route endpoints
+│   │   │   ├── dio_client.dart         # Singleton Dio client instance
+│   │   │   └── interceptors.dart       # Error interceptors and ApiException parsing
 │   │   └── widgets/
 │   │       ├── app_snackbar.dart                  # Premium global floating SnackBar notification helper
 │   │       ├── expandable_section.dart            # Reusable collapsible dashboard section widget
@@ -388,6 +392,14 @@ student_buddy/
 │   │   └── todo/
 │   │       ├── add_todo_screen.dart          # Screen for creating new tasks with title, due dates, priority, and category
 │   │       └── todo_screen.dart              # Screen listing, sorting, and managing due tasks and reminders
+│   ├── data/                                 # Clean Architecture Data Access Layer
+│   │   ├── api/
+│   │   │   └── semester_api.dart             # API wrapper for Semester endpoints
+│   │   ├── dto/
+│   │   │   └── semester/
+│   │   │       └── semester_dto.dart         # DTO serialization and deserialization classes
+│   │   └── repositories/
+│   │       └── semester_repository.dart      # Clean interface mapping endpoints to state
 │   └── main.dart
 ├── pubspec.yaml
 └── README.md
@@ -397,7 +409,7 @@ student_buddy/
 
 ## 9. Current Backend Status
 
-We are currently developing the **FastAPI Backend (Sprint 10 — Review Queue Module)**.
+We are currently developing the **Flutter API Integration (Sprint 12 — Semester & Subject Modules)**.
 
 
 ### 9.1. Frontend / UI (Phase 1 — Locked)
@@ -540,12 +552,24 @@ We are currently developing the **FastAPI Backend (Sprint 10 — Review Queue Mo
   * Implemented complete alphabetical hierarchy tree retrieval `GET /hierarchy/{semester_id}`.
   * Added future TODO integration placeholders for Activity Logs (Sprint 11) and Storage Deletion (Sprint 12).
   * Optimized database query performance by adding database indexes on `notes_sections.notes_subject_id` and `notes_resources.section_id`, `notes_resources.resource_name`, and `notes_resources.file_name`.
-  * Implemented optional limit/offset pagination on `GET /api/v1/notes/resources` with validation constraints enforcing `1 <= limit <= 100` and `offset >= 0`, returning 50 records by default.
   * Documented future physical storage upload logic checks in `create_resource` and deletion flows in `delete_resource` using structured TODO comments.
 
+* **What was implemented (Sprint 10 - Review Queue Module)**:
+  - Created review queue tables and enums in SQL database.
+  - Implemented human-in-the-loop review queue architecture resolving ambiguous data updates via service resolvers.
+
+* **What was implemented (Sprint 11 - Activity Logs Module)**:
+  - Created central activity logger helper, database schema, and REST API search.
+  - Hooked all core business services to record user/admin activities.
+
+* **What was implemented (Sprint 12 - Semester Module Integration)**:
+  - Set up Dio client, base constants, and ApiException interceptors on Flutter frontend.
+  - Bootstrapped, fetched, and selected academic semesters from local uvicorn host.
+  - Completed active semester selector screen and new semester creation form dialog.
+
 * **What was intentionally NOT implemented (postponed)**:
-  * Supabase integration & authentication APIs (postponed to Sprint 12)
-  * SQLite synchronization engine (postponed to Sprint 13)
+  * Authentication & Supabase integration (postponed to Sprint 13)
+  * SQLite synchronization engine (postponed to Sprint 14)
   * WhatsApp bot webhook and Meta Cloud API integration (postponed to Sprint 15)
   * AI engine and OCR timetable parser (postponed to Sprint 16)
 
