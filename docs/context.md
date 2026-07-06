@@ -137,22 +137,193 @@ student_buddy/
 ├── macos/
 ├── linux/
 ├── web/
-├── backend/                  # FastAPI backend skeleton
+├── backend/                  # FastAPI backend module
 │   ├── app/                  # FastAPI application package
-│   │   ├── api/              # Routers (health check, and placeholders)
-│   │   ├── core/             # Configuration, database, exception handler, logging
-│   │   ├── dependencies/     # Dependency injection providers
+│   │   ├── api/              # API Routers for health check, settings, academic, notes, and todos modules
+│   │   │   ├── v1/
+│   │   │   │   ├── academic/
+│   │   │   │   │   ├── semesters.py            # Semester REST endpoints
+│   │   │   │   │   ├── subjects.py             # Subject REST endpoints
+│   │   │   │   │   ├── lecture_templates.py    # Lecture Template REST endpoints
+│   │   │   │   │   ├── lecture_instances.py    # Lecture Instance REST endpoints
+│   │   │   │   │   ├── attendance_settings.py  # Attendance Settings REST endpoints
+│   │   │   │   │   └── holidays.py             # Holiday REST endpoints
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── settings/
+│   │   │   │   │   ├── app_settings.py         # App Settings REST endpoints
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── todo/
+│   │   │   │   │   ├── todos.py                # Todo REST endpoints
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── notes/
+│   │   │   │   │   ├── notes.py                # Notes REST endpoints
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── activity_logs/
+│   │   │   │   │   └── __init__.py             # Activity logs endpoint placeholders
+│   │   │   │   ├── review_queue/
+│   │   │   │   │   ├── review_queue.py         # Review queue REST endpoints
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── health.py                   # Health check endpoint
+│   │   │   │   └── __init__.py
+│   │   │   └── __init__.py
+│   │   ├── core/             # Configuration, database connection, exception handling, and logging
+│   │   │   ├── config.py                       # Global settings loader
+│   │   │   ├── constants.py                    # Static global constants
+│   │   │   ├── database.py                     # Database connection pool setup
+│   │   │   ├── exceptions.py                   # Custom exceptions and handlers
+│   │   │   ├── logging.py                      # Structured logging configuration
+│   │   │   ├── security.py                     # Password/token security helpers
+│   │   │   └── __init__.py
+│   │   ├── dependencies/     # FastAPI Dependency injection providers
+│   │   │   ├── database.py                     # Database session injector
+│   │   │   └── __init__.py
 │   │   ├── models/           # Database SQLAlchemy models
-│   │   ├── schemas/          # Pydantic schemas (common responses)
-│   │   ├── repositories/     # Database CRUD repositories
-│   │   ├── services/         # Business logic services
-│   │   ├── utils/            # Helper utilities
-│   │   └── main.py           # Application entry point
-│   ├── alembic/              # Database migration tool configuration
-│   ├── tests/                # Test package (conftest, health test)
+│   │   │   ├── academic/
+│   │   │   │   ├── semester.py                 # Semester model
+│   │   │   │   ├── subject.py                  # Subject model
+│   │   │   │   ├── lecture_template.py         # LectureTemplate model
+│   │   │   │   ├── lecture_instance.py         # LectureInstance model
+│   │   │   │   ├── attendance_settings.py      # AttendanceSettings model
+│   │   │   │   ├── holiday.py                  # Holiday model
+│   │   │   │   └── __init__.py
+│   │   │   ├── settings/
+│   │   │   │   ├── app_settings.py             # AppSettings singleton model
+│   │   │   │   └── __init__.py
+│   │   │   ├── todo/
+│   │   │   │   ├── todo.py                     # Todo model
+│   │   │   │   └── __init__.py
+│   │   │   ├── notes/
+│   │   │   │   ├── notes_subject.py            # NotesSubject model
+│   │   │   │   ├── notes_section.py            # NotesSection model
+│   │   │   │   ├── notes_resource.py           # NotesResource model
+│   │   │   │   └── __init__.py
+│   │   │   ├── activity_logs/
+│   │   │   │   └── __init__.py                 # Activity logs models placeholder
+│   │   │   ├── review_queue/
+│   │   │   │   ├── review_queue.py             # Review queue model
+│   │   │   │   └── __init__.py
+│   │   │   └── __init__.py
+│   │   ├── schemas/          # Pydantic validation models
+│   │   │   ├── academic/
+│   │   │   │   ├── semester.py                 # Semester validation schemas
+│   │   │   │   ├── subject.py                  # Subject validation schemas
+│   │   │   │   ├── lecture_template.py         # LectureTemplate validation schemas
+│   │   │   │   ├── lecture_instance.py         # LectureInstance validation schemas
+│   │   │   │   ├── attendance_settings.py      # AttendanceSettings validation schemas
+│   │   │   │   ├── holiday.py                  # Holiday validation schemas
+│   │   │   │   └── __init__.py
+│   │   │   ├── settings/
+│   │   │   │   ├── app_settings.py             # AppSettings validation schemas
+│   │   │   │   └── __init__.py
+│   │   │   ├── todo/
+│   │   │   │   ├── todo.py                     # Todo validation schemas
+│   │   │   │   └── __init__.py
+│   │   │   ├── notes/
+│   │   │   │   ├── notes_subject.py            # NotesSubject validation schemas
+│   │   │   │   ├── notes_section.py            # NotesSection validation schemas
+│   │   │   │   ├── notes_resource.py           # NotesResource validation schemas
+│   │   │   │   └── __init__.py
+│   │   │   ├── activity_logs/
+│   │   │   │   └── __init__.py                 # Activity logs schemas placeholder
+│   │   │   ├── review_queue/
+│   │   │   │   ├── review_queue.py             # Review queue validation schemas
+│   │   │   │   └── __init__.py
+│   │   │   ├── common.py                       # Global standard API response schemas
+│   │   │   └── __init__.py
+│   │   ├── repositories/     # Database queries and operations (CRUD)
+│   │   │   ├── academic/
+│   │   │   │   ├── semester.py                 # Semester DB query operations
+│   │   │   │   ├── subject.py                  # Subject DB query operations
+│   │   │   │   ├── lecture_template.py         # LectureTemplate DB query operations
+│   │   │   │   ├── lecture_instance.py         # LectureInstance DB query operations
+│   │   │   │   ├── attendance_settings.py      # AttendanceSettings DB query operations
+│   │   │   │   ├── holiday.py                  # Holiday DB query operations
+│   │   │   │   └── __init__.py
+│   │   │   ├── settings/
+│   │   │   │   ├── app_settings.py             # AppSettings DB query operations
+│   │   │   │   └── __init__.py
+│   │   │   ├── todo/
+│   │   │   │   ├── todo.py                     # Todo DB query operations
+│   │   │   │   └── __init__.py
+│   │   │   ├── notes/
+│   │   │   │   ├── notes_subject.py            # NotesSubject DB query operations
+│   │   │   │   ├── notes_section.py            # NotesSection DB query operations
+│   │   │   │   ├── notes_resource.py           # NotesResource DB query operations
+│   │   │   │   └── __init__.py
+│   │   │   ├── activity_logs/
+│   │   │   │   └── __init__.py                 # Activity logs repository placeholder
+│   │   │   ├── review_queue/
+│   │   │   │   ├── review_queue.py             # Review queue DB query operations
+│   │   │   │   └── __init__.py
+│   │   │   └── __init__.py
+│   │   ├── services/         # Business logic and transaction rules orchestrations
+│   │   │   ├── academic/
+│   │   │   │   ├── semester.py                 # Semester business logic
+│   │   │   │   ├── subject.py                  # Subject business logic & notes sync
+│   │   │   │   ├── lecture_template.py         # LectureTemplate business logic
+│   │   │   │   ├── lecture_instance.py         # LectureInstance business logic
+│   │   │   │   ├── attendance_settings.py      # AttendanceSettings business logic
+│   │   │   │   ├── attendance_statistics.py    # Ratios and safe skip logic
+│   │   │   │   ├── holiday.py                  # Holiday transactional updates
+│   │   │   │   └── __init__.py
+│   │   │   ├── settings/
+│   │   │   │   ├── app_settings.py             # AppSettings business logic
+│   │   │   │   └── __init__.py
+│   │   │   ├── todo/
+│   │   │   │   ├── todo.py                     # Todo business logic and status state transitions
+│   │   │   │   └── __init__.py
+│   │   │   ├── notes/
+│   │   │   │   ├── notes.py                    # Notes service orchestrator
+│   │   │   │   └── __init__.py
+│   │   │   ├── activity_logs/
+│   │   │   │   └── __init__.py                 # Activity logs service placeholder
+│   │   │   ├── review_queue/
+│   │   │   │   ├── review_queue.py             # Review queue business logic & dispatcher
+│   │   │   │   ├── resolvers/                  # Entity-specific resolver classes
+│   │   │   │   │   ├── base.py                 # BaseResolver interface
+│   │   │   │   │   ├── todo.py                 # TodoResolver - applies TodoUpdate changes
+│   │   │   │   │   ├── lecture_instance.py     # LectureInstanceResolver - applies attendance/status changes
+│   │   │   │   │   ├── finance.py              # FinanceResolver - frozen no-op placeholder
+│   │   │   │   │   ├── registry.py             # RESOLVERS map: EntityType -> resolver class
+│   │   │   │   │   └── __init__.py
+│   │   │   │   └── __init__.py
+│   │   │   └── __init__.py
+│   │   ├── utils/            # Helper utilities and shared formulas
+│   │   │   ├── attendance_calculator.py        # Core attendance mathematical formulas
+│   │   │   └── __init__.py
+│   │   ├── main.py           # FastAPI entrypoint, router registers, exception handler registers
+│   │   └── __init__.py
+│   ├── alembic/              # Alembic database migration tool configurations
+│   │   ├── versions/         # Alembic database migration version scripts
+│   │   │   ├── 192b4793464e_create_semester_and_attendance_settings_.py
+│   │   │   ├── 1a9ff58b8423_create_subjects_and_notes_subjects_.py
+│   │   │   ├── 2db1602c28b4_create_lecture_template_instance_.py
+│   │   │   ├── ca2a9e095c10_create_app_settings_table.py
+│   │   │   ├── 6e718cd5065a_create_todos_table.py
+│   │   │   └── e4ffe7e8e71b_create_notes_tables.py
+│   │   ├── env.py            # Migration target registration env
+│   │   └── script.py.mako    # Alembic revision template script
+│   ├── tests/                # Unit and integration test suites
+│   │   ├── academic/
+│   │   │   ├── test_semesters.py               # Semester test cases
+│   │   │   ├── test_subjects.py                # Subject CRUD and notes sync test cases
+│   │   │   ├── test_lecture_templates.py       # LectureTemplate validation test cases
+│   │   │   ├── test_lecture_instances.py       # LectureInstance CRUD test cases
+│   │   │   ├── test_attendance_settings.py     # AttendanceSettings constraints tests
+│   │   │   └── test_holidays.py                # Holiday transaction rollback tests
+│   │   ├── settings/
+│   │   │   └── test_app_settings.py            # AppSettings theme/path normalization tests
+│   │   ├── todo/
+│   │   │   └── test_todos.py                   # Todo status-transition & sorting tests
+│   │   ├── notes/
+│   │   │   └── test_notes.py                   # Notes CRUD, validators, hierarchy and search tests
+│   │   ├── test_health.py                      # Health endpoint verification
+│   │   ├── conftest.py                         # Test database session fixtures and cleanup setups
+│   │   └── __init__.py
 │   ├── requirements.txt      # Python dependencies list
 │   ├── README.md             # Development documentation setup
 │   └── .env.example          # Environment variables template
+
 ├── docs/                     # Documentation files
 │   ├── database/             # Database design documents
 │   │   ├── 04_entity_relationship_diagram.md
@@ -224,9 +395,10 @@ student_buddy/
 
 ---
 
-## 9. Current Development Phase
+## 9. Current Backend Status
 
-We are currently developing the **FastAPI Backend (Sprint 0 — Backend Foundation)**.
+We are currently developing the **FastAPI Backend (Sprint 10 — Review Queue Module)**.
+
 
 ### 9.1. Frontend / UI (Phase 1 — Locked)
 
@@ -275,17 +447,103 @@ We are currently developing the **FastAPI Backend (Sprint 0 — Backend Foundati
   * **Finance Module (FROZEN)**: All Finance module development is officially frozen. It is now disabled by default on clean installs, and the toggle state is persisted via `SharedPreferences`.
   * Riverpod state management implementation (postponed to Sprint 14)
 
-### 9.2. Backend (Sprint 0 — Backend Foundation)
+### 9.2. Backend (Sprint 3 — Lecture Template Module)
 
-* **What was implemented**:
+* **What was implemented (Sprint 0 - Backend Foundation)**:
   * Established the complete FastAPI project skeleton with folder structure matching the architectural specification.
   * Configured Pydantic settings loading from environmental files (`.env`), async database engine, and session maker in SQLAlchemy 2.x.
   * Structured unified python console logging format and custom application exception hierarchy with global FastAPI interceptors.
   * Designed standard API response formats (`ApiResponse` and `ApiErrorResponse`) and registered a testable health check router (`/api/v1/health`).
   * Created empty Python package folders with `__init__.py` markers for all academic, settings, todo, notes, review queue, and log modules.
 
+* **What was implemented (Sprint 1 - Semester Module)**:
+  * Created database models for `Semester` and `AttendanceSettings` with appropriate columns, constraints, unique keys, and cascading relationships.
+  * Attendance criteria modes: `overall`, `subject`, `custom` (matching finalized database schema).
+  * Autogenerated and executed Alembic database migrations to create matching PostgreSQL tables.
+  * Developed the Repository Layer containing query methods (`SemesterRepository` including overlap detection, and a create-only stub for `AttendanceSettingsRepository`).
+  * Implemented the Service Layer (`SemesterService`) handling date validations, unique checks, **semester date overlap rejection**, default attendance settings creation (criteria mode overall, goal sourced from `DEFAULT_ATTENDANCE_GOAL` constant), and marked TODO placeholders for future Activity Log integrations.
+  * Designed RESTful API endpoints under `/api/v1/academic/semesters` supporting all standard CRUD actions wrapped in standard `ApiResponse` envelopes, with professional OpenAPI documentation (summary, description, response descriptions on every endpoint).
+  * Configured Pytest testing suite (15 tests) using async isolation (connection-level transaction rollback per test with engine disposal to avoid event loop issues), covering repositories, services, overlap/adjacent validation, and API integration.
+
+* **What was implemented (Sprint 2 - Subject Module)**:
+  * Created database SQLAlchemy models for `Subject` and `NotesSubject` tables including unique constraints and cascade foreign keys.
+  * Configured Alembic database migrations to create the corresponding database tables.
+  * Built Pydantic validation schemas with custom regex for hex theme color codes and boundary verification for `attendance_goal` parameter.
+  * Developed repository layers for both `subjects` and `notes_subjects` tables.
+  * Implemented `SubjectService` containing all core business logic including validation of the parent semester existence, validation of name uniqueness per semester, automatic creation/rename sync of matching Notes Subject, and conditional deletion.
+  * Designed 5 thin RESTful endpoints under `/api/v1/academic/subjects` with structured response schemas and complete OpenAPI descriptions.
+  * Added 12 new async tests covering repository unique constraints, service auto-sync functionality, parameter boundaries, and integration routes.
+
+* **What was implemented (Sprint 3 - Lecture Template Module)**:
+  * Created database SQLAlchemy models for `LectureTemplate` (schedule unique constraint, day_of_week range 1-7 check, and start_time < end_time check), `LectureInstance` (with statuses and attendance enums), and `Holiday`.
+  * Configured and applied Alembic database migration to generate the tables.
+  * Designed Pydantic validation schemas for `LectureTemplate` with cross-field time range verification.
+  * Created repository layers for `lecture_templates` and `lecture_instances`. Removed early-access `Holiday` repositories, services, and endpoints to keep Sprint boundaries clean.
+  * Implemented `LectureTemplateService` encapsulating schedule uniqueness checks and **Semester Lecture Generation** logic.
+  * Built automatic synchronization: changing scheduling attributes (`day_of_week`, `start_time`, `end_time`) automatically deletes all future scheduled unmarked instances and regenerates them. Changing non-scheduling attributes like `room` leaves instances intact.
+  * Added **Timetable Overlap Validation** to block overlapping lecture templates inside the same semester and day.
+  * Secured **Transaction Integrity** by executing updates and instance regenerations within single savepoint transactions (`begin_nested`), rolling back changes to both database rows and in-memory attributes if regeneration fails.
+  * Registered REST API router `/api/v1/academic/lecture-templates` in `main.py` with 5 CRUD endpoints and detailed OpenAPI Swagger specifications.
+  * Created 18 comprehensive tests in `tests/academic/test_lecture_templates.py` covering repository constraints, conflict check rules, boundary conditions, leap-year calculations, schedule changes vs. room changes, and transaction rollback.
+
+* **What was implemented (Sprint 4 - Lecture Instance Module)**:
+  * Created Pydantic validation and nested response schemas for `LectureInstance` and dynamic `AttendanceStatsResponse`.
+  * Extended `LectureInstanceRepository` with eager-loaded relationships, filters, chronologically ordered sorting, and optimized `get_by_subject` history retrieval.
+  * Implemented `LectureInstanceService` encapsulating runtime attendance calculations (total, present, absent, percentage, remaining, safe skip), enforcing business rules (rejecting markings on holiday/cancelled classes, allowing resets to unmarked), and bulk-marking updates with skipped count.
+  * Registered REST API router `/api/v1/academic/lecture-instances` supporting list, today's schedule, details, single updates, bulk updates, and runtime subject/semester stats.
+  * Created 19 comprehensive async tests covering constraints, validations, bulk updates, and calculations.
+
+* **What was implemented (Sprint 5 - Attendance Settings Module)**:
+  * Developed Pydantic schemas for `AttendanceSettingsUpdate`.
+  * Expanded `AttendanceSettingsRepository` with `get_by_semester_id` and `update` persistence methods.
+  * Implemented `AttendanceSettingsService` to validate settings updates (value range 1-100, checking mandatory goal for overall/subject mode, and support for clearing goal in custom mode).
+  * Extracted calculations into a dedicated `AttendanceStatisticsService` to decouple database fetching from pure calculations and criteria-mode evaluations.
+  * Configured criteria mode rules: `Overall Mode` computes overall statistics across all scheduled lectures; `Subject Mode` aggregates subject calculations using the semester's overall goal; `Custom Mode` aggregates subject calculations using each subject's individual target.
+  * Registered REST API endpoints with path-parameter layout: `GET /api/v1/academic/attendance-settings/{semester_id}` and `PUT /api/v1/academic/attendance-settings/{semester_id}`.
+  * Added 13 unit/integration tests in `tests/academic/test_attendance_settings.py` covering transition permutations, partial updates, edge cases (no subjects, no marked lectures), history immutability, and validation limits.
+
+* **What was implemented (Sprint 6 - Holiday Module)**:
+  * Integrated CRUD endpoints for holidays under `/api/v1/academic/holidays`.
+  * Added validation rules: date must fall within semester bounds, date must be unique per semester.
+  * Implemented Holiday Business Rule: holidays only modify scheduled lecture instances (never cancelled ones) and restore only previously holiday-marked instances back to scheduled status.
+  * Ensured transaction safety: all holiday mutations run inside single nested savepoint transactions, rolling back all associated database states on failure.
+  * Utilized database-level SQLAlchemy bulk updates to optimize performance.
+  * Added a dedicated chronological `/calendar/{semester_id}` endpoint returning only dates and names for calendar rendering.
+  * Integrated holiday status checking in `LectureTemplateService` during timetable template creation and regeneration.
+  * Documented and enforced that holidays never modify Lecture Templates; they only modify Lecture Instances.
+
+* **What was implemented (Sprint 7 - App Settings Module)**:
+  * Designed singleton `app_settings` database schema containing global application preferences (Theme Mode, Finance Toggle, Digests, and Notes download directory path).
+  * Enforced singleton database constraint `settings_id = 1` and restricted foreign key cascade deletion for active semesters.
+  * Developed repository, service, and API controller layers exposing only GET settings and PUT settings operations.
+  * Added custom validation and normalizations: case-insensitive theme parsing ('light', 'dark', 'system') and normalized OS file path strings.
+  * Implemented active semester deletion protection (blocking deletion of semester currently selected as active via 409 conflict).
+  * Automated seed generation for default configuration in database migrations and clean test suite sessions.
+
+* **What was implemented (Sprint 8 - Todo Module)**:
+  * Documented and enforced that todos are completely independent of semesters, subjects, attendance, notes, and academic modules.
+  * Designed `todos` database schema supporting categories, priorities, statuses, and custom created_by sources.
+  * Developed repository, service, and API controller layers with full CRUD operations.
+  * Implemented default ordering for list_todos (pending first, priority High->Med->Low, earliest due date with nulls last, newest created_at first).
+  * Added query parameter case-insensitive title search (`q`) filtered inside the repository.
+  * Enforced due date year validation to fall within the range [2000, 2100].
+  * Added dynamic response model field `days_overdue` and `is_overdue` (computed at runtime, not persisted in the database).
+  * Integrated status state-transitions where completing/reverting a task automatically manages `completed_at` timestamps.
+
+* **What was implemented (Sprint 9 - Notes Repository Module)**:
+  * Designed the database schemas for `notes_sections` and `notes_resources` tables with cascade deletion.
+  * Configured `uploaded_via` PostgreSQL enum supporting `app`, `whatsapp`, `ocr`, `review_queue`, and `api`.
+  * Implemented read-only notes subjects endpoints synchronized automatically from the academic subject module (the subject module remains the single source of truth).
+  * Exposed complete CRUD endpoints for Notes Sections and Notes Resources with Pydantic validators checking `file_size_bytes > 0` and `mime_type` against an allow-list of supported document/image types.
+  * Derived `file_extension` dynamically from `file_name` to prevent inconsistent metadata.
+  * Added hierarchical search `GET /resources` with case-insensitive search (`q`) and optional `semester_id`, ordered by Semester -> Notes Subject -> Section -> Resource Name.
+  * Implemented complete alphabetical hierarchy tree retrieval `GET /hierarchy/{semester_id}`.
+  * Added future TODO integration placeholders for Activity Logs (Sprint 11) and Storage Deletion (Sprint 12).
+  * Optimized database query performance by adding database indexes on `notes_sections.notes_subject_id` and `notes_resources.section_id`, `notes_resources.resource_name`, and `notes_resources.file_name`.
+  * Implemented optional limit/offset pagination on `GET /api/v1/notes/resources` with validation constraints enforcing `1 <= limit <= 100` and `offset >= 0`, returning 50 records by default.
+  * Documented future physical storage upload logic checks in `create_resource` and deletion flows in `delete_resource` using structured TODO comments.
+
 * **What was intentionally NOT implemented (postponed)**:
-  * Database Models, Repositories, Services, and REST CRUD API endpoints (begins in Sprint 1 — Semester Module)
   * Supabase integration & authentication APIs (postponed to Sprint 12)
   * SQLite synchronization engine (postponed to Sprint 13)
   * WhatsApp bot webhook and Meta Cloud API integration (postponed to Sprint 15)
@@ -296,21 +554,21 @@ We are currently developing the **FastAPI Backend (Sprint 0 — Backend Foundati
 ## 10. Future Development Roadmap
 
 * **Sprint 0**: Backend Foundation (Completed)
-* **Sprint 1**: Semester Module
-* **Sprint 2**: Subject Module
-* **Sprint 3**: Lecture Template Module
-* **Sprint 4**: Lecture Instance Module
-* **Sprint 5**: Attendance Settings Module
-* **Sprint 6**: Holiday Module
-* **Sprint 7**: App Settings Module
-* **Sprint 8**: Todo Module
-* **Sprint 9**: Notes Repository Module
-* **Sprint 10**: Review Queue Module
-* **Sprint 11**: Activity Logs Module
-* **Sprint 12**: Authentication
-* **Sprint 13**: SQLite Synchronization Engine
-* **Sprint 14**: Flutter Data Layer Integration
-* **Sprint 15**: WhatsApp Bot Integration
+* **Sprint 1**: Semester Module (Completed)
+* **Sprint 2**: Subject Module (Completed)
+* **Sprint 3**: Lecture Template Module (Completed)
+* **Sprint 4**: Lecture Instance Module (Completed)
+* **Sprint 5**: Attendance Settings Module (Completed)
+* **Sprint 6**: Holiday Module (Completed)
+* **Sprint 7**: App Settings Module (Completed)
+* **Sprint 8**: Todo Module (Completed)
+* **Sprint 9**: Notes Repository Module (Completed)
+* **Sprint 10**: Review Queue Module (Completed + Refined)
+* **Sprint 11**: Activity Logs Module (Completed)
+* **Sprint 12**: Backend Verification & Flutter API Integration (MVP Mode)
+* **Sprint 13**: Authentication
+* **Sprint 14**: SQLite Synchronization Engine
+* **Sprint 15**: WhatsApp Integration
 * **Sprint 16**: AI Integration
 * **Sprint 17**: Finance Module (Frozen until core is stable)
 
@@ -334,4 +592,50 @@ We are currently developing the **FastAPI Backend (Sprint 0 — Backend Foundati
 * **State Isolation**: State must be kept local to individual screens (e.g. within stateful wrapper pages) to avoid nested global `ValueNotifier` trees.
 * **ValueNotifier Restrictions**: Standard `ValueNotifier` can only be used for simple, isolated UI events. All core calculations, models, and operations must not depend on `ValueNotifier` chains.
 * **Riverpod Migration Preparation**: State logic (such as attendance calculations, holiday maps) should be organized into notifier-like structures inside the screen states, facilitating clean extraction to `StateNotifier` or `Notifier` classes in Phase 2+.
+
+---
+
+## 13. MVP Implementation Rule
+
+Before implementing Authentication, SQLite Sync, WhatsApp or AI, the application must be fully usable using the existing FastAPI backend.
+
+This means:
+
+Flutter
+↓
+Dio
+↓
+FastAPI
+↓
+PostgreSQL
+
+without any authentication layer.
+
+The MVP should support all existing backend functionality through REST APIs.
+
+The goal is to validate business logic and user experience before introducing additional complexity.
+
+---
+
+## 14. Implementation Priority Rule
+
+Unless explicitly instructed otherwise, always implement features assuming the application is operating in MVP mode.
+
+MVP Mode consists of:
+
+Flutter
+↓
+FastAPI
+↓
+PostgreSQL
+
+No Authentication
+No SQLite
+No WhatsApp
+No AI
+
+Every new feature should first be implemented and verified in MVP mode before integration with advanced infrastructure.
+
+Authentication, SQLite, WhatsApp and AI should be treated as extension layers that wrap existing functionality rather than replacing it.
+
 

@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from app.core.constants import BACKEND_VERSION
 from app.schemas.common import ApiResponse
 
 router = APIRouter()
@@ -11,6 +12,6 @@ async def health_check() -> ApiResponse[dict[str, str]]:
         message="Student Buddy Backend Running",
         data={
             "status": "healthy",
-            "version": "1.0.0"
+            "version": BACKEND_VERSION
         }
     )

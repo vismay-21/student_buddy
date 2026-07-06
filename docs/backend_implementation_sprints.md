@@ -246,67 +246,92 @@ No APIs.
 
 ---
 
-# Sprint 12 — Authentication
+# Sprint 12 — Backend Verification & Flutter API Integration
+
+## Objectives
+
+### Backend Verification
+- Run FastAPI locally.
+- Verify every API using Swagger.
+- Test CRUD operations.
+- Test validations.
+- Test business rules.
+- Verify Activity Logs.
+- Verify Review Queue.
+- Verify lecture generation.
+- Verify attendance calculations.
+- Fix any backend bugs.
+
+### Flutter Integration
+- Replace every piece of dummy data with backend APIs.
+- Connect Flutter to FastAPI using:
+  - Dio
+  - Repository Layer
+  - DTOs
+  - API Clients
+- Do NOT implement:
+  - Authentication
+  - SQLite
+  - Offline Sync
+  - WhatsApp
+  - AI
+- The app should become completely usable with a running backend.
+
+### Supported Modules
+- Semester
+- Subjects
+- Timetable
+- Attendance
+- Todo
+- Notes
+- Review Queue
+- Settings
+- Activity Timeline
+
+## Deliverable
+- A complete working Student Buddy application using the existing REST APIs.
+
+---
+
+# Sprint 13 — Authentication
 
 ## Deliverables
-
 - Supabase Authentication
-- JWT Validation
-- Dependency Injection
-- Protected APIs
+- JWT validation
+- Protected endpoints
+- User context
 
 ---
 
-# Sprint 13 — SQLite Synchronization Engine
+# Sprint 14 — SQLite Synchronization Engine
 
 ## Deliverables
-
-- SQLite First Policy
-- Upload Sync
-- Download Sync
-- Conflict Resolution
-- Retry Logic
-- Sync Metadata
-
----
-
-# Sprint 14 — Flutter Data Layer Integration
-
-## Deliverables
-
-Replace dummy data with backend APIs.
-
-Connect:
-
-- Riverpod
-- Repositories
-- Dio
 - SQLite
+- Offline-first repositories
+- Synchronization engine
+- Conflict resolution
+- Retry logic
 
 ---
 
-# Sprint 15 — WhatsApp Bot Integration
+# Sprint 15 — WhatsApp Integration
 
 ## Deliverables
-
+- Meta Cloud API
 - Webhooks
-- Intent Parsing
-- Structured Commands
-- Review Queue Integration
-
-No AI.
+- Command parser
+- Review Queue integration
+- No AI
 
 ---
 
 # Sprint 16 — AI Integration
 
 ## Deliverables
-
-- Intent Understanding
+- Natural Language Understanding
+- OCR
 - RAG
 - Context Engine
-- Review Queue Learning
-- Activity Log Context
 - Decision Assistant
 
 ---
@@ -316,3 +341,48 @@ No AI.
 Finance Module implementation begins only after the core application is stable.
 
 This module will be documented separately.
+
+---
+
+# MVP Implementation Rule
+
+Before implementing Authentication, SQLite Sync, WhatsApp or AI, the application must be fully usable using the existing FastAPI backend.
+
+This means:
+
+Flutter
+↓
+Dio
+↓
+FastAPI
+↓
+PostgreSQL
+
+without any authentication layer.
+
+The MVP should support all existing backend functionality through REST APIs.
+
+The goal is to validate business logic and user experience before introducing additional complexity.
+
+---
+
+# Implementation Priority Rule
+
+Unless explicitly instructed otherwise, always implement features assuming the application is operating in MVP mode.
+
+MVP Mode consists of:
+
+Flutter
+↓
+FastAPI
+↓
+PostgreSQL
+
+No Authentication
+No SQLite
+No WhatsApp
+No AI
+
+Every new feature should first be implemented and verified in MVP mode before integration with advanced infrastructure.
+
+Authentication, SQLite, WhatsApp and AI should be treated as extension layers that wrap existing functionality rather than replacing it.

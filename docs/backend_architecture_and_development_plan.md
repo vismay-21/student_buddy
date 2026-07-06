@@ -577,15 +577,17 @@ Only after completing one module should development proceed to the next.
 
 12. Activity Logs
 
-13. Authentication
+13. Backend Verification & Flutter API Integration (MVP Mode)
 
-14. Synchronization Engine
+14. Authentication
 
-15. WhatsApp Integration
+15. Synchronization Engine
 
-16. AI Integration
+16. WhatsApp Integration
 
-17. Finance Module
+17. AI Integration
+
+18. Finance Module
 ```
 
 This order follows the dependency hierarchy of the database.
@@ -2017,6 +2019,51 @@ The backend implementation is complete when:
 - Synchronization follows the Synchronization Strategy.
 - Tests pass successfully.
 - Documentation remains synchronized with implementation.
+
+---
+
+# MVP Implementation Rule
+
+Before implementing Authentication, SQLite Sync, WhatsApp or AI, the application must be fully usable using the existing FastAPI backend.
+
+This means:
+
+Flutter
+↓
+Dio
+↓
+FastAPI
+↓
+PostgreSQL
+
+without any authentication layer.
+
+The MVP should support all existing backend functionality through REST APIs.
+
+The goal is to validate business logic and user experience before introducing additional complexity.
+
+---
+
+# Implementation Priority Rule
+
+Unless explicitly instructed otherwise, always implement features assuming the application is operating in MVP mode.
+
+MVP Mode consists of:
+
+Flutter
+↓
+FastAPI
+↓
+PostgreSQL
+
+No Authentication
+No SQLite
+No WhatsApp
+No AI
+
+Every new feature should first be implemented and verified in MVP mode before integration with advanced infrastructure.
+
+Authentication, SQLite, WhatsApp and AI should be treated as extension layers that wrap existing functionality rather than replacing it.
 
 ---
 

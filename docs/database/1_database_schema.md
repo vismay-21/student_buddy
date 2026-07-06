@@ -1115,14 +1115,15 @@ The Review Queue acts as a decision queue rather than a data storage table.
 
 | Column | PostgreSQL Type |
 |----------|----------------|
-| review_id | UUID (PK) |
+| review_id | UUID (PK, Index) |
 | review_type | ENUM |
 | entity_type | ENUM |
-| entity_id | UUID |
+| entity_id | UUID (Index) |
 | review_message | TEXT |
-| review_status | ENUM |
-| created_at | TIMESTAMPTZ |
-| resolved_at | TIMESTAMPTZ |
+| review_status | ENUM (Index) |
+| resolved_by | ENUM (default: `user`) |
+| created_at | TIMESTAMPTZ (Index) |
+| resolved_at | TIMESTAMPTZ (nullable) |
 
 ---
 
@@ -1157,6 +1158,16 @@ resolved
 
 ---
 
+#### resolved_by
+
+```
+user
+system
+admin
+```
+
+---
+
 ### Constraints
 
 Primary Key
@@ -1169,6 +1180,28 @@ No Foreign Keys are enforced because the table uses a polymorphic reference thro
 
 ---
 
+### Indexes
+
+| Column | Purpose |
+|---|---|
+| review_id | Primary key lookup |
+| entity_id | Fast polymorphic entity lookup |
+| review_status | Filter pending vs. resolved queue |
+| created_at | Optimal ordering of pending queue (newest first) |
+
+---
+
+### Architectural Contract
+
+> [!IMPORTANT]
+> `entity_type` + `entity_id` **must always reference a valid, existing entity** at the time the review item is created. The service layer is responsible for verifying the entity exists before inserting a review item. No database-level foreign key is possible because the reference is polymorphic.
+>
+> **Review Queue never owns business data.** It only coordinates human verification of decisions made by automated systems (WhatsApp Bot, OCR, AI). All business data lives in the original entity tables (`todos`, `lecture_instances`, etc.).
+>
+> When a review item is resolved, the original entity is updated first, and the review status is then set to `resolved` atomically within a single transaction. If the entity update fails, the review status remains `pending`.
+
+---
+
 ### Business Rules
 
 - Review Queue never stores application data.
@@ -1178,6 +1211,7 @@ No Foreign Keys are enforced because the table uses a polymorphic reference thro
 - Attendance, To-Do and future Finance modules may create review items.
 - Resolved review items are retained for historical reference.
 - Review Queue serves as a manual decision layer between AI automation and the user.
+- `resolved_by` records who performed the resolution: `user` (default), `system` (automated), or `admin` (administrative override).
 
 ---
 
@@ -1207,15 +1241,30 @@ Used for:
 
 ### Columns
 
-| Column | PostgreSQL Type |
-|----------|----------------|
-| activity_id | UUID (PK) |
-| actor_type | ENUM |
-| entity_type | ENUM |
-| entity_id | UUID |
-| action_type | ENUM |
-| activity_message | TEXT |
-| created_at | TIMESTAMPTZ |
+| Column | PostgreSQL Type | Description |
+|----------|----------------|-------------|
+| activity_id | UUID (PK) | Unique identifier for the activity log |
+| actor_type | ENUM | Type of actor performing the action (`activity_actor_type`) |
+| entity_type | ENUM | Polymorphic type of the entity involved (`activity_entity_type`) |
+| entity_id | UUID | Polymorphic ID of the entity involved |
+| action_type | ENUM | Action performed on the entity (`activity_action_type`) |
+| activity_message | TEXT | Human-readable log message describing the activity |
+| correlation_id | UUID | Optional correlation ID to trace related events (e.g., WhatsApp bot interaction -> review queue -> update -> log) |
+| created_at | TIMESTAMPTZ | Timestamp when the activity was logged |
+
+---
+
+### Indexes
+
+| Column | Purpose |
+|---|---|
+| activity_id | Primary key lookup |
+| actor_type | Filter timeline by actor (user vs. bot/system) |
+| entity_type | Filter timeline by entity type |
+| entity_id | Retrieve audit trail for a specific entity |
+| action_type | Filter logs by action |
+| correlation_id | Correlate events belonging to a single request/message flow |
+| created_at | Fast ordering of activity timeline (newest first) |
 
 ---
 

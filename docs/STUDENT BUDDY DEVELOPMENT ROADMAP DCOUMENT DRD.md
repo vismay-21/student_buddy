@@ -112,45 +112,12 @@ The entire app is visually complete and navigable.
 
 ---
 
-# Phase 2 - Authentication
+# Phase 2 - Authentication (Postponed to Phase 7)
 
-**Estimated Duration:** 1 Day
+> [!NOTE]
+> This phase has been postponed to Phase 7 to prioritize building a fully functional MVP connected directly to REST APIs first.
 
-### Goal
-
-Implement user authentication.
-
-### Technology
-
-Supabase Auth
-
-### Flow
-
-```text
-Splash Screen
-
-↓
-
-Login Screen
-
-↓
-
-OTP Verification
-
-↓
-
-Dashboard
-```
-
-### Deliverable
-
-Users can:
-
-* Login
-* Logout
-* Maintain session
-
-Still no backend.
+Still no backend at this point in historical sequence.
 
 ---
 
@@ -275,133 +242,87 @@ No AI yet.
 
 ---
 
-# Phase 6 - Connect Flutter and FastAPI
+# Phase 6 - Backend Verification & Flutter API Integration (MVP Mode)
 
 **Estimated Duration:** 3-4 Days
 
 ### Goal
 
-Replace dummy data with real backend data.
+Verify the existing backend REST APIs and integrate Flutter with the completed FastAPI backend in MVP Mode.
 
-Current:
+### MVP Mode Architecture
 
-```text
-Flutter
-
-↓
-
-Hardcoded data
-```
-
-Replace with:
+No authentication, SQLite/offline sync, WhatsApp or AI.
 
 ```text
 Flutter
-
 ↓
-
 FastAPI
-
 ↓
-
-Supabase
+PostgreSQL
 ```
+
+### Tasks
+
+- Run FastAPI locally.
+- Verify every API using Swagger.
+- Test CRUD operations, validations, business rules.
+- Connect Flutter to FastAPI using:
+  - Dio
+  - Repository Layer
+  - DTOs
+  - API Clients
+- Replace every piece of dummy data in Flutter with backend APIs.
 
 ### Deliverable
 
-App displays real data.
+A completely working, usable Student Buddy application connected directly to REST APIs (without auth or offline sync).
 
 ---
 
-# Phase 7 - Add SQLite Offline Support
+# Phase 7 - Authentication
+
+**Estimated Duration:** 1 Day
+
+### Goal
+
+Implement user authentication.
+
+### Technology
+
+Supabase Auth (JWT validation, protected endpoints, user context).
+
+### Deliverable
+
+Users can login, logout, and access protected endpoints with valid JWT sessions.
+
+---
+
+# Phase 8 - SQLite Synchronization Engine
 
 **Estimated Duration:** 3 Days
 
 ### Goal
 
-Enable offline functionality.
+Enable offline-first capability.
 
 ### Architecture
 
 ```text
 Flutter
-
 ↓
-
 Repository
-
 ↓
-
 SQLite
-
 ↓
-
 FastAPI
-
 ↓
-
-Supabase
-```
-
-Rules:
-
-```text
-Internet Available
-
-↓
-
-Cloud Data
-
-Internet Unavailable
-
-↓
-
-SQLite Data
-```
-
-When internet returns:
-
-```text
-Auto Sync
-
-↓
-
-Update SQLite
-
-↓
-
-Update Cloud
+PostgreSQL
 ```
 
 ### Deliverable
 
-App works without internet.
-
----
-
-# Phase 8 - Implement Riverpod
-
-**Estimated Duration:** 3 Days
-
-### Goal
-
-Enable centralized state management.
-
-### Providers
-
-* AuthProvider
-* SemesterProvider
-* AttendanceProvider
-* TimetableProvider
-* FinanceProvider
-* AssignmentProvider
-* NotesProvider
-* ReviewQueueProvider
-* SettingsProvider
-
-### Deliverable
-
-UI automatically updates when data changes.
+Offline repositories and synchronization engine with conflict resolution and retry logic.
 
 ---
 
@@ -413,45 +334,12 @@ UI automatically updates when data changes.
 
 Connect Meta Cloud API.
 
-### Initial Commands
+### Deliverables
 
-Attendance:
-
-```text
-Present
-
-Absent
-
-Cancelled
-```
-
-Finance:
-
-```text
-Spent 250 on lunch
-```
-
-Assignments:
-
-```text
-Maths assignment due Friday
-```
-
-Notes:
-
-```text
-Send CN Unit 2 notes
-```
-
-### Important Rule
-
-Do NOT use AI yet.
-
-Initially implement command-based processing.
-
-### Deliverable
-
-WhatsApp ↔ FastAPI communication works.
+- Webhooks
+- Intent parsing & Command parser
+- Review Queue integration
+- Pure command-based flow, no AI.
 
 ---
 
@@ -467,121 +355,33 @@ Implement automated notifications.
 
 APScheduler
 
-### Features
-
-* Morning Digest
-* Before Lecture Reminder
-* After Lecture Reminder
-* Assignment Reminder
-* Night Digest
-
-### Important Rule
-
-No AI.
-
-Pure scheduling logic.
-
 ### Deliverable
 
-Automated notifications working.
+Automated scheduled morning/night digests, class reminders.
 
 ---
 
-# Phase 11 - AI Integration
+# Phase 11 - AI & OCR Integration
 
 **Estimated Duration:** 5-7 Days
 
 ### Goal
 
-Add AI only where necessary.
+Implement intelligent automation.
 
-### Responsibilities
+### Deliverables
 
-Natural Language Understanding
-
-Examples:
-
-```text
-Spent ₹250 on lunch
-
-Present in DBMS
-
-DBMS assignment due Friday
-
-Send CN Unit 2 notes
-```
-
-AI converts natural language into structured data.
-
-### AI Features
-
-1. Context Engine
-
-Prioritize information.
-
-2. Semester Drift Detection
-
-Detect patterns.
-
-3. Cognitive Load Balancer
-
-Identify heavy academic weeks.
-
-4. Decision Assistant
-
-Examples:
-
-```text
-Should I attend today's lecture?
-
-Should I finish this assignment today?
-```
-
-### Important Rule
-
-AI should NEVER perform deterministic calculations.
-
-### Deliverable
-
-AI genuinely adds value.
+- Natural Language Understanding (WhatsApp bot message parsing)
+- OCR (Timetable & Academic Calendar parsing via Gemini Vision)
+- RAG, Context Engine, Decision Assistant
 
 ---
 
-# Phase 12 - OCR Integration
+# Phase 12 - Finance Module
 
-**Estimated Duration:** 3-5 Days
+Finance Module implementation begins only after the core application is stable.
 
-### Goal
-
-Implement image understanding.
-
-### Features
-
-Timetable OCR
-
-Academic Calendar OCR
-
-### Flow
-
-```text
-Image
-
-↓
-
-Gemini Vision
-
-↓
-
-Review Queue
-
-↓
-
-Database
-```
-
-### Deliverable
-
-Students upload once per semester instead of manually entering everything.
+This module will be documented separately.
 
 ---
 
@@ -599,31 +399,61 @@ Keep these in Future Scope:
 
 # Official Development Order
 
-0. Environment Setup
+0. Environment Setup (Completed)
+1. Flutter UI Skeleton (Completed)
+2. FastAPI Setup, Database Design & CRUD (Completed through Sprint 11)
+3. Backend Verification & Flutter API Integration (MVP Mode - Current Priority)
+4. Authentication (Phase 7)
+5. SQLite Synchronization Engine (Phase 8)
+6. WhatsApp Integration (Phase 9)
+7. Notification Engine (Phase 10)
+8. AI & OCR Integration (Phase 11)
+9. Finance Module (Phase 12)
 
-1. Flutter UI Skeleton
+---
 
-2. Authentication
+# MVP Implementation Rule
 
-3. FastAPI Setup
+Before implementing Authentication, SQLite Sync, WhatsApp or AI, the application must be fully usable using the existing FastAPI backend.
 
-4. Database Design
+This means:
 
-5. Backend CRUD
+Flutter
+↓
+Dio
+↓
+FastAPI
+↓
+PostgreSQL
 
-6. Flutter ↔ FastAPI Integration
+without any authentication layer.
 
-7. SQLite Offline Support
+The MVP should support all existing backend functionality through REST APIs.
 
-8. Riverpod State Management
+The goal is to validate business logic and user experience before introducing additional complexity.
 
-9. WhatsApp Integration
+---
 
-10. Notification Engine
+# Implementation Priority Rule
 
-11. AI Integration
+Unless explicitly instructed otherwise, always implement features assuming the application is operating in MVP mode.
 
-12. OCR Integration
+MVP Mode consists of:
+
+Flutter
+↓
+FastAPI
+↓
+PostgreSQL
+
+No Authentication
+No SQLite
+No WhatsApp
+No AI
+
+Every new feature should first be implemented and verified in MVP mode before integration with advanced infrastructure.
+
+Authentication, SQLite, WhatsApp and AI should be treated as extension layers that wrap existing functionality rather than replacing it.
 
 ---
 

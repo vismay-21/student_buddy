@@ -14,10 +14,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "Student Buddy"
     APP_ENV: Literal["development", "staging", "production"] = "development"
     LOG_LEVEL: str = "INFO"
-    API_V1_PREFIX: str = "/api/v1"
 
     # Database Configuration
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/student_buddy"
+
 
 
 # Instantiate settings instance

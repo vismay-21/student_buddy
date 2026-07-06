@@ -1,0 +1,50 @@
+import uuid
+from datetime import datetime
+from sqlalchemy import ForeignKey, String, DateTime, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.core.database import Base
+
+
+class NotesSubject(Base):
+    __tablename__ = "notes_subjects"
+
+    notes_subject_id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True
+    )
+    semester_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("semesters.semester_id", ondelete="CASCADE"),
+        nullable=False
+    )
+    notes_subject_name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("semester_id", "notes_subject_name", name="uq_notes_subject_per_semester"),
+    )
+
+    # Relationships
+    semester: Mapped["Semester"] = relationship(
+        "Semester",
+        back_populates="notes_subjects"
+    )
+    sections: Mapped[list["NotesSection"]] = relationship(
+        "NotesSection",
+        back_populates="notes_subject",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )

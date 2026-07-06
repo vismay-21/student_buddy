@@ -9,6 +9,13 @@ from alembic import context
 # Import our settings and base metadata
 from app.core.config import settings
 from app.core.database import Base
+from app.models.academic import Semester, AttendanceSettings, Subject, LectureTemplate, LectureInstance, Holiday
+from app.models.notes import NotesSubject, NotesSection, NotesResource
+from app.models.settings import AppSettings
+from app.models.todo import Todo
+from app.models.review_queue import ReviewQueue
+from app.models.activity_logs import ActivityLog
+
 
 # this is the Alembic Config object, which provides access to the values within the .ini file in use.
 config = context.config
