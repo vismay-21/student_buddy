@@ -11,7 +11,7 @@ abstract class BaseApi {
     required T Function(dynamic json) parser,
   }) async {
     final response = await dio.get(path, queryParameters: queryParameters);
-    return ApiResponse<T>.fromJson(response.data as Map<String, dynamic>, parser);
+    return ApiResponse<T>.fromJson(response.data, parser);
   }
 
   Future<ApiResponse<T>> post<T>(
@@ -21,7 +21,7 @@ abstract class BaseApi {
     required T Function(dynamic json) parser,
   }) async {
     final response = await dio.post(path, data: data, queryParameters: queryParameters);
-    return ApiResponse<T>.fromJson(response.data as Map<String, dynamic>, parser);
+    return ApiResponse<T>.fromJson(response.data, parser);
   }
 
   Future<ApiResponse<T>> put<T>(
@@ -31,7 +31,7 @@ abstract class BaseApi {
     required T Function(dynamic json) parser,
   }) async {
     final response = await dio.put(path, data: data, queryParameters: queryParameters);
-    return ApiResponse<T>.fromJson(response.data as Map<String, dynamic>, parser);
+    return ApiResponse<T>.fromJson(response.data, parser);
   }
 
   Future<ApiResponse<void>> delete(
@@ -40,6 +40,6 @@ abstract class BaseApi {
     Map<String, dynamic>? queryParameters,
   }) async {
     final response = await dio.delete(path, data: data, queryParameters: queryParameters);
-    return ApiResponse<void>.fromJson(response.data as Map<String, dynamic>, (_) => null);
+    return ApiResponse<void>.fromJson(response.data, (_) => null);
   }
 }

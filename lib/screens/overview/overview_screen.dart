@@ -3,8 +3,12 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/utils/dummy_data.dart';
+import '../../core/utils/color_helper.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/widgets/expandable_section.dart';
+import '../../data/dto/lecture/lecture_instance_dto.dart';
+import '../../data/repositories/lecture_instance_repository.dart';
+import '../../data/repositories/review_queue_repository.dart';
 import '../review_queue/review_queue_screen.dart';
 import '../settings/semester_selection_screen.dart';
 import '../attendance/widgets/lecture_card.dart';
@@ -17,35 +21,95 @@ class OverviewScreen extends StatefulWidget {
 }
 
 class _OverviewScreenState extends State<OverviewScreen> {
+  final _lectureRepo = LectureInstanceRepository();
+  final _reviewRepo = ReviewQueueRepository();
+
+  List<LectureInstanceDto> _todayInstances = [];
+  int _pendingReviewsCount = 0;
+  bool _isLoading = false;
   late VoidCallback _stateListener;
 
   @override
   void initState() {
     super.initState();
+    _loadData();
     _stateListener = () {
       if (mounted) {
-        setState(() {});
+        _loadData();
       }
     };
-    AppState.instance.dateActions.addListener(_stateListener);
-    AppState.instance.criteriaMode.addListener(_stateListener);
-    AppState.instance.targetPercentage.addListener(_stateListener);
-    AppState.instance.defaultDaysOff.addListener(_stateListener);
-    AppState.instance.holidays.addListener(_stateListener);
-    AppState.instance.activeSemester.addListener(_stateListener);
+    AppState.instance.activeSemesterDto.addListener(_stateListener);
     AppState.instance.isFinanceEnabled.addListener(_stateListener);
   }
 
   @override
   void dispose() {
-    AppState.instance.dateActions.removeListener(_stateListener);
-    AppState.instance.criteriaMode.removeListener(_stateListener);
-    AppState.instance.targetPercentage.removeListener(_stateListener);
-    AppState.instance.defaultDaysOff.removeListener(_stateListener);
-    AppState.instance.holidays.removeListener(_stateListener);
-    AppState.instance.activeSemester.removeListener(_stateListener);
+    AppState.instance.activeSemesterDto.removeListener(_stateListener);
     AppState.instance.isFinanceEnabled.removeListener(_stateListener);
     super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) {
+      setState(() {
+        _todayInstances = [];
+        _pendingReviewsCount = 0;
+      });
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final instances = await _lectureRepo.getTodayLectures(
+        date: todayStr,
+        semesterId: activeSem.semesterId,
+      );
+      final reviews = await _reviewRepo.getReviewQueue(status: 'pending');
+
+      setState(() {
+        _todayInstances = instances;
+        _pendingReviewsCount = reviews.length;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  LectureMock _mapToMock(LectureInstanceDto inst) {
+    final template = inst.lectureTemplate;
+    final subject = template.subject;
+    final colorVal = parseHexColor(subject.themeColor).value;
+    return LectureMock(
+      id: inst.lectureInstanceId,
+      name: subject.subjectName,
+      startTime: template.startTime.substring(0, 5),
+      endTime: template.endTime.substring(0, 5),
+      room: template.room ?? 'Room TBD',
+      teacher: subject.facultyName ?? 'Faculty TBD',
+      colorValue: colorVal,
+    );
+  }
+
+  String? _getNextClassNotification() {
+    if (_todayInstances.isEmpty) return null;
+    final now = DateTime.now();
+    final nowTimeStr = DateFormat('HH:mm').format(now);
+
+    final futureClasses = _todayInstances.where((inst) {
+      if (inst.lectureStatus != 'scheduled') return false;
+      final startTime = inst.lectureTemplate.startTime;
+      return startTime.compareTo(nowTimeStr) > 0;
+    }).toList();
+
+    if (futureClasses.isEmpty) return null;
+
+    futureClasses.sort((a, b) => a.lectureTemplate.startTime.compareTo(b.lectureTemplate.startTime));
+    final nextClass = futureClasses.first;
+    final template = nextClass.lectureTemplate;
+    return '${template.subject.subjectName} starts at ${template.startTime.substring(0, 5)}${template.room != null ? " (Room ${template.room})" : ""}';
   }
 
   Widget _buildNoSemesterState(BuildContext context) {
@@ -131,9 +195,13 @@ class _OverviewScreenState extends State<OverviewScreen> {
       );
     }
 
-    final today = DateTime.now();
-    final todayIndex = (today.weekday - 1) % 7;
-    final todayLectures = DummyData.getLecturesForDay(todayIndex);
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final nextClassNotif = _getNextClassNotification();
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -143,23 +211,25 @@ class _OverviewScreenState extends State<OverviewScreen> {
           children: [
             _buildReviewQueueCard(context),
 
-            // Notifications Bar
-            _buildNotificationsBanner(context),
-            const SizedBox(height: 16),
+            // Dynamic Notifications Bar
+            if (nextClassNotif != null) ...[
+              _buildNotificationsBanner(context, nextClassNotif),
+              const SizedBox(height: 16),
+            ],
 
             // Collapsible Classes Section
             ExpandableSection(
               title: 'TODAY\'S CLASSES',
-              subtitle: ' (${todayLectures.length})',
+              subtitle: ' (${_todayInstances.length})',
               showFrame: true,
               children: [
-                if (todayLectures.isNotEmpty) ...[
+                if (_todayInstances.isNotEmpty) ...[
                   _buildSectionHeader('MARK WHOLE DAY'),
                   const SizedBox(height: 6),
-                  _buildWholeDayActionPanel(context, todayLectures),
+                  _buildWholeDayActionPanel(context, _todayInstances),
                   const SizedBox(height: 10),
                 ],
-                _buildLecturesSection(context, todayLectures),
+                _buildLecturesSection(context, _todayInstances),
               ],
             ),
             const SizedBox(height: 16),
@@ -193,8 +263,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     );
   }
 
-
-  Widget _buildNotificationsBanner(BuildContext context) {
+  Widget _buildNotificationsBanner(BuildContext context, String message) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -206,10 +275,10 @@ class _OverviewScreenState extends State<OverviewScreen> {
         children: [
           const Icon(Icons.notification_important_rounded, color: AppTheme.warning, size: 20),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              'DBMS starts in 15 mins (Room B-204)',
-              style: TextStyle(
+              message,
+              style: const TextStyle(
                 color: AppTheme.warning,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -221,7 +290,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     );
   }
 
-  Widget _buildWholeDayActionPanel(BuildContext context, List<LectureMock> lectures) {
+  Widget _buildWholeDayActionPanel(BuildContext context, List<LectureInstanceDto> lectures) {
     if (lectures.isEmpty) return const SizedBox.shrink();
 
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
@@ -241,13 +310,9 @@ class _OverviewScreenState extends State<OverviewScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(child: _buildWholeDayButton('clear', 'Clear', AppTheme.textMuted, Icons.remove_circle_outline, lectures)),
+              Expanded(child: _buildWholeDayButton('missed', 'Missed', AppTheme.danger, Icons.highlight_off)),
               const SizedBox(width: 6),
-              Expanded(child: _buildWholeDayButton('off', 'Day Off', AppTheme.warning, Icons.pause_circle_outline, lectures)),
-              const SizedBox(width: 6),
-              Expanded(child: _buildWholeDayButton('missed', 'Missed', AppTheme.danger, Icons.highlight_off, lectures)),
-              const SizedBox(width: 6),
-              Expanded(child: _buildWholeDayButton('attended', 'Attended', AppTheme.accent, Icons.check_circle_rounded, lectures)),
+              Expanded(child: _buildWholeDayButton('attended', 'Attended', AppTheme.accent, Icons.check_circle_rounded)),
             ],
           ),
         ),
@@ -255,16 +320,42 @@ class _OverviewScreenState extends State<OverviewScreen> {
     );
   }
 
-  Widget _buildWholeDayButton(String action, String label, Color color, IconData icon, List<LectureMock> lectures) {
+  Widget _buildWholeDayButton(String action, String label, Color color, IconData icon) {
     return InkWell(
-      onTap: () {
-        AppState.instance.setWholeDayAction(DateTime.now(), lectures, action);
-        AppSnackbar.show(
-          context,
-          message: 'Whole day marked as "${action.toUpperCase()}"',
-          icon: icon,
-          color: color,
-        );
+      onTap: () async {
+        String? newAttendanceStatus;
+        if (action == 'attended') {
+          newAttendanceStatus = 'present';
+        } else if (action == 'missed') {
+          newAttendanceStatus = 'absent';
+        } else {
+          AppSnackbar.warning(context, 'Only "attended" or "missed" can be bulk applied to the whole day.');
+          return;
+        }
+
+        final activeSem = AppState.instance.activeSemesterDto.value;
+        if (activeSem == null) return;
+
+        try {
+          await _lectureRepo.markWholeDay(LectureInstanceBulkUpdateRequest(
+            lectureDate: DateFormat('yyyy-MM-dd').format(DateTime.now()),
+            attendanceStatus: newAttendanceStatus,
+            semesterId: activeSem.semesterId,
+          ));
+          _loadData();
+          if (mounted) {
+            AppSnackbar.show(
+              context,
+              message: 'Whole day marked as "${action.toUpperCase()}"',
+              icon: icon,
+              color: color,
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            AppSnackbar.error(context, 'Failed to bulk update: $e');
+          }
+        }
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -281,7 +372,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 13, color: color),
-              const SizedBox(width: 3),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
@@ -297,7 +388,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     );
   }
 
-  Widget _buildLecturesSection(BuildContext context, List<LectureMock> lectures) {
+  Widget _buildLecturesSection(BuildContext context, List<LectureInstanceDto> lectures) {
     if (lectures.isEmpty) {
       return Card(
         color: Theme.of(context).brightness == Brightness.dark ? AppTheme.surface : AppTheme.lightSurface,
@@ -320,13 +411,17 @@ class _OverviewScreenState extends State<OverviewScreen> {
       );
     }
 
-    final today = DateTime.now();
-    final dateKey = DateFormat('yyyy-MM-dd').format(today);
     final calculatedSubjects = AppState.instance.getCalculatedSubjects();
 
     return Column(
-      children: lectures.map((lecture) {
-        final currentAction = (AppState.instance.dateActions.value[dateKey] ?? {})[lecture.id] ?? 'clear';
+      children: lectures.map((inst) {
+        final lecture = _mapToMock(inst);
+        final currentAction = inst.attendanceStatus == 'present'
+            ? 'attended'
+            : (inst.attendanceStatus == 'absent'
+                ? 'missed'
+                : (inst.lectureStatus == 'holiday' ? 'off' : 'clear'));
+
         final metrics = calculatedSubjects.firstWhere(
           (sub) => sub['name'] == lecture.name,
           orElse: () => {
@@ -351,15 +446,37 @@ class _OverviewScreenState extends State<OverviewScreen> {
             total: metrics['total'],
             statusMessage: metrics['statusMessage'],
             isAboveTarget: metrics['isAboveTarget'],
-            onActionChanged: (action) {
-              AppState.instance.setLectureAction(today, lecture.id, action);
+            onActionChanged: (action) async {
+              String newAttendanceStatus = 'unmarked';
+              String newLectureStatus = 'scheduled';
+              if (action == 'attended') {
+                newAttendanceStatus = 'present';
+              } else if (action == 'missed') {
+                newAttendanceStatus = 'absent';
+              } else if (action == 'off') {
+                newLectureStatus = 'holiday';
+              }
+
+              try {
+                await _lectureRepo.updateAttendance(
+                  inst.lectureInstanceId,
+                  LectureInstanceUpdateRequest(
+                    attendanceStatus: newAttendanceStatus,
+                    lectureStatus: newLectureStatus,
+                  ),
+                );
+                _loadData();
+              } catch (e) {
+                if (mounted) {
+                  AppSnackbar.error(context, 'Failed to update attendance: $e');
+                }
+              }
             },
           ),
         );
       }).toList(),
     );
   }
-
 
   Widget _buildFinanceSummaryCard(BuildContext context) {
     return Padding(
@@ -423,10 +540,8 @@ class _OverviewScreenState extends State<OverviewScreen> {
     );
   }
 
-
   Widget _buildReviewQueueCard(BuildContext context) {
-    final pendingReviews = DummyData.reviewQueue.length;
-    if (pendingReviews == 0) return const SizedBox.shrink();
+    if (_pendingReviewsCount == 0) return const SizedBox.shrink();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -443,7 +558,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                '$pendingReviews item${pendingReviews > 1 ? "s" : ""} need your review',
+                '$_pendingReviewsCount item${_pendingReviewsCount > 1 ? "s" : ""} need your review',
                 style: const TextStyle(
                   color: AppTheme.danger,
                   fontWeight: FontWeight.bold,
@@ -464,7 +579,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
                 await Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const ReviewQueueScreen()),
                 );
-                setState(() {});
+                _loadData();
               },
               child: const Text(
                 'Review Now',

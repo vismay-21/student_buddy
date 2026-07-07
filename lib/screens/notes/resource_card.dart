@@ -1,9 +1,10 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/dummy_data.dart';
+import '../../data/dto/notes/notes_dto.dart';
 
 class ResourceCard extends StatelessWidget {
-  final NotesFileMock file;
+  final NotesResourceDto file;
   final bool isDownloading;
   final VoidCallback onDownload;
   final VoidCallback onEdit;
@@ -15,6 +16,24 @@ class ResourceCard extends StatelessWidget {
     required this.onDownload,
     required this.onEdit,
   });
+
+  String _getFileType(String mime) {
+    final m = mime.toLowerCase();
+    if (m.contains('pdf')) return 'PDF';
+    if (m.contains('presentation') || m.contains('powerpoint') || m.contains('ppt')) return 'PPT';
+    if (m.contains('word') || m.contains('document') || m.contains('docx')) return 'DOCX';
+    if (m.contains('image')) return 'IMAGE';
+    if (m.contains('html') || m.contains('uri') || m.contains('link')) return 'LINK';
+    
+    // Check file extension as a fallback
+    final ext = file.fileName.split('.').last.toLowerCase();
+    if (ext == 'pdf') return 'PDF';
+    if (ext == 'ppt' || ext == 'pptx') return 'PPT';
+    if (ext == 'doc' || ext == 'docx') return 'DOCX';
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext)) return 'IMAGE';
+    
+    return 'Other';
+  }
 
   IconData _getFileIcon(String type) {
     switch (type.toUpperCase()) {
@@ -50,20 +69,28 @@ class ResourceCard extends StatelessWidget {
     }
   }
 
+  String _formatFileSize(int bytes) {
+    if (bytes <= 0) return '0 B';
+    const suffixes = ['B', 'KB', 'MB', 'GB'];
+    var i = (log(bytes) / log(1024)).floor();
+    return '${(bytes / pow(1024, i)).toStringAsFixed(1)} ${suffixes[i]}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color fileColor = _getFileColor(file.type);
+    final type = _getFileType(file.mimeType);
+    final Color fileColor = _getFileColor(type);
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       leading: Icon(
-        _getFileIcon(file.type),
+        _getFileIcon(type),
         color: fileColor,
         size: 22,
       ),
       title: Text(
-        file.name,
+        file.resourceName,
         style: TextStyle(
           color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary,
           fontSize: 13,
@@ -71,7 +98,7 @@ class ResourceCard extends StatelessWidget {
         ),
       ),
       subtitle: Text(
-        '${file.type} • ${file.size}',
+        '$type • ${_formatFileSize(file.fileSizeLinesOrBytes)}',
         style: TextStyle(
           color: isDark ? AppTheme.textMuted : AppTheme.lightTextMuted,
           fontSize: 11,

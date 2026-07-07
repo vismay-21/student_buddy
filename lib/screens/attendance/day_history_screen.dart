@@ -2,22 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/dummy_data.dart';
+import '../../../core/utils/app_state.dart';
+import '../../../core/utils/color_helper.dart';
+import '../../../core/widgets/app_snackbar.dart';
+import '../../../data/dto/lecture/lecture_instance_dto.dart';
+import '../../../data/repositories/lecture_instance_repository.dart';
+import '../../../data/repositories/attendance_settings_repository.dart';
 import 'widgets/lecture_card.dart';
 
 class DayHistoryScreen extends StatefulWidget {
   final DateTime date;
-  final List<LectureMock> todayLectures;
-  final Map<String, String> lectureActions;
-  final Map<String, Map<String, dynamic>> subjectsMetrics;
-  final Function(DateTime date, LectureMock lecture, String action) onLectureActionChanged;
+  final VoidCallback? onAttendanceChanged;
 
   const DayHistoryScreen({
     super.key,
     required this.date,
-    required this.todayLectures,
-    required this.lectureActions,
-    required this.subjectsMetrics,
-    required this.onLectureActionChanged,
+    this.onAttendanceChanged,
   });
 
   @override
@@ -25,30 +25,178 @@ class DayHistoryScreen extends StatefulWidget {
 }
 
 class _DayHistoryScreenState extends State<DayHistoryScreen> {
-  late Map<String, String> _localLectureActions;
+  final _instanceRepo = LectureInstanceRepository();
+  final _settingsRepo = AttendanceSettingsRepository();
+
+  bool _isLoading = true;
+  List<LectureInstanceDto> _instances = [];
+  Map<String, Map<String, dynamic>> _subjectsMetrics = {};
 
   @override
   void initState() {
     super.initState();
-    // Copy actions to local state to allow instant UI updates on click
-    _localLectureActions = Map<String, String>.from(widget.lectureActions);
+    _loadData();
   }
 
-  void _onActionTapped(LectureMock lecture, String action) {
-    setState(() {
-      _localLectureActions[lecture.id] = action;
-    });
-    // Trigger callback to bubble changes to the parent controller
-    widget.onLectureActionChanged(widget.date, lecture, action);
-  }
+  Future<void> _loadData() async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      // 1. Get today's instances
+      final dateStr = DateFormat('yyyy-MM-dd').format(widget.date);
+      final list = await _instanceRepo.getTodayLectures(date: dateStr, semesterId: activeSem.semesterId);
 
-  void _onWholeDayAction(String action) {
-    setState(() {
-      for (var lecture in widget.todayLectures) {
-        _localLectureActions[lecture.id] = action;
-        widget.onLectureActionChanged(widget.date, lecture, action);
+      // 2. Get settings for mode
+      final settings = await _settingsRepo.getSettings(activeSem.semesterId);
+      final mappedMode = settings.criteriaMode == 'subject' ? 'subject_wise' : settings.criteriaMode;
+
+      // 3. For each subject in today's lectures, get stats
+      final Map<String, Map<String, dynamic>> metrics = {};
+      for (final inst in list) {
+        final sub = inst.lectureTemplate.subject;
+        final stats = await _instanceRepo.getSubjectStats(sub.subjectId);
+        
+        int target = settings.overallAttendanceGoal;
+        if (mappedMode == 'custom') {
+          target = sub.attendanceGoal;
+        }
+
+        final bool isAboveTarget = stats.attendancePercentage >= target;
+
+        metrics[sub.subjectName] = {
+          'percent': stats.attendancePercentage,
+          'target': target,
+          'attended': stats.presentLectures,
+          'total': stats.totalLectures,
+          'statusMessage': stats.statusMessage,
+          'isAboveTarget': isAboveTarget,
+        };
       }
-    });
+
+      setState(() {
+        _instances = list;
+        _subjectsMetrics = metrics;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _onActionTapped(LectureInstanceDto inst, String action) async {
+    String? newAttendanceStatus;
+    String? newLectureStatus;
+
+    if (action == 'attended') {
+      newAttendanceStatus = 'present';
+      newLectureStatus = 'scheduled';
+    } else if (action == 'missed') {
+      newAttendanceStatus = 'absent';
+      newLectureStatus = 'scheduled';
+    } else if (action == 'off') {
+      newAttendanceStatus = 'unmarked';
+      newLectureStatus = 'holiday';
+    } else if (action == 'clear') {
+      newAttendanceStatus = 'unmarked';
+      newLectureStatus = 'scheduled';
+    }
+
+    try {
+      await _instanceRepo.updateAttendance(
+        inst.lectureInstanceId,
+        LectureInstanceUpdateRequest(
+          attendanceStatus: newAttendanceStatus,
+          lectureStatus: newLectureStatus,
+        ),
+      );
+      
+      await _loadData();
+
+      if (widget.onAttendanceChanged != null) {
+        widget.onAttendanceChanged!();
+      }
+
+      if (mounted) {
+        AppSnackbar.success(context, 'Attendance updated.');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to update attendance: $e');
+      }
+    }
+  }
+
+  void _onWholeDayAction(String action) async {
+    String? newAttendanceStatus;
+
+    if (action == 'attended') {
+      newAttendanceStatus = 'present';
+    } else if (action == 'missed') {
+      newAttendanceStatus = 'absent';
+    } else {
+      AppSnackbar.warning(context, 'Only "attended" or "missed" can be bulk applied to the whole day.');
+      return;
+    }
+
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) {
+      AppSnackbar.warning(context, 'Please select or create a semester first');
+      return;
+    }
+
+    try {
+      await _instanceRepo.markWholeDay(LectureInstanceBulkUpdateRequest(
+        lectureDate: DateFormat('yyyy-MM-dd').format(widget.date),
+        attendanceStatus: newAttendanceStatus,
+        semesterId: activeSem.semesterId,
+      ));
+      
+      await _loadData();
+
+      if (widget.onAttendanceChanged != null) {
+        widget.onAttendanceChanged!();
+      }
+
+      if (mounted) {
+        AppSnackbar.success(context, 'Whole day status updated.');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to bulk update: $e');
+      }
+    }
+  }
+
+  LectureMock _mapToMock(LectureInstanceDto inst) {
+    final template = inst.lectureTemplate;
+    final subject = template.subject;
+    final colorVal = parseHexColor(subject.themeColor).value;
+    return LectureMock(
+      id: inst.lectureInstanceId,
+      name: subject.subjectName,
+      startTime: template.startTime.substring(0, 5),
+      endTime: template.endTime.substring(0, 5),
+      room: template.room ?? 'Room TBD',
+      teacher: subject.facultyName ?? 'Faculty TBD',
+      colorValue: colorVal,
+    );
+  }
+
+  String _getAction(LectureInstanceDto inst) {
+    if (inst.lectureStatus == 'holiday' || inst.lectureStatus == 'cancelled') {
+      return 'off';
+    }
+    if (inst.attendanceStatus == 'present') {
+      return 'attended';
+    }
+    if (inst.attendanceStatus == 'absent') {
+      return 'missed';
+    }
+    return 'clear';
   }
 
   @override
@@ -58,6 +206,13 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
     final Color borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
 
     final String titleStr = DateFormat('EEEE, d MMMM yyyy').format(widget.date);
+
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Day Logs Details')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -115,7 +270,7 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${widget.todayLectures.length} scheduled lectures for this day',
+                          '${_instances.length} scheduled lectures for this day',
                           style: const TextStyle(
                             color: AppTheme.textMuted,
                             fontSize: 12,
@@ -129,8 +284,8 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
             ),
           ),
 
-          // Whole day action panel (copied from Today tab)
-          if (widget.todayLectures.isNotEmpty)
+          // Whole day action panel
+          if (_instances.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
               child: Card(
@@ -171,7 +326,7 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
           ),
 
           Expanded(
-            child: widget.todayLectures.isEmpty
+            child: _instances.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -195,10 +350,11 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: widget.todayLectures.length,
+                    itemCount: _instances.length,
                     itemBuilder: (context, index) {
-                      final lecture = widget.todayLectures[index];
-                      final metrics = widget.subjectsMetrics[lecture.name] ??
+                      final inst = _instances[index];
+                      final lecture = _mapToMock(inst);
+                      final metrics = _subjectsMetrics[lecture.name] ??
                           {
                             'percent': 0.0,
                             'target': 80,
@@ -208,7 +364,7 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
                             'isAboveTarget': false,
                           };
 
-                      final currentAction = _localLectureActions[lecture.id] ?? 'clear';
+                      final currentAction = _getAction(inst);
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16.0),
@@ -222,7 +378,7 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
                           total: metrics['total'],
                           statusMessage: metrics['statusMessage'],
                           isAboveTarget: metrics['isAboveTarget'],
-                          onActionChanged: (action) => _onActionTapped(lecture, action),
+                          onActionChanged: (action) => _onActionTapped(inst, action),
                         ),
                       );
                     },

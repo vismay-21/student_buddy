@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/dummy_data.dart';
 import '../../../core/utils/app_state.dart';
+import '../../../core/utils/dummy_data.dart';
+import '../../data/dto/lecture/lecture_instance_dto.dart';
+import '../../data/repositories/lecture_instance_repository.dart';
 import 'widgets/attendance_calendar_legend.dart';
 import 'widgets/attendance_analytics_card.dart';
 import 'widgets/attendance_overview_card.dart';
@@ -41,28 +43,44 @@ class _HistoryTabState extends State<HistoryTab> {
   late DateTime _visibleMonth;
   int _totalMonths = 1;
 
+  final _instanceRepo = LectureInstanceRepository();
+  List<LectureInstanceDto> _allInstances = [];
+  bool _isLoading = false;
+
   @override
   void initState() {
     super.initState();
     _totalMonths = _calculateTotalMonths();
-    // Default visible month to the month containing the selectedDate
     _visibleMonth = DateTime(widget.selectedDate.year, widget.selectedDate.month, 1);
-    
-    // Find initial page index for selectedDate
     final int initialPage = _getPageIndexForDate(widget.selectedDate);
     _pageController = PageController(initialPage: initialPage);
+    _loadInstances();
   }
 
   @override
   void didUpdateWidget(covariant HistoryTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     _totalMonths = _calculateTotalMonths();
+    _loadInstances();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadInstances() async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) return;
+    try {
+      final list = await _instanceRepo.getInstances(semesterId: activeSem.semesterId);
+      if (mounted) {
+        setState(() {
+          _allInstances = list;
+        });
+      }
+    } catch (_) {}
   }
 
   int _calculateTotalMonths() {
@@ -84,80 +102,42 @@ class _HistoryTabState extends State<HistoryTab> {
   }
 
   // ── Date status logic ──────────────────────────────────────────────────────
-  // Returns: 'attended' (Green), 'missed' (Red), 'off' (Orange), 'mixed' (Purple), 'clear' (Dark Grey)
   String _getDateStatus(DateTime date) {
-    // Check if outside semester range
-    if (date.isBefore(widget.semesterStartDate) || date.isAfter(widget.semesterEndDate)) {
+    final dayInstances = _allInstances.where((inst) {
+      return inst.lectureDate.year == date.year &&
+          inst.lectureDate.month == date.month &&
+          inst.lectureDate.day == date.day;
+    }).toList();
+
+    if (dayInstances.isEmpty) {
       return 'clear';
     }
 
-    // Check if Holiday
-    final bool isHoliday = widget.holidays.any((h) {
-      final DateTime hDate = h['date'];
-      return hDate.year == date.year && hDate.month == date.month && hDate.day == date.day;
-    });
-    if (isHoliday) {
+    // Check if all are holiday / cancelled
+    final bool allOff = dayInstances.every((inst) =>
+        inst.lectureStatus == 'holiday' || inst.lectureStatus == 'cancelled');
+    if (allOff) {
       return 'off';
     }
 
-    // Check default days off
-    bool isDefaultDayOff = false;
-    if (widget.defaultDaysOff == 'Sunday Only' && date.weekday == DateTime.sunday) {
-      isDefaultDayOff = true;
-    } else if (widget.defaultDaysOff == 'Saturday & Sunday' && 
-        (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday)) {
-      isDefaultDayOff = true;
-    }
-    if (isDefaultDayOff) {
+    final scheduled = dayInstances.where((inst) => inst.lectureStatus == 'scheduled').toList();
+    if (scheduled.isEmpty) {
       return 'off';
     }
 
-    // Get scheduled classes for this weekday
-    final lectures = DummyData.getLecturesForDay(date.weekday - 1);
-    if (lectures.isEmpty) {
-      return 'off'; // If no classes, automatically a day off
-    }
+    final int attendedCount = scheduled.where((inst) => inst.attendanceStatus == 'present').length;
+    final int missedCount = scheduled.where((inst) => inst.attendanceStatus == 'absent').length;
+    final int unmarkedCount = scheduled.where((inst) => inst.attendanceStatus == 'unmarked').length;
 
-    // Check actions logged for this day
-    final dateKey = DateFormat('yyyy-MM-dd').format(date);
-    final dayActions = widget.dateActions[dateKey];
-    if (dayActions == null || dayActions.isEmpty) {
-      return 'clear'; // No data logged
-    }
-
-    int attendedCount = 0;
-    int missedCount = 0;
-    int offCount = 0;
-    int clearCount = 0;
-
-    for (var lecture in lectures) {
-      final action = dayActions[lecture.id] ?? 'clear';
-      if (action == 'attended') {
-        attendedCount++;
-      } else if (action == 'missed') {
-        missedCount++;
-      } else if (action == 'off') {
-        offCount++;
-      } else {
-        clearCount++;
-      }
-    }
-
-    // Evaluate mixed status
-    if (clearCount == lectures.length) {
+    if (unmarkedCount == scheduled.length) {
       return 'clear';
     }
-    if (offCount == lectures.length) {
-      return 'off';
-    }
-    if (attendedCount == lectures.length) {
+    if (attendedCount == scheduled.length) {
       return 'attended';
     }
-    if (missedCount == lectures.length) {
+    if (missedCount == scheduled.length) {
       return 'missed';
     }
-    
-    // Any other combination is mixed
     return 'mixed';
   }
 
@@ -187,37 +167,21 @@ class _HistoryTabState extends State<HistoryTab> {
         default: break;
       }
 
-      // Check if day is holiday
-      final bool isHoliday = widget.holidays.any((h) {
-        final DateTime hDate = h['date'];
-        return hDate.year == date.year && hDate.month == date.month && hDate.day == date.day;
-      });
+      final dayInstances = _allInstances.where((inst) {
+        return inst.lectureDate.year == date.year &&
+            inst.lectureDate.month == date.month &&
+            inst.lectureDate.day == date.day;
+      }).toList();
 
-      // Check default days off
-      bool isDefaultDayOff = false;
-      if (widget.defaultDaysOff == 'Sunday Only' && date.weekday == DateTime.sunday) {
-        isDefaultDayOff = true;
-      } else if (widget.defaultDaysOff == 'Saturday & Sunday' && 
-          (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday)) {
-        isDefaultDayOff = true;
-      }
-
-      if (!isHoliday && !isDefaultDayOff) {
-        final lectures = DummyData.getLecturesForDay(date.weekday - 1);
-        if (lectures.isNotEmpty) {
-          final dateKey = DateFormat('yyyy-MM-dd').format(date);
-          final dayActions = widget.dateActions[dateKey];
-          
-          for (var lec in lectures) {
-            final action = dayActions?[lec.id] ?? 'clear';
-            totalLectures++;
-            if (action == 'attended') {
-              attendedLectures++;
-            } else if (action == 'missed') {
-              missedLectures++;
-            } else if (action == 'off') {
-              offLectures++;
-            }
+      for (var inst in dayInstances) {
+        if (inst.lectureStatus == 'holiday' || inst.lectureStatus == 'cancelled') {
+          offLectures++;
+        } else if (inst.lectureStatus == 'scheduled') {
+          totalLectures++;
+          if (inst.attendanceStatus == 'present') {
+            attendedLectures++;
+          } else if (inst.attendanceStatus == 'absent') {
+            missedLectures++;
           }
         }
       }
@@ -269,37 +233,21 @@ class _HistoryTabState extends State<HistoryTab> {
         default: break;
       }
 
-      // Check if holiday
-      final bool isHoliday = widget.holidays.any((h) {
-        final DateTime hDate = h['date'];
-        return hDate.year == current.year && hDate.month == current.month && hDate.day == current.day;
-      });
+      final dayInstances = _allInstances.where((inst) {
+        return inst.lectureDate.year == current.year &&
+            inst.lectureDate.month == current.month &&
+            inst.lectureDate.day == current.day;
+      }).toList();
 
-      // Check default days off
-      bool isDefaultDayOff = false;
-      if (widget.defaultDaysOff == 'Sunday Only' && current.weekday == DateTime.sunday) {
-        isDefaultDayOff = true;
-      } else if (widget.defaultDaysOff == 'Saturday & Sunday' && 
-          (current.weekday == DateTime.saturday || current.weekday == DateTime.sunday)) {
-        isDefaultDayOff = true;
-      }
-
-      if (!isHoliday && !isDefaultDayOff) {
-        final lectures = DummyData.getLecturesForDay(current.weekday - 1);
-        if (lectures.isNotEmpty) {
-          final dateKey = DateFormat('yyyy-MM-dd').format(current);
-          final dayActions = widget.dateActions[dateKey];
-          
-          for (var lec in lectures) {
-            final action = dayActions?[lec.id] ?? 'clear';
-            totalLectures++;
-            if (action == 'attended') {
-              attendedLectures++;
-            } else if (action == 'missed') {
-              missedLectures++;
-            } else if (action == 'off') {
-              offLectures++;
-            }
+      for (var inst in dayInstances) {
+        if (inst.lectureStatus == 'holiday' || inst.lectureStatus == 'cancelled') {
+          offLectures++;
+        } else if (inst.lectureStatus == 'scheduled') {
+          totalLectures++;
+          if (inst.attendanceStatus == 'present') {
+            attendedLectures++;
+          } else if (inst.attendanceStatus == 'absent') {
+            missedLectures++;
           }
         }
       }
@@ -324,6 +272,7 @@ class _HistoryTabState extends State<HistoryTab> {
       'attendancePercentage': attendancePercentage,
     };
   }
+
 
   void _showSemesterStatsDialog(BuildContext context) {
     final stats = _calculateSemesterSummaries();
@@ -661,8 +610,12 @@ class _HistoryTabState extends State<HistoryTab> {
                 case 'mixed': dotColor = AppTheme.secondary; break;
                 case 'clear':
                   // Only show dot if classes are scheduled (Grey)
-                  final lectures = DummyData.getLecturesForDay(date.weekday - 1);
-                  if (lectures.isNotEmpty) {
+                  final dayInstances = _allInstances.where((inst) {
+                    return inst.lectureDate.year == date.year &&
+                        inst.lectureDate.month == date.month &&
+                        inst.lectureDate.day == date.day;
+                  });
+                  if (dayInstances.isNotEmpty) {
                     dotColor = AppTheme.textMuted;
                   }
                   break;
@@ -674,19 +627,29 @@ class _HistoryTabState extends State<HistoryTab> {
               return GestureDetector(
                 onTap: () {
                   if (!isOutsideSemester) {
+                    final dummyLecture = LectureMock(
+                      id: '',
+                      name: '',
+                      startTime: '',
+                      endTime: '',
+                      teacher: '',
+                      room: '',
+                      colorValue: 0,
+                    );
                     widget.onDateSelected(date);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => DayHistoryScreen(
                           date: date,
-                          todayLectures: DummyData.getLecturesForDay(date.weekday - 1),
-                          lectureActions: widget.dateActions[DateFormat('yyyy-MM-dd').format(date)] ?? {},
-                          subjectsMetrics: widget.subjectsMetrics,
-                          onLectureActionChanged: widget.onLectureActionChanged,
+                          onAttendanceChanged: () {
+                            widget.onLectureActionChanged(date, dummyLecture, 'changed');
+                          },
                         ),
                       ),
-                    );
+                    ).then((_) {
+                      widget.onLectureActionChanged(date, dummyLecture, 'changed');
+                    });
                   }
                 },
                 child: Container(

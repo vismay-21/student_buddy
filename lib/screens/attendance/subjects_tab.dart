@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'widgets/attendance_overview_card.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/color_helper.dart';
 import '../../../core/utils/dummy_data.dart';
 import '../../../core/widgets/attendance_ring_label.dart';
 import 'subject_history_screen.dart';
@@ -64,11 +65,8 @@ class SubjectsTab extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => SubjectHistoryScreen(
-                        subjectName: sub['name'],
-                        semesterStartDate: semesterStartDate,
-                        semesterEndDate: semesterEndDate,
-                        holidays: holidays,
-                        dateActions: dateActions,
+                        subjectId: sub['id'] as String,
+                        subjectName: sub['name'] as String,
                         criteriaPercentage: sub['target'] as int,
                         onLectureActionChanged: onLectureActionChanged,
                       ),
@@ -91,18 +89,9 @@ class SubjectsTab extends StatelessWidget {
     final Color borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
     final Color ringColor = sub['isAboveTarget'] as bool ? AppTheme.accent : AppTheme.danger;
 
-    // Find color from dummy data by subject name if possible
     Color accentColor = AppTheme.primary;
-    bool found = false;
-    for (int i = 0; i < 5; i++) {
-      if (found) break;
-      for (var l in DummyData.getLecturesForDay(i)) {
-        if (l.name == sub['name']) {
-          accentColor = Color(l.colorValue);
-          found = true;
-          break;
-        }
-      }
+    if (sub['color'] != null) {
+      accentColor = parseHexColor(sub['color'] as String);
     }
 
     return Container(

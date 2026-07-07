@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/dummy_data.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../data/dto/review_queue/review_queue_dto.dart';
+import '../../data/repositories/review_queue_repository.dart';
 import 'review_queue_edit_screen.dart';
 
 class ReviewQueueScreen extends StatefulWidget {
@@ -12,34 +14,53 @@ class ReviewQueueScreen extends StatefulWidget {
 }
 
 class _ReviewQueueScreenState extends State<ReviewQueueScreen> {
-  // Local list to simulate queue operations
-  late List<ReviewItemMock> _localQueue;
+  final ReviewQueueRepository _repository = ReviewQueueRepository();
+  List<ReviewQueueDto> _queueItems = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _localQueue = List.from(DummyData.reviewQueue);
+    _loadQueue();
   }
 
-  void _approveItem(ReviewItemMock item) {
-    setState(() {
-      _localQueue.removeWhere((x) => x.id == item.id);
-      DummyData.reviewQueue.removeWhere((x) => x.id == item.id);
-    });
-
-    String msg = 'Item approved successfully!';
-    if (item.id == 'rev1') {
-      msg = 'Approved expense: Category set to "Other", Account set to "UPI"';
-    } else if (item.id == 'rev2') {
-      msg = 'Approved OCR Timetable: DAA Lab added to Friday';
-    } else if (item.id == 'rev3') {
-      msg = 'DBMS class cancellation confirmed';
+  Future<void> _loadQueue() async {
+    setState(() => _isLoading = true);
+    try {
+      final items = await _repository.getReviewQueue(status: 'pending');
+      setState(() {
+        _queueItems = items;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to load review items: $e');
+      }
     }
-
-    AppSnackbar.success(context, msg);
   }
 
-  void _editItem(ReviewItemMock item) async {
+  Future<void> _approveItem(ReviewQueueDto item) async {
+    try {
+      await _repository.resolveReviewQueueItem(
+        item.reviewId,
+        ReviewQueueResolveRequest(
+          resolutionData: {},
+          resolvedBy: 'user',
+        ),
+      );
+      _loadQueue();
+      if (mounted) {
+        AppSnackbar.success(context, 'Item approved successfully!');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to approve item: $e');
+      }
+    }
+  }
+
+  Future<void> _editItem(ReviewQueueDto item) async {
     final bool? result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -48,24 +69,39 @@ class _ReviewQueueScreenState extends State<ReviewQueueScreen> {
     );
 
     if (result == true) {
-      setState(() {
-        _localQueue.removeWhere((x) => x.id == item.id);
-        DummyData.reviewQueue.removeWhere((x) => x.id == item.id);
-      });
+      _loadQueue();
     }
   }
 
-  Color _getSourceColor(String source) {
-    return source.toLowerCase() == 'whatsapp' ? const Color(0xFF10B981) : AppTheme.primary;
+  Color _getTypeColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'missing_information':
+        return AppTheme.warning;
+      case 'confirmation_required':
+        return AppTheme.accent;
+      case 'manual_review':
+      default:
+        return AppTheme.primary;
+    }
+  }
+
+  String _formatType(String type) {
+    return type.replaceAll('_', ' ').toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Review Queue (${_localQueue.length})'),
+        title: Text('Review Queue (${_queueItems.length})'),
       ),
-      body: _localQueue.isEmpty
+      body: _queueItems.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -76,7 +112,7 @@ class _ReviewQueueScreenState extends State<ReviewQueueScreen> {
                       color: AppTheme.accent.withOpacity(0.08),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.done_all_rounded, size: 64, color: AppTheme.accent),
+                    child: const Icon(Icons.done_all_rounded, size: 64, color: AppTheme.accent),
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -97,10 +133,10 @@ class _ReviewQueueScreenState extends State<ReviewQueueScreen> {
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: _localQueue.length,
+              itemCount: _queueItems.length,
               itemBuilder: (context, index) {
-                final item = _localQueue[index];
-                final sourceColor = _getSourceColor(item.source);
+                final item = _queueItems[index];
+                final typeColor = _getTypeColor(item.reviewType);
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 16),
@@ -116,29 +152,29 @@ class _ReviewQueueScreenState extends State<ReviewQueueScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: sourceColor.withOpacity(0.12),
+                                color: typeColor.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                item.source.toUpperCase(),
+                                _formatType(item.reviewType),
                                 style: TextStyle(
-                                  color: sourceColor,
+                                  color: typeColor,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                             Text(
-                              item.dateString,
+                              DateFormat('MMM d, h:mm a').format(item.createdAt.toLocal()),
                               style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
                             ),
                           ],
                         ),
                         const SizedBox(height: 10),
                         
-                        // Description
+                        // Description/Message
                         Text(
-                          item.description,
+                          item.reviewMessage,
                           style: const TextStyle(
                             color: AppTheme.textPrimary,
                             fontWeight: FontWeight.bold,
@@ -146,45 +182,18 @@ class _ReviewQueueScreenState extends State<ReviewQueueScreen> {
                           ),
                         ),
                         
+                        if (item.entitySummary.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            item.entitySummary,
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+
                         const SizedBox(height: 12),
-                        const Divider(color: Color(0xFF1E293B)),
-                        const SizedBox(height: 10),
-
-                        // Details grid/table
-                        Column(
-                          children: item.details.entries.map((entry) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SizedBox(
-                                    width: 110,
-                                    child: Text(
-                                      '${entry.key}:',
-                                      style: const TextStyle(
-                                        color: AppTheme.textSecondary,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      entry.value,
-                                      style: const TextStyle(
-                                        color: AppTheme.textPrimary,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-
-                        const SizedBox(height: 16),
                         const Divider(color: Color(0xFF1E293B)),
                         const SizedBox(height: 8),
 

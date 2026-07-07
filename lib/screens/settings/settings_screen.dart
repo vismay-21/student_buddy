@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
+import '../../core/widgets/app_snackbar.dart';
+import '../../data/dto/settings/app_settings_dto.dart';
+import '../../data/repositories/app_settings_repository.dart';
+import '../../data/dto/activity_log/activity_log_dto.dart';
+import '../../data/repositories/activity_log_repository.dart';
 import 'semester_selection_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -11,8 +17,72 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _settingsRepo = AppSettingsRepository();
+  final _activityRepo = ActivityLogRepository();
+
+  bool _isLoading = false;
+  List<ActivityLogDto> _activityLogsList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBackendSettings();
+  }
+
+  ThemeMode _themeModeFromString(String modeStr) {
+    switch (modeStr.toLowerCase()) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  Future<void> _loadBackendSettings() async {
+    setState(() => _isLoading = true);
+    try {
+      final s = await _settingsRepo.getSettings();
+      AppState.instance.themeMode.value = _themeModeFromString(s.themeMode);
+      AppState.instance.isFinanceEnabled.value = s.financeEnabled;
+      AppState.instance.morningDigest.value = s.morningDigestEnabled;
+      AppState.instance.nightDigest.value = s.nightDigestEnabled;
+      AppState.instance.beforeLectureNotif.value = s.attendancePromptEnabled;
+      AppState.instance.afterLectureNotif.value = s.attendancePromptEnabled;
+
+      final logs = await _activityRepo.getActivityLogs(limit: 5);
+      setState(() {
+        _activityLogsList = logs;
+      });
+    } catch (e) {
+      // Failed to load backend settings, fallback to local/defaults
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _updateSetting(AppSettingsUpdateRequest request) async {
+    try {
+      await _settingsRepo.updateSettings(request);
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to update setting: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Settings'), centerTitle: true),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -105,8 +175,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             value: isDark,
             onChanged: (val) {
-              AppState.instance.themeMode.value =
-                  val ? ThemeMode.dark : ThemeMode.light;
+              final mode = val ? ThemeMode.dark : ThemeMode.light;
+              AppState.instance.themeMode.value = mode;
+              _updateSetting(AppSettingsUpdateRequest(themeMode: val ? 'dark' : 'light'));
             },
           );
         },
@@ -191,6 +262,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: enabled,
               onChanged: (val) {
                 AppState.instance.isFinanceEnabled.value = val;
+                _updateSetting(AppSettingsUpdateRequest(financeEnabled: val));
               },
             );
           },
@@ -210,7 +282,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('Morning Digest', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               subtitle: const Text('Daily schedules & notifications sent at 8:00 AM.', style: TextStyle(fontSize: 11)),
               value: val,
-              onChanged: (v) => AppState.instance.morningDigest.value = v,
+              onChanged: (v) {
+                AppState.instance.morningDigest.value = v;
+                _updateSetting(AppSettingsUpdateRequest(morningDigestEnabled: v));
+              },
             ),
           ),
           const Divider(color: Color(0xFF1E293B), height: 1),
@@ -221,7 +296,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('Night Digest', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               subtitle: const Text('Daily summary of classes and transactions at 9:00 PM.', style: TextStyle(fontSize: 11)),
               value: val,
-              onChanged: (v) => AppState.instance.nightDigest.value = v,
+              onChanged: (v) {
+                AppState.instance.nightDigest.value = v;
+                _updateSetting(AppSettingsUpdateRequest(nightDigestEnabled: v));
+              },
             ),
           ),
           const Divider(color: Color(0xFF1E293B), height: 1),
@@ -231,7 +309,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               activeColor: AppTheme.primary,
               title: const Text('Before Lecture Reminders', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               value: val,
-              onChanged: (v) => AppState.instance.beforeLectureNotif.value = v,
+              onChanged: (v) {
+                AppState.instance.beforeLectureNotif.value = v;
+                _updateSetting(AppSettingsUpdateRequest(attendancePromptEnabled: v));
+              },
             ),
           ),
           const Divider(color: Color(0xFF1E293B), height: 1),
@@ -241,7 +322,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               activeColor: AppTheme.primary,
               title: const Text('After Lecture Log Prompts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               value: val,
-              onChanged: (v) => AppState.instance.afterLectureNotif.value = v,
+              onChanged: (v) {
+                AppState.instance.afterLectureNotif.value = v;
+                _updateSetting(AppSettingsUpdateRequest(attendancePromptEnabled: v));
+              },
             ),
           ),
         ],
@@ -250,22 +334,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildActivityTimelineCard() {
-    final List<Map<String, String>> timeline = [
-      {'time': 'Today, 10:30 AM', 'event': 'Marked Attendance: DBMS (Attended)'},
-      {'time': 'Yesterday, 4:15 PM', 'event': 'Completed Task: CN Socket Programming Lab'},
-      {'time': '22 Jun, 11:00 AM', 'event': 'Changed Criteria Mode to Overall (85%)'},
-    ];
-    
+    if (_activityLogsList.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: const Center(
+            child: Text(
+              'No activity timeline events recorded.',
+              style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: timeline.length,
+          itemCount: _activityLogsList.length,
           separatorBuilder: (context, index) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
-            final item = timeline[index];
+            final item = _activityLogsList[index];
+            final timeStr = DateFormat('d MMM yyyy, h:mm a').format(item.createdAt);
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -284,12 +377,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item['event']!,
+                        item.activityMessage,
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        item['time']!,
+                        timeStr,
                         style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
                       ),
                     ],

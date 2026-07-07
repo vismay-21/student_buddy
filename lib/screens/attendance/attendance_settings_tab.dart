@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/dummy_data.dart';
 
 class AttendanceSettingsTab extends StatelessWidget {
   final String criteriaMode; // 'overall', 'subject_wise', 'custom'
@@ -17,6 +16,7 @@ class AttendanceSettingsTab extends StatelessWidget {
   final Function(DateTime date) onSemesterStartDateChanged;
   final Function(DateTime date) onSemesterEndDateChanged;
   final Function(String name, DateTime date) onHolidayAdded;
+  final Function(String holidayId) onHolidayDeleted;
   final Function(String subjectName, int target) onSubjectCustomTargetChanged;
   final Function(String daysOff) onDefaultDaysOffChanged;
 
@@ -34,6 +34,7 @@ class AttendanceSettingsTab extends StatelessWidget {
     required this.onSemesterStartDateChanged,
     required this.onSemesterEndDateChanged,
     required this.onHolidayAdded,
+    required this.onHolidayDeleted,
     required this.onSubjectCustomTargetChanged,
     required this.onDefaultDaysOffChanged,
   });
@@ -375,6 +376,14 @@ class AttendanceSettingsTab extends StatelessWidget {
                               ),
                               child: const Icon(Icons.beach_access_rounded, color: AppTheme.warning, size: 18),
                             ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
+                              onPressed: () {
+                                if (hol['id'] != null) {
+                                  onHolidayDeleted(hol['id'] as String);
+                                }
+                              },
+                            ),
                           );
                         },
                       ),
@@ -474,10 +483,10 @@ class AttendanceSettingsTab extends StatelessWidget {
                 width: double.maxFinite,
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: DummyData.attendanceList.length,
+                  itemCount: subjectCustomTargets.keys.length,
                   itemBuilder: (context, index) {
-                    final sub = DummyData.attendanceList[index];
-                    final currentVal = subjectCustomTargets[sub.name] ?? targetPercentage;
+                    final subjectName = subjectCustomTargets.keys.elementAt(index);
+                    final currentVal = subjectCustomTargets[subjectName] ?? targetPercentage;
                     
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -486,7 +495,7 @@ class AttendanceSettingsTab extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              sub.name,
+                              subjectName,
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -518,7 +527,7 @@ class AttendanceSettingsTab extends StatelessWidget {
                               onChanged: (newVal) {
                                 if (newVal != null) {
                                   setDialogState(() {
-                                    onSubjectCustomTargetChanged(sub.name, newVal);
+                                    onSubjectCustomTargetChanged(subjectName, newVal);
                                   });
                                 }
                               },

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/dummy_data.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../data/dto/todo/todo_dto.dart';
+import '../../data/repositories/todo_repository.dart';
 
 class AddTodoScreen extends StatefulWidget {
-  final TodoMock? todoToEdit;
+  final TodoDto? todoToEdit;
   const AddTodoScreen({super.key, this.todoToEdit});
 
   @override
@@ -15,8 +16,9 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _customCategoryController = TextEditingController();
+  final TodoRepository _todoRepository = TodoRepository();
 
-  final List<String> _categories = ['Academic', 'Personal', 'Event', 'Project', 'Finance', 'Other'];
+  final List<String> _categories = ['Academic', 'Personal', 'Work', 'Health', 'Other'];
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
@@ -25,6 +27,7 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
 
   // Collapsible section state
   bool _isAdvancedExpanded = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -34,78 +37,35 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
       _titleController.text = todo.title;
       
       // Handle Priority
-      final priority = todo.cognitiveLoad;
+      final priority = todo.priority;
       if (['low', 'medium', 'high'].contains(priority.toLowerCase())) {
         _selectedPriority = priority[0].toUpperCase() + priority.substring(1).toLowerCase();
       }
 
       // Handle Category
-      if (_categories.contains(todo.subject)) {
-        _selectedCategory = todo.subject;
+      final categoryFormatted = todo.category[0].toUpperCase() + todo.category.substring(1).toLowerCase();
+      if (_categories.contains(categoryFormatted)) {
+        _selectedCategory = categoryFormatted;
       } else {
         // If custom category, insert before 'Other'
         final otherIndex = _categories.indexOf('Other');
         if (otherIndex != -1) {
-          _categories.insert(otherIndex, todo.subject);
+          _categories.insert(otherIndex, categoryFormatted);
         } else {
-          _categories.add(todo.subject);
+          _categories.add(categoryFormatted);
         }
-        _selectedCategory = todo.subject;
+        _selectedCategory = categoryFormatted;
       }
 
-      // Handle Time & Date parsing
-      if (todo.dueTime != null) {
-        _selectedTime = _parseTimeOfDay(todo.dueTime!);
+      // Handle Time & Date
+      _selectedDate = todo.dueDatetime;
+      if (todo.dueDatetime != null) {
+        _selectedTime = TimeOfDay.fromDateTime(todo.dueDatetime!);
       }
-      _selectedDate = _parseDueDateString(todo.dueDateString);
     }
   }
 
-  TimeOfDay? _parseTimeOfDay(String timeStr) {
-    try {
-      final parts = timeStr.trim().split(' ');
-      if (parts.length < 2) return null;
-      final timeParts = parts[0].split(':');
-      if (timeParts.length < 2) return null;
-      int hour = int.parse(timeParts[0]);
-      final minute = int.parse(timeParts[1]);
-      final isPm = parts[1].toLowerCase() == 'pm';
-      if (isPm && hour != 12) {
-        hour += 12;
-      } else if (!isPm && hour == 12) {
-        hour = 0;
-      }
-      return TimeOfDay(hour: hour, minute: minute);
-    } catch (_) {
-      return null;
-    }
-  }
 
-  DateTime? _parseDueDateString(String dateStr) {
-    if (dateStr.toLowerCase() == 'no due date') return null;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    if (dateStr.startsWith('Today')) return today;
-    if (dateStr.startsWith('Tomorrow')) return today.add(const Duration(days: 1));
-
-    try {
-      final parts = dateStr.split(',');
-      if (parts.length < 2) return null;
-      final datePart = parts[1].trim();
-      final dateSubParts = datePart.split(' ');
-      if (dateSubParts.length < 2) return null;
-      final day = int.parse(dateSubParts[0]);
-      final monthStr = dateSubParts[1].toLowerCase();
-
-      final months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-      final monthIndex = months.indexOf(monthStr.substring(0, 3));
-      if (monthIndex == -1) return null;
-
-      return DateTime(now.year, monthIndex + 1, day);
-    } catch (_) {
-      return null;
-    }
-  }
 
   void _showAddCategoryDialog() {
     final controller = TextEditingController();
@@ -307,43 +267,88 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
     }
   }
 
-  void _saveTask() {
+  Future<void> _saveTask() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Format final due date string (optional)
-    String finalDueDate = 'No due date';
+    final String categoryToSave = _selectedCategory == 'Other'
+        ? (_customCategoryController.text.trim().isNotEmpty ? _customCategoryController.text.trim().toLowerCase() : 'other')
+        : _selectedCategory.toLowerCase();
+
+    final priorityToSave = _selectedPriority.toLowerCase();
+
+    DateTime? dueDatetime;
     if (_selectedDate != null) {
-      finalDueDate = _formatDateForDisplay(_selectedDate!);
       if (_selectedTime != null) {
-        finalDueDate += ', ${_formatTimeOfDay(_selectedTime!)}';
+        dueDatetime = DateTime(
+          _selectedDate!.year,
+          _selectedDate!.month,
+          _selectedDate!.day,
+          _selectedTime!.hour,
+          _selectedTime!.minute,
+        );
+      } else {
+        dueDatetime = DateTime(
+          _selectedDate!.year,
+          _selectedDate!.month,
+          _selectedDate!.day,
+          12, // Default to noon
+          0,
+        );
       }
     }
 
-    final String categoryToSave = _selectedCategory == 'Other'
-        ? (_customCategoryController.text.trim().isNotEmpty ? _customCategoryController.text.trim() : 'Other')
-        : _selectedCategory;
+    setState(() => _isLoading = true);
 
-    final newTodo = TodoMock(
-      id: widget.todoToEdit?.id ?? 'todo_${DateTime.now().millisecondsSinceEpoch}',
-      title: _titleController.text.trim(),
-      subject: categoryToSave,
-      dueDateString: finalDueDate,
-      cognitiveLoad: _selectedPriority,
-      isCompleted: widget.todoToEdit?.isCompleted ?? false,
-      description: null, // Description removed completely
-      dueTime: _selectedTime != null ? _formatTimeOfDay(_selectedTime!) : null,
-      repeatTask: false, // Default placeholder state
-      createdBy: widget.todoToEdit?.createdBy ?? 'Manual', // Default placeholder state
-    );
+    try {
+      if (widget.todoToEdit != null) {
+        await _todoRepository.updateTodo(
+          widget.todoToEdit!.todoId,
+          TodoUpdateRequest(
+            title: _titleController.text.trim(),
+            category: categoryToSave,
+            priority: priorityToSave,
+            dueDatetime: dueDatetime,
+          ),
+        );
+      } else {
+        await _todoRepository.createTodo(
+          TodoCreateRequest(
+            title: _titleController.text.trim(),
+            category: categoryToSave,
+            priority: priorityToSave,
+            dueDatetime: dueDatetime,
+          ),
+        );
+      }
 
-    Navigator.of(context).pop(newTodo);
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to save task: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.todoToEdit != null ? 'Edit To Do' : 'Add To Do'),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

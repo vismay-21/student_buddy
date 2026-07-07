@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/dummy_data.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../data/dto/review_queue/review_queue_dto.dart';
+import '../../data/repositories/review_queue_repository.dart';
 
 class ReviewQueueEditScreen extends StatefulWidget {
-  final ReviewItemMock item;
+  final ReviewQueueDto item;
   const ReviewQueueEditScreen({super.key, required this.item});
 
   @override
@@ -13,6 +14,8 @@ class ReviewQueueEditScreen extends StatefulWidget {
 
 class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
   final _formKey = GlobalKey<FormState>();
+  final ReviewQueueRepository _repository = ReviewQueueRepository();
+  bool _isLoading = false;
 
   // Finance Form State
   late TextEditingController _financeDescController;
@@ -20,60 +23,85 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
   String _selectedCategory = 'Other';
   String _selectedAccount = 'UPI';
 
-  // OCR Form State
-  late TextEditingController _ocrSubjectController;
-  String _selectedOcrDay = 'Friday';
-  late TextEditingController _ocrStartTimeController;
-  late TextEditingController _ocrEndTimeController;
-  late TextEditingController _ocrRoomController;
+  // Todo Form State
+  late TextEditingController _todoTitleController;
+  String _selectedTodoCategory = 'Academic';
+  String _selectedTodoPriority = 'Medium';
+  String _selectedTodoStatus = 'Pending';
 
-  // Cancellation Form State
-  String _selectedCancelClass = 'DBMS';
+  // Cancellation / Attendance Form State
   bool _confirmCancel = true;
 
   @override
   void initState() {
     super.initState();
     // Initialize state depending on item type
-    if (widget.item.id == 'rev1') {
-      _financeDescController = TextEditingController(text: 'Dinner with friends');
-      _financeAmountController = TextEditingController(text: '500.00');
-    } else if (widget.item.id == 'rev2') {
-      _ocrSubjectController = TextEditingController(text: 'DAA Lab');
-      _ocrStartTimeController = TextEditingController(text: '14:00');
-      _ocrEndTimeController = TextEditingController(text: '16:00');
-      _ocrRoomController = TextEditingController(text: 'Lab 2');
+    if (widget.item.entityType == 'finance') {
+      _financeDescController = TextEditingController(text: widget.item.reviewMessage);
+      _financeAmountController = TextEditingController(text: '0.00');
+    } else if (widget.item.entityType == 'todo') {
+      _todoTitleController = TextEditingController(text: widget.item.reviewMessage);
     }
   }
 
   @override
   void dispose() {
-    if (widget.item.id == 'rev1') {
+    if (widget.item.entityType == 'finance') {
       _financeDescController.dispose();
       _financeAmountController.dispose();
-    } else if (widget.item.id == 'rev2') {
-      _ocrSubjectController.dispose();
-      _ocrStartTimeController.dispose();
-      _ocrEndTimeController.dispose();
-      _ocrRoomController.dispose();
+    } else if (widget.item.entityType == 'todo') {
+      _todoTitleController.dispose();
     }
     super.dispose();
   }
 
-  void _saveResolution() {
+  Future<void> _saveResolution() async {
     if (!_formKey.currentState!.validate()) return;
 
-    String msg = '';
-    if (widget.item.id == 'rev1') {
-      msg = 'Expense of ₹${_financeAmountController.text} saved under Category "$_selectedCategory" (${_selectedAccount})';
-    } else if (widget.item.id == 'rev2') {
-      msg = 'Timetable updated: ${_ocrSubjectController.text} on $_selectedOcrDay at ${_ocrStartTimeController.text} in Room ${_ocrRoomController.text}';
-    } else if (widget.item.id == 'rev3') {
-      msg = 'Class ${_selectedCancelClass} marked as ${(_confirmCancel ? "CANCELLED" : "ACTIVE")}';
+    Map<String, dynamic> resolutionData = {};
+    if (widget.item.entityType == 'finance') {
+      resolutionData = {
+        'description': _financeDescController.text.trim(),
+        'amount': double.tryParse(_financeAmountController.text) ?? 0.0,
+        'category': _selectedCategory.toLowerCase(),
+        'account': _selectedAccount.toLowerCase(),
+      };
+    } else if (widget.item.entityType == 'todo') {
+      resolutionData = {
+        'title': _todoTitleController.text.trim(),
+        'category': _selectedTodoCategory.toLowerCase(),
+        'priority': _selectedTodoPriority.toLowerCase(),
+        'status': _selectedTodoStatus.toLowerCase(),
+      };
+    } else {
+      resolutionData = {
+        'status': _confirmCancel ? 'cancelled' : 'attended',
+      };
     }
 
-    AppSnackbar.success(context, msg);
-    Navigator.pop(context, true);
+    setState(() => _isLoading = true);
+
+    try {
+      await _repository.resolveReviewQueueItem(
+        widget.item.reviewId,
+        ReviewQueueResolveRequest(
+          resolutionData: resolutionData,
+          resolvedBy: 'user',
+        ),
+      );
+      if (mounted) {
+        AppSnackbar.success(context, 'Review item resolved!');
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to resolve item: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -81,6 +109,12 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color cardBackground = isDark ? AppTheme.surface : AppTheme.lightSurface;
     final Color borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -109,25 +143,36 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'SOURCE: ${widget.item.source.toUpperCase()}',
-                            style: TextStyle(
-                              color: widget.item.source.toLowerCase() == 'whatsapp' ? const Color(0xFF10B981) : AppTheme.primary,
+                            'ENTITY TYPE: ${widget.item.entityType.toUpperCase()}',
+                            style: const TextStyle(
+                              color: AppTheme.primary,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1.0,
                             ),
                           ),
                           Text(
-                            widget.item.dateString,
-                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                            widget.item.reviewStatus.toUpperCase(),
+                            style: TextStyle(
+                              color: widget.item.reviewStatus == 'pending' ? AppTheme.warning : AppTheme.accent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        widget.item.description,
+                        widget.item.reviewMessage,
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                       ),
+                      if (widget.item.entitySummary.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.item.entitySummary,
+                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -146,9 +191,9 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
               const SizedBox(height: 12),
 
               // Render correct fields
-              if (widget.item.id == 'rev1') _buildFinanceFields(isDark),
-              if (widget.item.id == 'rev2') _buildOcrFields(isDark),
-              if (widget.item.id == 'rev3') _buildCancellationFields(isDark),
+              if (widget.item.entityType == 'finance') _buildFinanceFields(isDark),
+              if (widget.item.entityType == 'todo') _buildTodoFields(isDark),
+              if (widget.item.entityType != 'finance' && widget.item.entityType != 'todo') _buildCancellationFields(isDark),
 
               const SizedBox(height: 32),
 
@@ -233,51 +278,38 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
     );
   }
 
-  Widget _buildOcrFields(bool isDark) {
+  Widget _buildTodoFields(bool isDark) {
     return Column(
       children: [
         _buildTextField(
-          controller: _ocrSubjectController,
-          label: 'Subject Name',
-          icon: Icons.book_outlined,
+          controller: _todoTitleController,
+          label: 'Title',
+          icon: Icons.title_rounded,
           validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
         ),
         const SizedBox(height: 16),
         _buildDropdown(
-          label: 'Day of Week',
-          value: _selectedOcrDay,
-          items: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-          onChanged: (val) => setState(() => _selectedOcrDay = val!),
-          icon: Icons.calendar_today_outlined,
+          label: 'Category',
+          value: _selectedTodoCategory,
+          items: ['Academic', 'Personal', 'Work', 'Health', 'Other'],
+          onChanged: (val) => setState(() => _selectedTodoCategory = val!),
+          icon: Icons.category_outlined,
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                controller: _ocrStartTimeController,
-                label: 'Start Time',
-                icon: Icons.access_time,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildTextField(
-                controller: _ocrEndTimeController,
-                label: 'End Time',
-                icon: Icons.access_time,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-              ),
-            ),
-          ],
+        _buildDropdown(
+          label: 'Priority',
+          value: _selectedTodoPriority,
+          items: ['Low', 'Medium', 'High'],
+          onChanged: (val) => setState(() => _selectedTodoPriority = val!),
+          icon: Icons.priority_high_rounded,
         ),
         const SizedBox(height: 16),
-        _buildTextField(
-          controller: _ocrRoomController,
-          label: 'Room Number',
-          icon: Icons.meeting_room_outlined,
-          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+        _buildDropdown(
+          label: 'Status',
+          value: _selectedTodoStatus,
+          items: ['Pending', 'Completed'],
+          onChanged: (val) => setState(() => _selectedTodoStatus = val!),
+          icon: Icons.check_circle_outline_rounded,
         ),
       ],
     );
@@ -287,14 +319,6 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
     final bool isDarkTheme = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
-        _buildDropdown(
-          label: 'Select Class',
-          value: _selectedCancelClass,
-          items: ['DBMS', 'DAA', 'OS', 'CN'],
-          onChanged: (val) => setState(() => _selectedCancelClass = val!),
-          icon: Icons.school_outlined,
-        ),
-        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
@@ -356,7 +380,6 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
     required void Function(String?) onChanged,
     required IconData icon,
   }) {
-    final bool isDarkTheme = Theme.of(context).brightness == Brightness.dark;
     return DropdownButtonFormField<String>(
       value: value,
       items: items.map((val) {

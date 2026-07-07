@@ -1,25 +1,23 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/app_state.dart';
-import '../../core/utils/dummy_data.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../data/dto/notes/notes_dto.dart';
+import '../../data/dto/subject/subject_dto.dart';
+import '../../data/repositories/notes_repository.dart';
+import '../../data/repositories/subject_repository.dart';
 
 class AddResourceScreen extends StatefulWidget {
-  final NotesFileMock? resourceToEdit;
-  final String? initialSubject;
-  final String? initialSubsection;
-  final String? initialSemester;
-  final List<String> existingSubjects;
-  final Map<String, List<String>> subjectToSubsections;
+  final NotesResourceDto? resourceToEdit;
+  final String? initialSubjectId;
+  final String? initialSectionId;
+  final String semesterId;
 
   const AddResourceScreen({
     super.key,
     this.resourceToEdit,
-    this.initialSubject,
-    this.initialSubsection,
-    this.initialSemester,
-    required this.existingSubjects,
-    required this.subjectToSubsections,
+    this.initialSubjectId,
+    this.initialSectionId,
+    required this.semesterId,
   });
 
   @override
@@ -30,55 +28,76 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
 
-  late List<String> _subjects;
-  late Map<String, List<String>> _subsectionsMap;
+  final NotesRepository _notesRepo = NotesRepository();
+  final SubjectRepository _subjectRepo = SubjectRepository();
 
-  String? _selectedSemester;
-  String? _selectedSubject;
-  String? _selectedSubsection;
+  List<NotesSubjectDto> _subjects = [];
+  List<NotesSectionDto> _sections = [];
+
+  String? _selectedSubjectId;
+  String? _selectedSectionId;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _subjects = List.from(widget.existingSubjects);
-    _subsectionsMap = Map.from(widget.subjectToSubsections);
-
-    _selectedSemester = widget.initialSemester ?? AppState.instance.activeSemester.value;
-
     if (widget.resourceToEdit != null) {
-      _nameController.text = widget.resourceToEdit!.name;
+      _nameController.text = widget.resourceToEdit!.resourceName;
     }
+    _loadInitialData();
+  }
 
-    if (widget.resourceToEdit != null || widget.initialSubject != null) {
-      _selectedSubject = widget.initialSubject;
-      if (_selectedSubject != null && !_subjects.contains(_selectedSubject)) {
-        if (_subjects.isNotEmpty) {
-          _selectedSubject = _subjects.first;
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoading = true);
+    try {
+      final subs = await _notesRepo.getSubjects(widget.semesterId);
+      setState(() {
+        _subjects = subs;
+      });
+
+      // Handle initial/edit subject ID
+      final targetSubId = widget.resourceToEdit != null
+          ? widget.initialSubjectId
+          : widget.initialSubjectId;
+
+      if (targetSubId != null && subs.any((s) => s.notesSubjectId == targetSubId)) {
+        setState(() {
+          _selectedSubjectId = targetSubId;
+        });
+        await _loadSections(targetSubId);
+
+        // Handle initial/edit section ID
+        final targetSecId = widget.resourceToEdit != null
+            ? widget.initialSectionId
+            : widget.initialSectionId;
+
+        if (targetSecId != null && _sections.any((s) => s.sectionId == targetSecId)) {
+          setState(() {
+            _selectedSectionId = targetSecId;
+          });
         }
       }
-    } else {
-      _selectedSubject = null;
-    }
-
-    // Load subsections for current subject
-    _updateSubsectionsList();
-
-    if (widget.resourceToEdit != null || widget.initialSubsection != null) {
-      _selectedSubsection = widget.initialSubsection;
-      final currentSubsections = _selectedSubject != null ? (_subsectionsMap[_selectedSubject!] ?? []) : <String>[];
-      if (_selectedSubsection != null && !currentSubsections.contains(_selectedSubsection)) {
-        if (currentSubsections.isNotEmpty) {
-          _selectedSubsection = currentSubsections.first;
-        }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to load subjects: $e');
       }
-    } else {
-      _selectedSubsection = null;
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  void _updateSubsectionsList() {
-    if (_selectedSubject != null && !_subsectionsMap.containsKey(_selectedSubject)) {
-      _subsectionsMap[_selectedSubject!] = [];
+  Future<void> _loadSections(String subjectId) async {
+    try {
+      final secs = await _notesRepo.getSections(subjectId);
+      setState(() {
+        _sections = secs;
+      });
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to load sections: $e');
+      }
     }
   }
 
@@ -105,20 +124,39 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 final name = controller.text.trim();
-                if (name.isNotEmpty) {
-                  setState(() {
-                    if (!_subjects.contains(name)) {
-                      _subjects.add(name);
-                      _subsectionsMap[name] = ['Unit 1']; // Default initial unit
-                    }
-                    _selectedSubject = name;
-                    _updateSubsectionsList();
-                    _selectedSubsection = _subsectionsMap[name]?.first;
-                  });
-                }
                 Navigator.of(context).pop();
+                if (name.isNotEmpty) {
+                  setState(() => _isLoading = true);
+                  try {
+                    await _subjectRepo.createSubject(
+                      SubjectCreateRequest(
+                        semesterId: widget.semesterId,
+                        subjectName: name,
+                      ),
+                    );
+                    final subs = await _notesRepo.getSubjects(widget.semesterId);
+                    final newSub = subs.firstWhere((s) => s.notesSubjectName.toLowerCase() == name.toLowerCase());
+                    setState(() {
+                      _subjects = subs;
+                      _selectedSubjectId = newSub.notesSubjectId;
+                      _sections = [];
+                      _selectedSectionId = null;
+                    });
+                    if (mounted) {
+                      AppSnackbar.success(context, 'Subject "$name" created.');
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      AppSnackbar.error(context, 'Failed to create subject: $e');
+                    }
+                  } finally {
+                    if (mounted) {
+                      setState(() => _isLoading = false);
+                    }
+                  }
+                }
               },
               child: const Text('Create'),
             ),
@@ -129,14 +167,14 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
   }
 
   void _showCreateSubsectionDialog() {
-    if (_selectedSubject == null) return;
+    if (_selectedSubjectId == null) return;
     final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (context) {
         final bool isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
-          title: const Text('Create New Subsection', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          title: const Text('Create New Section / Unit', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           content: TextField(
             controller: controller,
             autofocus: true,
@@ -152,19 +190,37 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 final name = controller.text.trim();
-                if (name.isNotEmpty) {
-                  setState(() {
-                    final currentSubs = _subsectionsMap[_selectedSubject!] ?? [];
-                    if (!currentSubs.contains(name)) {
-                      currentSubs.add(name);
-                      _subsectionsMap[_selectedSubject!] = currentSubs;
-                    }
-                    _selectedSubsection = name;
-                  });
-                }
                 Navigator.of(context).pop();
+                if (name.isNotEmpty) {
+                  setState(() => _isLoading = true);
+                  try {
+                    await _notesRepo.createSection(
+                      NotesSectionCreateRequest(
+                        notesSubjectId: _selectedSubjectId!,
+                        sectionName: name,
+                      ),
+                    );
+                    final secs = await _notesRepo.getSections(_selectedSubjectId!);
+                    final newSec = secs.firstWhere((s) => s.sectionName.toLowerCase() == name.toLowerCase());
+                    setState(() {
+                      _sections = secs;
+                      _selectedSectionId = newSec.sectionId;
+                    });
+                    if (mounted) {
+                      AppSnackbar.success(context, 'Section "$name" created.');
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      AppSnackbar.error(context, 'Failed to create section: $e');
+                    }
+                  } finally {
+                    if (mounted) {
+                      setState(() => _isLoading = false);
+                    }
+                  }
+                }
               },
               child: const Text('Create'),
             ),
@@ -174,75 +230,113 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
     );
   }
 
-  void _saveResource() {
+  Future<void> _saveResource() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    if (_selectedSubject == null || _selectedSubsection == null) {
-      AppSnackbar.warning(context, 'Please select a Subject and Subsection first');
+    if (_selectedSubjectId == null || _selectedSectionId == null) {
+      AppSnackbar.warning(context, 'Please select a Subject and Section first');
       return;
     }
 
-    // Size placeholder based on type
-    String sizeStr = '2.0 MB';
-    if (widget.resourceToEdit != null) {
-      sizeStr = widget.resourceToEdit!.size;
-    }
-
-    // Detect file type from name extension
     final name = _nameController.text.trim();
-    String detectedType = 'Other';
+    String detectedType = 'PDF';
+    String mimeType = 'application/pdf';
     if (name.contains('.')) {
-      final ext = name.split('.').last.toUpperCase();
-      if (ext.isNotEmpty && ext.length <= 4) {
-        detectedType = ext;
+      final ext = name.split('.').last.toLowerCase();
+      if (ext == 'pdf') {
+        detectedType = 'PDF';
+        mimeType = 'application/pdf';
+      } else if (ext == 'ppt' || ext == 'pptx') {
+        detectedType = 'PPT';
+        mimeType = 'application/vnd.ms-powerpoint';
+      } else if (ext == 'doc' || ext == 'docx') {
+        detectedType = 'DOCX';
+        mimeType = 'application/msword';
+      } else if (['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext)) {
+        detectedType = 'IMAGE';
+        mimeType = 'image/png';
+      } else if (ext.startsWith('http') || ext.contains('www')) {
+        detectedType = 'LINK';
+        mimeType = 'text/html';
       }
     }
 
-    final newResource = NotesFileMock(
-      name: name,
-      type: detectedType,
-      size: sizeStr,
-    );
+    setState(() => _isLoading = true);
 
-    // Return the resulting resource plus routing info to parent screen
-    Navigator.of(context).pop({
-      'action': 'save',
-      'resource': newResource,
-      'subject': _selectedSubject,
-      'subsection': _selectedSubsection,
-      'semester': _selectedSemester,
-      'oldResource': widget.resourceToEdit,
-      'oldSubject': widget.initialSubject,
-      'oldSubsection': widget.initialSubsection,
-    });
+    try {
+      if (widget.resourceToEdit != null) {
+        // Edit existing resource
+        await _notesRepo.updateResource(
+          widget.resourceToEdit!.resourceId,
+          NotesResourceUpdateRequest(
+            resourceName: name,
+            fileName: name.contains('.') ? name : '$name.${detectedType.toLowerCase()}',
+            mimeType: mimeType,
+          ),
+        );
+      } else {
+        // Create new resource
+        await _notesRepo.createResource(
+          NotesResourceCreateRequest(
+            sectionId: _selectedSectionId!,
+            resourceName: name,
+            fileName: name.contains('.') ? name : '$name.${detectedType.toLowerCase()}',
+            mimeType: mimeType,
+            fileSizeLinesOrBytes: 2048 * 1024, // 2MB default
+            storagePath: '/notes/$name',
+            uploadedVia: 'app',
+          ),
+        );
+      }
+
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to save resource: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _deleteResource() {
     if (widget.resourceToEdit == null) return;
     
-    // Prompt confirmation
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Delete Resource', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          content: Text('Are you sure you want to delete "${widget.resourceToEdit!.name}"?'),
+          content: Text('Are you sure you want to delete "${widget.resourceToEdit!.resourceName}"?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop(); // Dismiss Dialog
-                Navigator.of(context).pop({
-                  'action': 'delete',
-                  'resource': widget.resourceToEdit,
-                  'subject': widget.initialSubject,
-                  'subsection': widget.initialSubsection,
-                }); // Dismiss AddResourceScreen
+                setState(() => _isLoading = true);
+                try {
+                  await _notesRepo.deleteResource(widget.resourceToEdit!.resourceId);
+                  if (mounted) {
+                    Navigator.of(context).pop(true); // Dismiss Screen
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    AppSnackbar.error(context, 'Failed to delete resource: $e');
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() => _isLoading = false);
+                  }
+                }
               },
               child: const Text('Delete', style: TextStyle(color: AppTheme.danger)),
             ),
@@ -255,7 +349,15 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final currentSubsections = _selectedSubject != null ? (_subsectionsMap[_selectedSubject!] ?? []) : <String>[];
+
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.resourceToEdit != null ? 'Edit Resource' : 'Add Resource'),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -272,7 +374,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Semester Field
+              // Semester Field (Read-only)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
@@ -293,24 +395,13 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      DropdownButtonFormField<String>(
-                        dropdownColor: isDark ? AppTheme.surface : Colors.white,
-                        value: _selectedSemester,
-                        style: TextStyle(color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary, fontSize: 13),
-                        decoration: InputDecoration(
-                          border: UnderlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.transparent : Colors.grey)),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Active Academic Semester',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
                         ),
-                        items: ['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4']
-                            .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _selectedSemester = val;
-                            });
-                          }
-                        },
                       ),
                     ],
                   ),
@@ -360,23 +451,24 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                       const SizedBox(height: 4),
                       DropdownButtonFormField<String>(
                         dropdownColor: isDark ? AppTheme.surface : Colors.white,
-                        value: _selectedSubject,
+                        value: _selectedSubjectId,
                         hint: const Text('Select Subject'),
                         style: TextStyle(color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary, fontSize: 13),
                         decoration: InputDecoration(
                           border: UnderlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.transparent : Colors.grey)),
                         ),
                         items: _subjects
-                            .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                            .map((s) => DropdownMenuItem(value: s.notesSubjectId, child: Text(s.notesSubjectName)))
                             .toList(),
                         validator: (value) => value == null ? 'Subject is required' : null,
                         onChanged: (val) {
                           if (val != null) {
                             setState(() {
-                              _selectedSubject = val;
-                              _updateSubsectionsList();
-                              _selectedSubsection = null;
+                              _selectedSubjectId = val;
+                              _selectedSectionId = null;
+                              _sections = [];
                             });
+                            _loadSections(val);
                           }
                         },
                       ),
@@ -386,7 +478,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
               ),
               const SizedBox(height: 8),
 
-              // Subsection Field
+              // Section Field
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
@@ -401,7 +493,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                               const Icon(Icons.subdirectory_arrow_right_rounded, color: AppTheme.primary, size: 18),
                               const SizedBox(width: 6),
                               Text(
-                                'Unit / Subsection',
+                                'Unit / Section',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -410,38 +502,39 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                               ),
                             ],
                           ),
-                          GestureDetector(
-                            onTap: _showCreateSubsectionDialog,
-                            child: const Row(
-                              children: [
-                                Icon(Icons.add_rounded, size: 14, color: AppTheme.primary),
-                                SizedBox(width: 2),
-                                Text(
-                                  'Create New Subsection',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                                ),
-                              ],
+                          if (_selectedSubjectId != null)
+                            GestureDetector(
+                              onTap: _showCreateSubsectionDialog,
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.add_rounded, size: 14, color: AppTheme.primary),
+                                  SizedBox(width: 2),
+                                  Text(
+                                    'Create New Section',
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       DropdownButtonFormField<String>(
                         dropdownColor: isDark ? AppTheme.surface : Colors.white,
-                        value: _selectedSubsection,
-                        hint: const Text('Select Unit / Subsection'),
+                        value: _selectedSectionId,
+                        hint: const Text('Select Unit / Section'),
                         style: TextStyle(color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary, fontSize: 13),
                         decoration: InputDecoration(
                           border: UnderlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.transparent : Colors.grey)),
                         ),
-                        items: currentSubsections
-                            .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                        items: _sections
+                            .map((s) => DropdownMenuItem(value: s.sectionId, child: Text(s.sectionName)))
                             .toList(),
-                        validator: (value) => value == null ? 'Subsection is required' : null,
+                        validator: (value) => value == null ? 'Section is required' : null,
                         onChanged: (val) {
                           if (val != null) {
                             setState(() {
-                              _selectedSubsection = val;
+                              _selectedSectionId = val;
                             });
                           }
                         },

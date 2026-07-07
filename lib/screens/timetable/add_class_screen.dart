@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../core/models/subject_template.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../core/utils/color_helper.dart';
+import '../../data/dto/subject/subject_dto.dart';
+import '../../data/dto/lecture/lecture_template_dto.dart';
+import '../../data/repositories/subject_repository.dart';
+import '../../data/repositories/lecture_template_repository.dart';
 
 /// Full-screen form for adding a lecture to the timetable.
 /// Supports:
@@ -29,7 +33,12 @@ class _AddClassScreenState extends State<AddClassScreen> {
   TimeOfDay? _beginTime;
   TimeOfDay? _endTime;
   int      _selectedColor = 0xFF3B82F6; // default blue
-  SubjectTemplate? _selectedTemplate;
+
+  final _subjectRepo = SubjectRepository();
+  final _templateRepo = LectureTemplateRepository();
+  List<SubjectDto> _existingSubjects = [];
+  bool _isLoadingSubjects = false;
+  SubjectDto? _selectedSubject;
 
   static const List<String> _days = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
@@ -52,6 +61,12 @@ class _AddClassScreenState extends State<AddClassScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadSubjects();
+  }
+
+  @override
   void dispose() {
     _subjectController.dispose();
     _roomController.dispose();
@@ -59,16 +74,40 @@ class _AddClassScreenState extends State<AddClassScreen> {
     super.dispose();
   }
 
-  // ── Template ──────────────────────────────────────────────────────────────
+  Future<void> _loadSubjects() async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) return;
+    setState(() => _isLoadingSubjects = true);
+    try {
+      final list = await _subjectRepo.getSubjects(activeSem.semesterId);
+      setState(() {
+        _existingSubjects = list;
+        _isLoadingSubjects = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingSubjects = false);
+    }
+  }
 
-  void _applyTemplate(SubjectTemplate template) {
+  void _applySubject(SubjectDto subject) {
     setState(() {
-      _selectedTemplate        = template;
-      _subjectController.text  = template.name;
-      _roomController.text     = template.room;
-      _teacherController.text  = template.teacher;
-      _selectedColor           = template.colorValue;
+      _selectedSubject = subject;
+      _subjectController.text = subject.subjectName;
+      _teacherController.text = subject.facultyName ?? '';
+      _selectedColor = parseHexColor(subject.themeColor).value;
     });
+    _fetchDetailsForSubject(subject);
+  }
+
+  Future<void> _fetchDetailsForSubject(SubjectDto subject) async {
+    try {
+      final temps = await _templateRepo.getTemplates(subject.subjectId);
+      if (temps.isNotEmpty) {
+        setState(() {
+          _roomController.text = temps.first.room ?? '';
+        });
+      }
+    } catch (_) {}
   }
 
   // ── Time picker ───────────────────────────────────────────────────────────
@@ -245,7 +284,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
-  void _handleAdd() {
+  void _handleAdd() async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedDay == null) {
@@ -257,23 +296,60 @@ class _AddClassScreenState extends State<AddClassScreen> {
       return;
     }
 
-    // Save / update the subject as a template for future reuse
-    AppState.instance.upsertSubjectTemplate(SubjectTemplate(
-      name:       _subjectController.text.trim(),
-      room:       _roomController.text.trim(),
-      teacher:    _teacherController.text.trim(),
-      colorValue: _selectedColor,
-    ));
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) {
+      _showError('No active semester configured.');
+      return;
+    }
 
-    final begin = _formatTime(_beginTime!);
-    final end   = _formatTime(_endTime!);
+    final dayIndex = _days.indexOf(_selectedDay!) + 1;
+    final startStr = '${_beginTime!.hour.toString().padLeft(2, '0')}:${_beginTime!.minute.toString().padLeft(2, '0')}';
+    final endStr = '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}';
 
-    AppSnackbar.success(
-      context,
-      '"${_subjectController.text.trim()}" added on $_selectedDay, $begin → $end (Mock)',
-    );
+    setState(() => _isLoadingSubjects = true);
 
-    Navigator.of(context).pop();
+    try {
+      String subjectId;
+      final typedName = _subjectController.text.trim();
+      SubjectDto? match;
+      for (final s in _existingSubjects) {
+        if (s.subjectName.toLowerCase() == typedName.toLowerCase()) {
+          match = s;
+          break;
+        }
+      }
+
+      if (match != null) {
+        subjectId = match.subjectId;
+      } else {
+        final newSub = await _subjectRepo.createSubject(SubjectCreateRequest(
+          semesterId: activeSem.semesterId,
+          subjectName: typedName,
+          facultyName: _teacherController.text.trim().isEmpty ? null : _teacherController.text.trim(),
+          themeColor: toHexColor(_selectedColor),
+        ));
+        subjectId = newSub.subjectId;
+      }
+
+      await _templateRepo.createTemplate(LectureTemplateCreateRequest(
+        subjectId: subjectId,
+        dayOfWeek: dayIndex,
+        startTime: startStr,
+        endTime: endStr,
+        room: _roomController.text.trim().isEmpty ? null : _roomController.text.trim(),
+      ));
+
+      if (mounted) {
+        AppSnackbar.success(
+          context,
+          '"$typedName" added successfully.',
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      setState(() => _isLoadingSubjects = false);
+      _showError('Failed to add class: $e');
+    }
   }
 
   void _showError(String msg) {
@@ -375,57 +451,58 @@ class _AddClassScreenState extends State<AddClassScreen> {
   // ── Row builders ──────────────────────────────────────────────────────────
 
   Widget _buildTemplateRow() {
-    return ValueListenableBuilder<List<SubjectTemplate>>(
-      valueListenable: AppState.instance.subjectTemplates,
-      builder: (context, templates, _) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              const Icon(Icons.copy_all_rounded, size: 20, color: AppTheme.primary),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Use Template',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-              ),
-              if (templates.isEmpty)
-                const Text('None yet', style: TextStyle(color: AppTheme.textMuted, fontSize: 13))
-              else
-                DropdownButton<SubjectTemplate>(
-                  hint: const Text('Select', style: TextStyle(color: AppTheme.primary, fontSize: 13)),
-                  value: _selectedTemplate,
-                  underline: const SizedBox.shrink(),
-                  icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primary),
-                  style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
-                  borderRadius: BorderRadius.circular(12),
-                  dropdownColor: Theme.of(context).cardColor,
-                  items: templates.map((t) {
-                    return DropdownMenuItem<SubjectTemplate>(
-                      value: t,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 12, height: 12,
-                            decoration: BoxDecoration(
-                              color: Color(t.colorValue),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(t.name),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (val) { if (val != null) _applyTemplate(val); },
-                ),
-            ],
+    if (_isLoadingSubjects) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          const Icon(Icons.copy_all_rounded, size: 20, color: AppTheme.primary),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Use Template',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
           ),
-        );
-      },
+          if (_existingSubjects.isEmpty)
+            const Text('None yet', style: TextStyle(color: AppTheme.textMuted, fontSize: 13))
+          else
+            DropdownButton<SubjectDto>(
+              hint: const Text('Select', style: TextStyle(color: AppTheme.primary, fontSize: 13)),
+              value: _selectedSubject,
+              underline: const SizedBox.shrink(),
+              icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.primary),
+              style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: Theme.of(context).cardColor,
+              items: _existingSubjects.map((s) {
+                return DropdownMenuItem<SubjectDto>(
+                  value: s,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 12, height: 12,
+                        decoration: BoxDecoration(
+                          color: parseHexColor(s.themeColor),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(s.subjectName),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (val) { if (val != null) _applySubject(val); },
+            ),
+        ],
+      ),
     );
   }
 

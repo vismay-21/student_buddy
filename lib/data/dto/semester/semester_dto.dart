@@ -57,3 +57,30 @@ class SemesterCreateRequest {
     };
   }
 }
+
+class SemesterUpdateRequest {
+  final int? semesterNumber;
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  SemesterUpdateRequest({
+    this.semesterNumber,
+    this.startDate,
+    this.endDate,
+  });
+
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = {};
+    if (semesterNumber != null) {
+      data['semester_number'] = semesterNumber;
+    }
+    if (startDate != null) {
+      data['start_date'] = startDate!.toIso8601String().substring(0, 10);
+    }
+    if (endDate != null) {
+      data['end_date'] = endDate!.toIso8601String().substring(0, 10);
+    }
+    return data;
+  }
+}
+

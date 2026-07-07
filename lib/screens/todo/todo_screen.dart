@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/dummy_data.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../data/dto/todo/todo_dto.dart';
+import '../../data/repositories/todo_repository.dart';
 import 'add_todo_screen.dart';
 
 class TodoScreen extends StatefulWidget {
@@ -13,15 +15,16 @@ class TodoScreen extends StatefulWidget {
 
 class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TodoRepository _todoRepository = TodoRepository();
   
-  // Local state to simulate toggling completion status
-  late List<TodoMock> _localTodoItems;
+  List<TodoDto> _todoItems = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _localTodoItems = List.from(DummyData.todoItems);
+    _loadTodos();
   }
 
   @override
@@ -30,27 +33,42 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  void _toggleTodoCompletion(String id) {
-    setState(() {
-      final index = _localTodoItems.indexWhere((a) => a.id == id);
-      if (index != -1) {
-        final current = _localTodoItems[index];
-        _localTodoItems[index] = TodoMock(
-          id: current.id,
-          title: current.title,
-          subject: current.subject,
-          dueDateString: current.dueDateString,
-          cognitiveLoad: current.cognitiveLoad,
-          isCompleted: !current.isCompleted,
-        );
+  Future<void> _loadTodos() async {
+    setState(() => _isLoading = true);
+    try {
+      final items = await _todoRepository.getTodos();
+      setState(() {
+        _todoItems = items;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to load tasks: $e');
       }
-    });
-
-    AppSnackbar.success(context, 'Task status updated! (Mock Simulation)');
+    }
   }
 
-  Color _getCognitiveColor(String load) {
-    switch (load.toLowerCase()) {
+  Future<void> _toggleTodoCompletion(TodoDto todo) async {
+    final newStatus = todo.status == 'completed' ? 'pending' : 'completed';
+    try {
+      await _todoRepository.updateTodo(
+        todo.todoId,
+        TodoUpdateRequest(status: newStatus),
+      );
+      _loadTodos();
+      if (mounted) {
+        AppSnackbar.success(context, 'Task marked as $newStatus');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to update task status: $e');
+      }
+    }
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority.toLowerCase()) {
       case 'high':
         return AppTheme.danger;
       case 'medium':
@@ -62,36 +80,55 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _navigateToAddTodo() async {
-    final result = await Navigator.of(context).push<TodoMock>(
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (context) => const AddTodoScreen()),
     );
 
-    if (result != null) {
-      setState(() {
-        _localTodoItems.insert(0, result);
-      });
+    if (result == true) {
+      _loadTodos();
     }
   }
 
-  Future<void> _navigateToEditTodo(TodoMock todoItem) async {
-    final result = await Navigator.of(context).push<TodoMock>(
+  Future<void> _navigateToEditTodo(TodoDto todoItem) async {
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (context) => AddTodoScreen(todoToEdit: todoItem)),
     );
 
-    if (result != null) {
-      setState(() {
-        final index = _localTodoItems.indexWhere((a) => a.id == todoItem.id);
-        if (index != -1) {
-          _localTodoItems[index] = result;
-        }
-      });
+    if (result == true) {
+      _loadTodos();
     }
+  }
+
+  String _formatDueDate(DateTime? date) {
+    if (date == null) return 'No due date';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final selected = DateTime(date.year, date.month, date.day);
+
+    String dateStr;
+    if (selected == today) {
+      dateStr = 'Today';
+    } else if (selected == tomorrow) {
+      dateStr = 'Tomorrow';
+    } else {
+      dateStr = DateFormat('EEE, d MMM').format(date);
+    }
+
+    final timeStr = DateFormat('h:mm a').format(date.toLocal());
+    return '$dateStr, $timeStr';
   }
 
   @override
   Widget build(BuildContext context) {
-    final pending = _localTodoItems.where((a) => !a.isCompleted).toList();
-    final completed = _localTodoItems.where((a) => a.isCompleted).toList();
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final pending = _todoItems.where((a) => a.status != 'completed').toList();
+    final completed = _todoItems.where((a) => a.status == 'completed').toList();
 
     return Scaffold(
       body: Column(
@@ -126,7 +163,7 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildTodoList(List<TodoMock> list, {required bool isPending}) {
+  Widget _buildTodoList(List<TodoDto> list, {required bool isPending}) {
     if (list.isEmpty) {
       return Center(
         child: Column(
@@ -161,7 +198,8 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
       itemCount: list.length,
       itemBuilder: (context, index) {
         final todoItem = list[index];
-        final loadColor = _getCognitiveColor(todoItem.cognitiveLoad);
+        final isCompleted = todoItem.status == 'completed';
+        final loadColor = _getPriorityColor(todoItem.priority);
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
@@ -173,8 +211,8 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
                 Checkbox(
                   activeColor: AppTheme.primary,
                   checkColor: Colors.white,
-                  value: todoItem.isCompleted,
-                  onChanged: (_) => _toggleTodoCompletion(todoItem.id),
+                  value: isCompleted,
+                  onChanged: (_) => _toggleTodoCompletion(todoItem),
                 ),
                 const SizedBox(width: 8),
                 
@@ -196,12 +234,12 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
                                     color: AppTheme.textPrimary,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
-                                    decoration: todoItem.isCompleted ? TextDecoration.lineThrough : null,
+                                    decoration: isCompleted ? TextDecoration.lineThrough : null,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  todoItem.subject,
+                                  todoItem.category[0].toUpperCase() + todoItem.category.substring(1),
                                   style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                                 ),
                                 const SizedBox(height: 8),
@@ -215,7 +253,7 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      todoItem.dueDateString,
+                                      _formatDueDate(todoItem.dueDatetime),
                                       style: TextStyle(
                                         color: isPending ? AppTheme.warning : AppTheme.textMuted,
                                         fontSize: 11,
@@ -237,7 +275,7 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
                               border: Border.all(color: loadColor.withOpacity(0.3)),
                             ),
                             child: Text(
-                              '${todoItem.cognitiveLoad} Load',
+                              todoItem.priority[0].toUpperCase() + todoItem.priority.substring(1),
                               style: TextStyle(
                                 color: loadColor,
                                 fontSize: 10,

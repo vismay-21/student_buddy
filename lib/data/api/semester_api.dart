@@ -33,4 +33,14 @@ class SemesterApi extends BaseApi {
   Future<void> deleteSemester(String semesterId) async {
     await delete('${ApiConstants.semesters}/$semesterId');
   }
+
+  Future<SemesterDto> updateSemester(String semesterId, SemesterUpdateRequest request) async {
+    final response = await put<SemesterDto>(
+      '${ApiConstants.semesters}/$semesterId',
+      data: request.toJson(),
+      parser: (json) => SemesterDto.fromJson(json as Map<String, dynamic>),
+    );
+    return response.data!;
+  }
 }
+

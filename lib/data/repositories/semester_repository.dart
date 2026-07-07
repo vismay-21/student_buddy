@@ -19,4 +19,9 @@ class SemesterRepository {
   Future<void> deleteSemester(String semesterId) {
     return _semesterApi.deleteSemester(semesterId);
   }
+
+  Future<SemesterDto> updateSemester(String semesterId, SemesterUpdateRequest request) {
+    return _semesterApi.updateSemester(semesterId, request);
+  }
 }
+

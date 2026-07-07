@@ -409,7 +409,7 @@ student_buddy/
 
 ## 9. Current Backend Status
 
-We are currently developing the **Flutter API Integration (Sprint 12 — Semester & Subject Modules)**.
+We are currently preparing for **Authentication (Sprint 13)**, having completed the **Business Logic & Runtime Calculation Audit (Sprint 12.5)**.
 
 
 ### 9.1. Frontend / UI (Phase 1 — Locked)
@@ -459,7 +459,7 @@ We are currently developing the **Flutter API Integration (Sprint 12 — Semeste
   * **Finance Module (FROZEN)**: All Finance module development is officially frozen. It is now disabled by default on clean installs, and the toggle state is persisted via `SharedPreferences`.
   * Riverpod state management implementation (postponed to Sprint 14)
 
-### 9.2. Backend (Sprint 3 — Lecture Template Module)
+### 9.2. Backend Service Implementations
 
 * **What was implemented (Sprint 0 - Backend Foundation)**:
   * Established the complete FastAPI project skeleton with folder structure matching the architectural specification.
@@ -567,6 +567,12 @@ We are currently developing the **Flutter API Integration (Sprint 12 — Semeste
   - Bootstrapped, fetched, and selected academic semesters from local uvicorn host.
   - Completed active semester selector screen and new semester creation form dialog.
 
+* **What was implemented (Sprint 12.5 - Business Logic & Runtime Calculation Audit)**:
+  - Audited and verified backend services (Academic, Todo, Notes, Review Queue, Activity Logs) for schema consistency and non-persistent derived data philosophy (e.g. dynamic calculations of attendance rates, overdue counts, entity summaries).
+  - Validated business logic boundaries (e.g., blocking marking holidays or cancelled classes as present/absent) and transactional integrity (nested savepoints and rollback rules).
+  - Verified frontend integration state, confirming full replacement of static mockup/dummy data with live database repository calls.
+  - Ensured 100% backend unit and integration test pass rate (160 tests).
+
 * **What was intentionally NOT implemented (postponed)**:
   * Authentication & Supabase integration (postponed to Sprint 13)
   * SQLite synchronization engine (postponed to Sprint 14)
@@ -589,7 +595,8 @@ We are currently developing the **Flutter API Integration (Sprint 12 — Semeste
 * **Sprint 9**: Notes Repository Module (Completed)
 * **Sprint 10**: Review Queue Module (Completed + Refined)
 * **Sprint 11**: Activity Logs Module (Completed)
-* **Sprint 12**: Backend Verification & Flutter API Integration (MVP Mode)
+* **Sprint 12**: Backend Verification & Flutter API Integration (MVP Mode) (Completed)
+* **Sprint 12.5**: Business Logic & Runtime Calculation Audit (Completed)
 * **Sprint 13**: Authentication
 * **Sprint 14**: SQLite Synchronization Engine
 * **Sprint 15**: WhatsApp Integration

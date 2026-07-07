@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
-import '../../core/utils/dummy_data.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../data/dto/subject/subject_dto.dart';
+import '../../data/dto/attendance/attendance_settings_dto.dart';
+import '../../data/dto/holiday/holiday_dto.dart';
+import '../../data/dto/semester/semester_dto.dart';
+import '../../data/repositories/subject_repository.dart';
+import '../../data/repositories/lecture_instance_repository.dart';
+import '../../data/repositories/attendance_settings_repository.dart';
+import '../../data/repositories/holiday_repository.dart';
+import '../../data/repositories/semester_repository.dart';
 import 'history_tab.dart';
 import 'subjects_tab.dart';
 import 'attendance_settings_tab.dart';
@@ -18,91 +26,284 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   int _currentTab = 0; // 0: History, 1: Subjects, 2: Settings
   DateTime _selectedDate = DateTime.now();
 
+  final _subjectRepo = SubjectRepository();
+  final _instanceRepo = LectureInstanceRepository();
+  final _settingsRepo = AttendanceSettingsRepository();
+  final _holidayRepo = HolidayRepository();
+  final _semesterRepo = SemesterRepository();
+
+  bool _isLoading = false;
+  double _overallPercentage = 0.0;
+  List<Map<String, dynamic>> _subjectsList = [];
+  List<Map<String, dynamic>> _belowTargetSubjects = [];
+  List<Map<String, dynamic>> _holidaysList = [];
+
   @override
   void initState() {
     super.initState();
-    // Register listeners on AppState variables to trigger rebuilds on change
-    AppState.instance.dateActions.addListener(_updateState);
-    AppState.instance.criteriaMode.addListener(_updateState);
-    AppState.instance.targetPercentage.addListener(_updateState);
-    AppState.instance.subjectCustomTargets.addListener(_updateState);
-    AppState.instance.defaultDaysOff.addListener(_updateState);
-    AppState.instance.semesterStartDate.addListener(_updateState);
-    AppState.instance.semesterEndDate.addListener(_updateState);
-    AppState.instance.holidays.addListener(_updateState);
+    _loadStats();
+    AppState.instance.activeSemesterDto.addListener(_loadStats);
   }
 
   @override
   void dispose() {
-    // Unregister listeners to avoid memory leaks
-    AppState.instance.dateActions.removeListener(_updateState);
-    AppState.instance.criteriaMode.removeListener(_updateState);
-    AppState.instance.targetPercentage.removeListener(_updateState);
-    AppState.instance.subjectCustomTargets.removeListener(_updateState);
-    AppState.instance.defaultDaysOff.removeListener(_updateState);
-    AppState.instance.semesterStartDate.removeListener(_updateState);
-    AppState.instance.semesterEndDate.removeListener(_updateState);
-    AppState.instance.holidays.removeListener(_updateState);
+    AppState.instance.activeSemesterDto.removeListener(_loadStats);
     super.dispose();
   }
 
-  void _updateState() {
-    if (mounted) {
-      setState(() {});
+  Future<void> _loadStats() async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) {
+      setState(() {
+        _overallPercentage = 0.0;
+        _subjectsList = [];
+        _belowTargetSubjects = [];
+        _isLoading = false;
+      });
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      // 1. Load settings
+      final settings = await _settingsRepo.getSettings(activeSem.semesterId);
+      final mappedMode = settings.criteriaMode == 'subject' ? 'subject_wise' : settings.criteriaMode;
+      AppState.instance.criteriaMode.value = mappedMode;
+      AppState.instance.targetPercentage.value = settings.overallAttendanceGoal;
+
+      // 2. Load overall stats
+      final semStats = await _instanceRepo.getSemesterStats(activeSem.semesterId);
+
+      // 3. Load all subjects and stats
+      final subjects = await _subjectRepo.getSubjects(activeSem.semesterId);
+      
+      final List<Map<String, dynamic>> subList = [];
+      final List<Map<String, dynamic>> belowTarget = [];
+
+      for (final sub in subjects) {
+        final stats = await _instanceRepo.getSubjectStats(sub.subjectId);
+
+        int target = settings.overallAttendanceGoal;
+        if (mappedMode == 'custom') {
+          target = sub.attendanceGoal;
+        }
+
+        final bool isAboveTarget = stats.attendancePercentage >= target;
+
+        subList.add({
+          'id': sub.subjectId,
+          'name': sub.subjectName,
+          'percent': stats.attendancePercentage,
+          'target': target,
+          'attended': stats.presentLectures,
+          'total': stats.totalLectures,
+          'statusMessage': stats.statusMessage,
+          'isAboveTarget': isAboveTarget,
+          'color': sub.themeColor,
+        });
+
+        if (!isAboveTarget) {
+          belowTarget.add({
+            'name': sub.subjectName,
+            'percent': stats.attendancePercentage,
+          });
+        }
+      }
+
+      // 4. Load holidays
+      final holidays = await _holidayRepo.getHolidays(semesterId: activeSem.semesterId);
+      final List<Map<String, dynamic>> mappedHolidays = holidays.map((h) => {
+        'id': h.holidayId,
+        'name': h.holidayName,
+        'date': h.holidayDate,
+      }).toList();
+
+      setState(() {
+        _overallPercentage = semStats.attendancePercentage;
+        _subjectsList = subList;
+        _belowTargetSubjects = belowTarget;
+        _holidaysList = mappedHolidays;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
     }
   }
 
-  // ── Callbacks for state mutation ───────────────────────────────────────────
-  void _onLectureActionChanged(DateTime date, LectureMock lecture, String action) {
-    AppState.instance.setLectureAction(date, lecture.id, action);
-
-    IconData icon = Icons.info_outline_rounded;
-    Color color = AppTheme.textMuted;
-    if (action == 'attended') {
-      icon = Icons.check_circle_outline_rounded;
-      color = AppTheme.accent;
-    } else if (action == 'missed') {
-      icon = Icons.highlight_off_rounded;
-      color = AppTheme.danger;
-    } else if (action == 'off') {
-      icon = Icons.pause_circle_outline_rounded;
-      color = AppTheme.warning;
+  Future<void> _updateCriteriaMode(String val) async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) return;
+    final backendMode = val == 'subject_wise' ? 'subject' : val;
+    try {
+      await _settingsRepo.updateSettings(
+        activeSem.semesterId,
+        AttendanceSettingsUpdateRequest(criteriaMode: backendMode),
+      );
+      AppState.instance.criteriaMode.value = val;
+      _loadStats();
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to update criteria mode: $e');
+      }
     }
+  }
 
-    AppSnackbar.show(
-      context,
-      message: '"${lecture.name}" marked as "${action.toUpperCase()}"',
-      icon: icon,
-      color: color,
+  Future<void> _updateTargetPercentage(int val) async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) return;
+    try {
+      await _settingsRepo.updateSettings(
+        activeSem.semesterId,
+        AttendanceSettingsUpdateRequest(overallAttendanceGoal: val),
+      );
+      AppState.instance.targetPercentage.value = val;
+      _loadStats();
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to update target: $e');
+      }
+    }
+  }
+
+  Future<void> _updateSubjectCustomTarget(String subjectName, int target) async {
+    final match = _subjectsList.firstWhere(
+      (s) => s['name'] == subjectName,
+      orElse: () => null as dynamic,
     );
+    if (match == null) return;
+    final subjectId = match['id'] as String;
+
+    try {
+      await _subjectRepo.updateSubject(
+        subjectId,
+        SubjectUpdateRequest(attendanceGoal: target),
+      );
+      _loadStats();
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to update target: $e');
+      }
+    }
   }
 
-  void _onHolidayAdded(String name, DateTime date) {
-    AppState.instance.addHoliday(name, date);
-    AppSnackbar.success(context, 'Holiday "$name" added successfully');
+  void _onLectureActionChanged(DateTime date, dynamic lecture, String action) {
+    _loadStats();
   }
 
-  // ── Main Build ─────────────────────────────────────────────────────────────
+  Future<void> _addHoliday(String name, DateTime date) async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) return;
+    try {
+      await _holidayRepo.createHoliday(HolidayCreateRequest(
+        semesterId: activeSem.semesterId,
+        holidayDate: date,
+        holidayName: name,
+      ));
+      _loadStats();
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to add holiday: $e');
+      }
+    }
+  }
+
+  Future<void> _deleteHoliday(String holidayId) async {
+    try {
+      await _holidayRepo.deleteHoliday(holidayId);
+      _loadStats();
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to delete holiday: $e');
+      }
+    }
+  }
+
+  Future<void> _updateSemesterStartDate(DateTime date) async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) return;
+    try {
+      final updated = await _semesterRepo.updateSemester(
+        activeSem.semesterId,
+        SemesterUpdateRequest(startDate: date),
+      );
+      AppState.instance.setActiveSemester(updated);
+      _loadStats();
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to update start date: $e');
+      }
+    }
+  }
+
+  Future<void> _updateSemesterEndDate(DateTime date) async {
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) return;
+    try {
+      final updated = await _semesterRepo.updateSemester(
+        activeSem.semesterId,
+        SemesterUpdateRequest(endDate: date),
+      );
+      AppState.instance.setActiveSemester(updated);
+      _loadStats();
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.error(context, 'Failed to update end date: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final calculatedSubjects = AppState.instance.getCalculatedSubjects();
-    final overallStats = AppState.instance.getOverallStats(calculatedSubjects);
+
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Attendance')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final activeSem = AppState.instance.activeSemesterDto.value;
+    if (activeSem == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Attendance')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.school_outlined, size: 64, color: AppTheme.textMuted.withOpacity(0.4)),
+                const SizedBox(height: 16),
+                const Text(
+                  'No Active Semester Selected',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Please select or create a semester from Settings first.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.textMuted),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     // Prepare tab bodies
     Widget tabBody;
     switch (_currentTab) {
       case 0:
         tabBody = HistoryTab(
-          semesterStartDate: AppState.instance.semesterStartDate.value,
-          semesterEndDate: AppState.instance.semesterEndDate.value,
+          semesterStartDate: activeSem.startDate,
+          semesterEndDate: activeSem.endDate,
           selectedDate: _selectedDate,
-          holidays: AppState.instance.holidays.value,
-          dateActions: AppState.instance.dateActions.value,
-          defaultDaysOff: AppState.instance.defaultDaysOff.value,
-          subjectsMetrics: {
-            for (var sub in calculatedSubjects) sub['name']: sub
-          },
+          holidays: _holidaysList,
+          dateActions: const {},
+          defaultDaysOff: '',
+          subjectsMetrics: const {},
           onDateSelected: (date) {
             setState(() {
               _selectedDate = date;
@@ -113,15 +314,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         break;
       case 1:
         tabBody = SubjectsTab(
-          overallPercentage: overallStats['percent'],
+          overallPercentage: _overallPercentage,
           targetPercentage: AppState.instance.targetPercentage.value,
           criteriaMode: AppState.instance.criteriaMode.value,
-          belowTargetSubjects: List<Map<String, dynamic>>.from(overallStats['belowTarget']),
-          subjectsList: calculatedSubjects,
-          semesterStartDate: AppState.instance.semesterStartDate.value,
-          semesterEndDate: AppState.instance.semesterEndDate.value,
-          holidays: AppState.instance.holidays.value,
-          dateActions: AppState.instance.dateActions.value,
+          belowTargetSubjects: _belowTargetSubjects,
+          subjectsList: _subjectsList,
+          semesterStartDate: activeSem.startDate,
+          semesterEndDate: activeSem.endDate,
+          holidays: _holidaysList,
+          dateActions: const {},
           onLectureActionChanged: _onLectureActionChanged,
         );
         break;
@@ -129,22 +330,21 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         tabBody = AttendanceSettingsTab(
           criteriaMode: AppState.instance.criteriaMode.value,
           targetPercentage: AppState.instance.targetPercentage.value,
-          semesterStartDate: AppState.instance.semesterStartDate.value,
-          semesterEndDate: AppState.instance.semesterEndDate.value,
-          holidays: AppState.instance.holidays.value,
-          subjectCustomTargets: AppState.instance.subjectCustomTargets.value,
-          defaultDaysOff: AppState.instance.defaultDaysOff.value,
-          onCriteriaModeChanged: (val) => AppState.instance.criteriaMode.value = val,
-          onTargetPercentageChanged: (val) => AppState.instance.targetPercentage.value = val,
-          onSemesterStartDateChanged: (val) => AppState.instance.semesterStartDate.value = val,
-          onSemesterEndDateChanged: (val) => AppState.instance.semesterEndDate.value = val,
-          onHolidayAdded: _onHolidayAdded,
-          onSubjectCustomTargetChanged: (subName, target) {
-            final current = Map<String, int>.from(AppState.instance.subjectCustomTargets.value);
-            current[subName] = target;
-            AppState.instance.subjectCustomTargets.value = current;
+          semesterStartDate: activeSem.startDate,
+          semesterEndDate: activeSem.endDate,
+          holidays: _holidaysList,
+          subjectCustomTargets: {
+            for (var s in _subjectsList) s['name']: s['target'] as int
           },
-          onDefaultDaysOffChanged: (val) => AppState.instance.defaultDaysOff.value = val,
+          defaultDaysOff: 'Saturday & Sunday',
+          onCriteriaModeChanged: _updateCriteriaMode,
+          onTargetPercentageChanged: _updateTargetPercentage,
+          onSemesterStartDateChanged: _updateSemesterStartDate,
+          onSemesterEndDateChanged: _updateSemesterEndDate,
+          onHolidayAdded: _addHoliday,
+          onHolidayDeleted: _deleteHoliday,
+          onSubjectCustomTargetChanged: _updateSubjectCustomTarget,
+          onDefaultDaysOffChanged: (val) {},
         );
         break;
       default:

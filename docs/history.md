@@ -835,3 +835,21 @@ This log tracks architectural decisions, feature implementations, and refinement
 * **Verification**:
   - Tested all endpoints manually in Swagger UI (Semester validation, Subject auto-notes sync, Lecture generation).
   - Executed static code analysis (`flutter analyze`), which passed with `Exit code 0` (no errors).
+
+---
+
+## 2026-07-07 (Phase 3: Sprint 12.5 — Business Logic & Runtime Calculation Audit)
+
+### Decisions
+1. **Adherence to Non-Persistent Derived Data Principles**: Formally verified that all statistics and metadata that change over time (such as attendance percentages, safe skip counts, required attendance, overdue flags, file extensions, and review/activity log summaries) are computed dynamically at runtime and never persisted in PostgreSQL to avoid data drift.
+2. **Best-Effort Activity Logging**: Formally validated that the centralized logger helper uses nested savepoints (`db.begin_nested()`) to write activity logs in isolation, ensuring logging failures never crash primary business transactions.
+3. **Resolver-Based Resolution Integrity**: Verified that the Review Queue resolvers dynamically enforce business boundary checks (such as blocking attendance status updates for holiday/cancelled lecture instances) during manual resolution.
+4. **Clean Frontend Integration**: Completed migration of the remaining Flutter screens to fetch data exclusively from the backend, completely removing dummy data references and resolving screen layouts.
+
+### Implementation Details
+* **Audit Report Compilation**:
+  - Created a comprehensive `audit_report.md` document addressing database schemas, dynamic runtime fields, business boundary validation checks, and edge cases across the Academic, To-Do, Notes, Review Queue, and Activity Logs modules.
+* **Documentation Update**:
+  - Updated `docs/context.md` and `docs/history.md` to record the completion of the business logic audit, preparing the codebase structure for Sprint 13 (Authentication).
+* **Verification**:
+  - Ran the full backend test suite (`venv/bin/pytest`); all 160 unit and integration tests passed successfully.
