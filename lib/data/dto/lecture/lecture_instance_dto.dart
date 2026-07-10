@@ -4,7 +4,7 @@ class LectureInstanceDto {
   final String lectureInstanceId;
   final String lectureTemplateId;
   final DateTime lectureDate;
-  final String lectureStatus; // scheduled, holiday, cancelled
+  final String lectureStatus; // scheduled, holiday
   final String attendanceStatus; // unmarked, present, absent
   final String? markedBy;
   final DateTime? markedAt;
@@ -94,20 +94,23 @@ class LectureInstanceUpdateRequest {
 
 class LectureInstanceBulkUpdateRequest {
   final String lectureDate; // format yyyy-MM-dd
-  final String attendanceStatus; // present, absent
+  final String? attendanceStatus; // present, absent, unmarked
+  final String? lectureStatus; // scheduled, holiday
   final String? semesterId;
 
   LectureInstanceBulkUpdateRequest({
     required this.lectureDate,
-    required this.attendanceStatus,
+    this.attendanceStatus,
+    this.lectureStatus,
     this.semesterId,
   });
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'lecture_date': lectureDate,
-      'attendance_status': attendanceStatus,
     };
+    if (attendanceStatus != null) data['attendance_status'] = attendanceStatus;
+    if (lectureStatus != null) data['lecture_status'] = lectureStatus;
     if (semesterId != null) data['semester_id'] = semesterId;
     return data;
   }

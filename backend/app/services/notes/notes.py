@@ -163,7 +163,7 @@ class NotesService:
         return await self.notes_resource_repo.list_by_section(section_id, limit=limit, offset=offset)
 
     async def create_resource(self, resource_in: NotesResourceCreate) -> NotesResource:
-        # TODO (Sprint 12):
+        # TODO (Future Storage Integration):
         # When physical uploads are implemented:
         # - Verify the uploaded file exists.
         # - Detect MIME type server-side.
@@ -276,7 +276,7 @@ class NotesService:
     async def delete_resource(self, resource_id: uuid.UUID) -> None:
         resource = await self.get_resource(resource_id)
 
-        # TODO (Sprint 12): Deletion flow:
+        # TODO (Future Storage Integration): Deletion flow:
         # 1. Delete file from Supabase Storage.
         # 2. If deletion succeeds:
         #    delete metadata row.

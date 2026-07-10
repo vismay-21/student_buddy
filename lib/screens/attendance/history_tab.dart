@@ -5,6 +5,8 @@ import '../../../core/utils/app_state.dart';
 import '../../../core/utils/dummy_data.dart';
 import '../../data/dto/lecture/lecture_instance_dto.dart';
 import '../../data/repositories/lecture_instance_repository.dart';
+import '../../data/repositories/subject_repository.dart';
+import '../../data/repositories/lecture_template_repository.dart';
 import 'widgets/attendance_calendar_legend.dart';
 import 'widgets/attendance_analytics_card.dart';
 import 'widgets/attendance_overview_card.dart';
@@ -16,10 +18,13 @@ class HistoryTab extends StatefulWidget {
   final DateTime selectedDate;
   final List<Map<String, dynamic>> holidays;
   final Map<String, Map<String, String>> dateActions; // dateStr -> lectureId -> action
-  final String defaultDaysOff;
   final Map<String, Map<String, dynamic>> subjectsMetrics;
   final Function(DateTime date) onDateSelected;
   final Function(DateTime date, LectureMock lecture, String action) onLectureActionChanged;
+
+  final double overallPercentage;
+  final List<Map<String, dynamic>> belowTargetSubjects;
+  final List<Map<String, dynamic>> subjectsList;
 
   const HistoryTab({
     super.key,
@@ -28,10 +33,12 @@ class HistoryTab extends StatefulWidget {
     required this.selectedDate,
     required this.holidays,
     required this.dateActions,
-    required this.defaultDaysOff,
     required this.subjectsMetrics,
     required this.onDateSelected,
     required this.onLectureActionChanged,
+    required this.overallPercentage,
+    required this.belowTargetSubjects,
+    required this.subjectsList,
   });
 
   @override
@@ -44,7 +51,10 @@ class _HistoryTabState extends State<HistoryTab> {
   int _totalMonths = 1;
 
   final _instanceRepo = LectureInstanceRepository();
+  final _subjectRepo = SubjectRepository();
+  final _templateRepo = LectureTemplateRepository();
   List<LectureInstanceDto> _allInstances = [];
+  Set<int> _workingWeekdays = {};
   bool _isLoading = false;
 
   @override
@@ -75,9 +85,18 @@ class _HistoryTabState extends State<HistoryTab> {
     if (activeSem == null) return;
     try {
       final list = await _instanceRepo.getInstances(semesterId: activeSem.semesterId);
+      final subjects = await _subjectRepo.getSubjects(activeSem.semesterId);
+      final Set<int> workingDays = {};
+      for (final sub in subjects) {
+        final temps = await _templateRepo.getTemplates(sub.subjectId);
+        for (final t in temps) {
+          workingDays.add(t.dayOfWeek);
+        }
+      }
       if (mounted) {
         setState(() {
           _allInstances = list;
+          _workingWeekdays = workingDays;
         });
       }
     } catch (_) {}
@@ -101,28 +120,56 @@ class _HistoryTabState extends State<HistoryTab> {
     return DateTime(widget.semesterStartDate.year + yearOffset, month, 1);
   }
 
+  bool _isHoliday(DateTime date) {
+    return widget.holidays.any((h) {
+      final dynamic hDateRaw = h['date'];
+      if (hDateRaw == null) return false;
+      final DateTime hDate = hDateRaw is String ? DateTime.parse(hDateRaw) : hDateRaw as DateTime;
+      return hDate.year == date.year &&
+          hDate.month == date.month &&
+          hDate.day == date.day;
+    });
+  }
+
   // ── Date status logic ──────────────────────────────────────────────────────
   String _getDateStatus(DateTime date) {
+    // 1. Holiday Check (strictly University Holiday)
+    if (_isHoliday(date)) {
+      return 'holiday';
+    }
+
     final dayInstances = _allInstances.where((inst) {
       return inst.lectureDate.year == date.year &&
           inst.lectureDate.month == date.month &&
           inst.lectureDate.day == date.day;
     }).toList();
 
+    // 2. Day Off Check
+    final Set<int> workingWeekdays = _workingWeekdays.isNotEmpty
+        ? _workingWeekdays
+        : const {1, 2, 3, 4, 5}; // Monday to Friday fallback
+
+    final bool isDefaultDayOff = !workingWeekdays.contains(date.weekday);
+
     if (dayInstances.isEmpty) {
-      return 'clear';
+      return isDefaultDayOff ? 'day_off' : 'clear';
     }
 
-    // Check if all are holiday / cancelled
-    final bool allOff = dayInstances.every((inst) =>
-        inst.lectureStatus == 'holiday' || inst.lectureStatus == 'cancelled');
+    // Check if all instances are marked as day off (holiday status)
+    final bool allOff = dayInstances.every((inst) => inst.lectureStatus == 'holiday');
     if (allOff) {
-      return 'off';
+      return 'day_off';
     }
 
+    final bool hasHoliday = dayInstances.any((inst) => inst.lectureStatus == 'holiday');
     final scheduled = dayInstances.where((inst) => inst.lectureStatus == 'scheduled').toList();
+
+    if (hasHoliday && scheduled.isNotEmpty) {
+      return 'mixed';
+    }
+
     if (scheduled.isEmpty) {
-      return 'off';
+      return isDefaultDayOff ? 'day_off' : 'clear';
     }
 
     final int attendedCount = scheduled.where((inst) => inst.attendanceStatus == 'present').length;
@@ -143,7 +190,8 @@ class _HistoryTabState extends State<HistoryTab> {
 
   // ── Monthly statistics calculations ────────────────────────────────────────
   Map<String, dynamic> _calculateMonthlySummaries(DateTime month) {
-    int totalDays = DateTime(month.year, month.month + 1, 0).day;
+    final int daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    int totalDays = 0;
     
     int attendedDays = 0;
     int missedDays = 0;
@@ -155,14 +203,24 @@ class _HistoryTabState extends State<HistoryTab> {
     int missedLectures = 0;
     int offLectures = 0;
 
-    for (int day = 1; day <= totalDays; day++) {
+    final DateTime startLimit = DateTime(widget.semesterStartDate.year, widget.semesterStartDate.month, widget.semesterStartDate.day);
+    final DateTime endLimit = DateTime(widget.semesterEndDate.year, widget.semesterEndDate.month, widget.semesterEndDate.day);
+
+    for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(month.year, month.month, day);
+      final bool inRange = (date.isAfter(startLimit) || date.isAtSameMomentAs(startLimit)) &&
+          (date.isBefore(endLimit) || date.isAtSameMomentAs(endLimit));
+      
+      if (!inRange) continue;
+
+      totalDays++;
       final status = _getDateStatus(date);
       
       switch (status) {
         case 'attended': attendedDays++; break;
         case 'missed': missedDays++; break;
-        case 'off': offDays++; break;
+        case 'day_off':
+        case 'holiday': offDays++; break;
         case 'mixed': mixedDays++; break;
         default: break;
       }
@@ -174,7 +232,7 @@ class _HistoryTabState extends State<HistoryTab> {
       }).toList();
 
       for (var inst in dayInstances) {
-        if (inst.lectureStatus == 'holiday' || inst.lectureStatus == 'cancelled') {
+        if (inst.lectureStatus == 'holiday') {
           offLectures++;
         } else if (inst.lectureStatus == 'scheduled') {
           totalLectures++;
@@ -228,7 +286,8 @@ class _HistoryTabState extends State<HistoryTab> {
       switch (status) {
         case 'attended': attendedDays++; break;
         case 'missed': missedDays++; break;
-        case 'off': offDays++; break;
+        case 'day_off':
+        case 'holiday': offDays++; break;
         case 'mixed': mixedDays++; break;
         default: break;
       }
@@ -240,7 +299,7 @@ class _HistoryTabState extends State<HistoryTab> {
       }).toList();
 
       for (var inst in dayInstances) {
-        if (inst.lectureStatus == 'holiday' || inst.lectureStatus == 'cancelled') {
+        if (inst.lectureStatus == 'holiday') {
           offLectures++;
         } else if (inst.lectureStatus == 'scheduled') {
           totalLectures++;
@@ -332,7 +391,7 @@ class _HistoryTabState extends State<HistoryTab> {
                           _buildPopupStatRow('Total Days', '${stats['totalDays']}', textColor, subtextColor),
                           _buildPopupStatRow('Attended', '${stats['attendedDays']}', textColor, subtextColor),
                           _buildPopupStatRow('Missed', '${stats['missedDays']}', textColor, subtextColor),
-                          _buildPopupStatRow('Off', '${stats['offDays']}', textColor, subtextColor),
+                          _buildPopupStatRow('Off/Holiday', '${stats['offDays']}', textColor, subtextColor),
                           _buildPopupStatRow('Mixed', '${stats['mixedDays']}', textColor, subtextColor),
                         ],
                       ),
@@ -363,8 +422,8 @@ class _HistoryTabState extends State<HistoryTab> {
                           _buildPopupStatRow('Total Lectures', '${stats['totalLectures']}', textColor, subtextColor),
                           _buildPopupStatRow('Attended', '${stats['attendedLectures']}', textColor, subtextColor),
                           _buildPopupStatRow('Missed', '${stats['missedLectures']}', textColor, subtextColor),
-                          _buildPopupStatRow('Off', '${stats['offLectures']}', textColor, subtextColor),
-                          _buildPopupStatRow('Attendance %', '${(stats['attendancePercentage'] as double).toStringAsFixed(1)}%', textColor, subtextColor, isBoldVal: true),
+                          _buildPopupStatRow('Off/Holiday', '${stats['offLectures']}', textColor, subtextColor),
+                          _buildPopupStatRow('Attendance %', '${(stats['attendancePercentage'] as double).toStringAsFixed(2)}%', textColor, subtextColor, isBoldVal: true),
                         ],
                       ),
                     ),
@@ -408,6 +467,15 @@ class _HistoryTabState extends State<HistoryTab> {
     );
   }
 
+  double _getCalendarCardHeight() {
+    final int daysInMonth = DateTime(_visibleMonth.year, _visibleMonth.month + 1, 0).day;
+    final int firstWeekday = DateTime(_visibleMonth.year, _visibleMonth.month, 1).weekday - 1;
+    final int startOffset = firstWeekday < 0 ? 0 : firstWeekday;
+    final int totalGridCells = daysInMonth + startOffset;
+    final int rowCount = (totalGridCells / 7.0).ceil();
+    return 136.0 + (rowCount * 48.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
@@ -415,9 +483,6 @@ class _HistoryTabState extends State<HistoryTab> {
     final Color borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
     
     final summaries = _calculateMonthlySummaries(_visibleMonth);
-
-    final calculatedSubjects = AppState.instance.getCalculatedSubjects();
-    final overallStats = AppState.instance.getOverallStats(calculatedSubjects);
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -428,18 +493,20 @@ class _HistoryTabState extends State<HistoryTab> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: AttendanceOverviewCard(
-                overallPercentage: overallStats['percent'],
+                overallPercentage: widget.overallPercentage,
                 targetPercentage: AppState.instance.targetPercentage.value,
                 isSubjectWise: AppState.instance.criteriaMode.value == 'subject_wise',
-                belowTargetSubjects: List<Map<String, dynamic>>.from(overallStats['belowTarget']),
+                belowTargetSubjects: widget.belowTargetSubjects,
                 onTap: () => _showSemesterStatsDialog(context),
               ),
             ),
             const SizedBox(height: 16),
 
             // 1. Calendar Month View Holder
-            Container(
-              height: 395,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+              height: _getCalendarCardHeight(),
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: cardBackground,
@@ -472,7 +539,7 @@ class _HistoryTabState extends State<HistoryTab> {
                                 if (currentPage > 0) {
                                   _pageController.animateToPage(
                                     currentPage - 1,
-                                    duration: const Duration(milliseconds: 500),
+                                    duration: const Duration(milliseconds: 700),
                                     curve: Curves.easeInOut,
                                   );
                                 }
@@ -488,7 +555,7 @@ class _HistoryTabState extends State<HistoryTab> {
                                 if (currentPage < _totalMonths - 1) {
                                   _pageController.animateToPage(
                                     currentPage + 1,
-                                    duration: const Duration(milliseconds: 500),
+                                    duration: const Duration(milliseconds: 700),
                                     curve: Curves.easeInOut,
                                   );
                                 }
@@ -586,7 +653,7 @@ class _HistoryTabState extends State<HistoryTab> {
               crossAxisCount: 7,
               mainAxisSpacing: 4,
               crossAxisSpacing: 4,
-              childAspectRatio: 1.0,
+              mainAxisExtent: 44,
             ),
             itemCount: totalGridCells,
             itemBuilder: (context, index) {
@@ -596,33 +663,28 @@ class _HistoryTabState extends State<HistoryTab> {
 
               final int dayNumber = index - firstWeekday + 1;
               final DateTime date = DateTime(monthDate.year, monthDate.month, dayNumber);
+              final bool isOutsideSemester = date.isBefore(widget.semesterStartDate) || date.isAfter(widget.semesterEndDate);
               
               final bool isSelected = date.year == widget.selectedDate.year &&
                   date.month == widget.selectedDate.month &&
                   date.day == widget.selectedDate.day;
 
-              final String status = _getDateStatus(date);
               Color dotColor = Colors.transparent;
-              switch (status) {
-                case 'attended': dotColor = AppTheme.accent; break;
-                case 'missed': dotColor = AppTheme.danger; break;
-                case 'off': dotColor = AppTheme.warning; break;
-                case 'mixed': dotColor = AppTheme.secondary; break;
-                case 'clear':
-                  // Only show dot if classes are scheduled (Grey)
-                  final dayInstances = _allInstances.where((inst) {
-                    return inst.lectureDate.year == date.year &&
-                        inst.lectureDate.month == date.month &&
-                        inst.lectureDate.day == date.day;
-                  });
-                  if (dayInstances.isNotEmpty) {
+              if (!isOutsideSemester) {
+                final String status = _getDateStatus(date);
+                switch (status) {
+                  case 'attended': dotColor = AppTheme.accent; break;
+                  case 'missed': dotColor = AppTheme.danger; break;
+                  case 'holiday': dotColor = const Color(0xFF0033FF); break;
+                  case 'day_off': dotColor = AppTheme.warning; break;
+                  case 'mixed': dotColor = AppTheme.secondary; break;
+                  case 'clear':
                     dotColor = AppTheme.textMuted;
-                  }
-                  break;
+                    break;
+                }
               }
 
               final bool isDark = Theme.of(context).brightness == Brightness.dark;
-              final bool isOutsideSemester = date.isBefore(widget.semesterStartDate) || date.isAfter(widget.semesterEndDate);
 
               return GestureDetector(
                 onTap: () {
@@ -681,15 +743,19 @@ class _HistoryTabState extends State<HistoryTab> {
                                       : AppTheme.lightTextPrimary,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: dotColor,
-                          shape: BoxShape.circle,
+                      if (!isOutsideSemester) ...[
+                        const SizedBox(height: 3),
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: dotColor,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
+                      ] else ...[
+                        const SizedBox(height: 8),
+                      ],
                     ],
                   ),
                 ),

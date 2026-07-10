@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
-from app.models.todo.todo import TodoCategory, TodoPriority, TodoStatus, TodoCreatedBy
+from app.models.todo.todo import TodoPriority, TodoStatus, TodoCreatedBy
 
 
 class TodoBase(BaseModel):
@@ -11,10 +11,6 @@ class TodoBase(BaseModel):
         max_length=255,
         description="The title of the To-Do item.",
         examples=["Complete Math Assignment", "Buy Groceries"]
-    )
-    category: TodoCategory = Field(
-        default=TodoCategory.OTHER,
-        description="Category of the task."
     )
     priority: TodoPriority = Field(
         default=TodoPriority.MEDIUM,
@@ -54,10 +50,6 @@ class TodoUpdate(BaseModel):
         min_length=1,
         max_length=255,
         description="Updated title of the task."
-    )
-    category: TodoCategory | None = Field(
-        None,
-        description="Updated category of the task."
     )
     priority: TodoPriority | None = Field(
         None,
@@ -100,11 +92,13 @@ class TodoResponse(TodoBase):
         These fields are not persisted in the database.
         """
         if self.status == TodoStatus.PENDING and self.due_datetime is not None:
-            # Match the timezone of the due_datetime
-            now = datetime.now(self.due_datetime.tzinfo) if self.due_datetime.tzinfo else datetime.now(timezone.utc)
-            if self.due_datetime < now:
+            due_dt = self.due_datetime
+            if due_dt.tzinfo is None:
+                due_dt = due_dt.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            if due_dt < now:
                 self.is_overdue = True
-                diff = now - self.due_datetime
+                diff = now - due_dt
                 # Compute floor number of days elapsed since the due date
                 self.days_overdue = max(0, int(diff.total_seconds() // 86400))
             else:

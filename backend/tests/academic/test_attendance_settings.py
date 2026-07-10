@@ -398,4 +398,4 @@ async def test_api_update_settings_validation_error(client: AsyncClient, test_se
         f"/api/v1/academic/attendance-settings/{test_semester.semester_id}",
         json=payload
     )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT

@@ -237,12 +237,7 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
                                     decoration: isCompleted ? TextDecoration.lineThrough : null,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  todoItem.category[0].toUpperCase() + todoItem.category.substring(1),
-                                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                                ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
                                 // Due Date
                                 Row(
                                   children: [

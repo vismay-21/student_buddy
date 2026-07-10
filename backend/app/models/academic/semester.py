@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from sqlalchemy import Integer, Date, DateTime, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
@@ -28,18 +28,19 @@ class Semester(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 
     __table_args__ = (
         CheckConstraint("semester_number > 0", name="semester_number_positive"),
+        CheckConstraint("start_date < end_date", name="semester_date_order"),
     )
 
     # Relationships

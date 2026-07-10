@@ -13,13 +13,11 @@ class TodoApi extends BaseApi {
 
   Future<ApiResponse<List<TodoDto>>> getTodos({
     String? status,
-    String? category,
     String? priority,
     String? q,
   }) async {
     final Map<String, dynamic> params = {};
     if (status != null) params['status'] = status;
-    if (category != null) params['category'] = category;
     if (priority != null) params['priority'] = priority;
     if (q != null) params['q'] = q;
 

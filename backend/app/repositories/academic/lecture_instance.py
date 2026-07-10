@@ -93,7 +93,9 @@ class LectureInstanceRepository:
         start_date: date | None = None,
         end_date: date | None = None,
         attendance_status: AttendanceStatus | None = None,
-        lecture_status: LectureStatus | None = None
+        lecture_status: LectureStatus | None = None,
+        limit: int | None = None,
+        offset: int | None = None
     ) -> Sequence[LectureInstance]:
         stmt = (
             select(LectureInstance)
@@ -117,6 +119,12 @@ class LectureInstanceRepository:
         if lecture_status is not None:
             stmt = stmt.where(LectureInstance.lecture_status == lecture_status)
         stmt = stmt.order_by(LectureInstance.lecture_date.asc(), LectureTemplate.start_time.asc())
+        
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        if offset is not None:
+            stmt = stmt.offset(offset)
+            
         result = await self.db.execute(stmt)
         return result.scalars().all()
 

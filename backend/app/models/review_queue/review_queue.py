@@ -1,6 +1,6 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Enum, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
@@ -66,7 +66,7 @@ class ReviewQueue(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
         index=True
     )

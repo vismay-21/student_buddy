@@ -2,7 +2,7 @@ import uuid
 from typing import Sequence
 from sqlalchemy import select, case, nulls_last
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.todo.todo import Todo, TodoCategory, TodoPriority, TodoStatus
+from app.models.todo.todo import Todo, TodoPriority, TodoStatus
 
 
 class TodoRepository:
@@ -20,12 +20,13 @@ class TodoRepository:
     async def list_todos(
         self,
         status: TodoStatus | None = None,
-        category: TodoCategory | None = None,
         priority: TodoPriority | None = None,
-        q: str | None = None
+        q: str | None = None,
+        limit: int = 50,
+        offset: int = 0
     ) -> Sequence[Todo]:
         """
-        Retrieves all todos, optionally filtered by status, category, priority,
+        Retrieves all todos, optionally filtered by status, priority,
         and query string `q` for a case-insensitive match on the title.
 
         Default Ordering Rules:
@@ -38,8 +39,6 @@ class TodoRepository:
 
         if status is not None:
             stmt = stmt.where(Todo.status == status)
-        if category is not None:
-            stmt = stmt.where(Todo.category == category)
         if priority is not None:
             stmt = stmt.where(Todo.priority == priority)
         if q is not None and q.strip() != "":
@@ -55,6 +54,7 @@ class TodoRepository:
         order_created = Todo.created_at.desc()
 
         stmt = stmt.order_by(order_pending, order_priority, order_due, order_created)
+        stmt = stmt.limit(limit).offset(offset)
 
         result = await self.db.execute(stmt)
         return result.scalars().all()

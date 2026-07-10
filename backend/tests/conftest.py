@@ -60,7 +60,8 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
     finally:
         await session.close()
-        await transaction.rollback()
+        if transaction.is_active:
+            await transaction.rollback()
         await connection.close()
         # Dispose of engine to release connection pool bound to current event loop
         await engine.dispose()

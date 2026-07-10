@@ -15,15 +15,11 @@ class AddTodoScreen extends StatefulWidget {
 class _AddTodoScreenState extends State<AddTodoScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _customCategoryController = TextEditingController();
   final TodoRepository _todoRepository = TodoRepository();
-
-  final List<String> _categories = ['Academic', 'Personal', 'Work', 'Health', 'Other'];
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   String _selectedPriority = 'Medium'; // Default
-  String _selectedCategory = 'Academic'; // Default
 
   // Collapsible section state
   bool _isAdvancedExpanded = false;
@@ -42,21 +38,6 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
         _selectedPriority = priority[0].toUpperCase() + priority.substring(1).toLowerCase();
       }
 
-      // Handle Category
-      final categoryFormatted = todo.category[0].toUpperCase() + todo.category.substring(1).toLowerCase();
-      if (_categories.contains(categoryFormatted)) {
-        _selectedCategory = categoryFormatted;
-      } else {
-        // If custom category, insert before 'Other'
-        final otherIndex = _categories.indexOf('Other');
-        if (otherIndex != -1) {
-          _categories.insert(otherIndex, categoryFormatted);
-        } else {
-          _categories.add(categoryFormatted);
-        }
-        _selectedCategory = categoryFormatted;
-      }
-
       // Handle Time & Date
       _selectedDate = todo.dueDatetime;
       if (todo.dueDatetime != null) {
@@ -66,97 +47,9 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
   }
 
 
-
-  void _showAddCategoryDialog() {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        final bool isDark = Theme.of(context).brightness == Brightness.dark;
-        return AlertDialog(
-          title: const Text('Add Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            style: TextStyle(color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary, fontSize: 14),
-            decoration: const InputDecoration(
-              hintText: 'Category name...',
-              hintStyle: TextStyle(fontSize: 14),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final text = controller.text.trim();
-                if (text.isNotEmpty) {
-                  setState(() {
-                    if (!_categories.contains(text)) {
-                      final otherIndex = _categories.indexOf('Other');
-                      if (otherIndex != -1) {
-                        _categories.insert(otherIndex, text);
-                      } else {
-                        _categories.add(text);
-                      }
-                    }
-                    _selectedCategory = text;
-                  });
-                }
-                Navigator.of(context).pop();
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _confirmDeleteCategory(String category) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final bool isDark = Theme.of(context).brightness == Brightness.dark;
-        return AlertDialog(
-          title: const Text('Delete Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          content: Text(
-            'Are you sure you want to delete the "$category" category?',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _categories.remove(category);
-                  if (_selectedCategory == category) {
-                    _selectedCategory = 'Other';
-                  }
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('Delete', style: TextStyle(color: AppTheme.danger)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-
   @override
   void dispose() {
     _titleController.dispose();
-    _customCategoryController.dispose();
     super.dispose();
   }
 
@@ -272,10 +165,6 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
       return;
     }
 
-    final String categoryToSave = _selectedCategory == 'Other'
-        ? (_customCategoryController.text.trim().isNotEmpty ? _customCategoryController.text.trim().toLowerCase() : 'other')
-        : _selectedCategory.toLowerCase();
-
     final priorityToSave = _selectedPriority.toLowerCase();
 
     DateTime? dueDatetime;
@@ -307,7 +196,6 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
           widget.todoToEdit!.todoId,
           TodoUpdateRequest(
             title: _titleController.text.trim(),
-            category: categoryToSave,
             priority: priorityToSave,
             dueDatetime: dueDatetime,
           ),
@@ -316,7 +204,6 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
         await _todoRepository.createTodo(
           TodoCreateRequest(
             title: _titleController.text.trim(),
-            category: categoryToSave,
             priority: priorityToSave,
             dueDatetime: dueDatetime,
           ),
@@ -641,126 +528,6 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Category Selector Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.folder_open_rounded, color: AppTheme.primary, size: 18),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Category',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          GestureDetector(
-                            onTap: _showAddCategoryDialog,
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.add_rounded, size: 14, color: AppTheme.primary),
-                                  SizedBox(width: 2),
-                                  Text(
-                                    'Add',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: _categories.map((category) {
-                          final isSelected = _selectedCategory == category;
-                          final canDelete = category != 'Other';
-
-                          return GestureDetector(
-                            onLongPress: canDelete ? () => _confirmDeleteCategory(category) : null,
-                            child: ChoiceChip(
-                              label: Text(
-                                category,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                  color: isSelected ? Colors.white : (isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary),
-                                ),
-                              ),
-                              selected: isSelected,
-                              selectedColor: AppTheme.primary,
-                              backgroundColor: isDark ? AppTheme.surfaceLight : AppTheme.lightSurfaceLight,
-                              checkmarkColor: Colors.white,
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: BorderSide(
-                                  color: isSelected
-                                      ? AppTheme.primary
-                                      : (isDark ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1)),
-                                ),
-                              ),
-                              onSelected: (selected) {
-                                if (selected) {
-                                  setState(() {
-                                    _selectedCategory = category;
-                                  });
-                                }
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      if (_selectedCategory == 'Other') ...[
-                        const SizedBox(height: 10),
-                        TextFormField(
-                          controller: _customCategoryController,
-                          style: TextStyle(color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary, fontSize: 13),
-                          decoration: InputDecoration(
-                            hintText: 'Enter custom category...',
-                            hintStyle: TextStyle(color: isDark ? AppTheme.textMuted : AppTheme.lightTextMuted, fontSize: 13),
-                            filled: true,
-                            fillColor: isDark ? AppTheme.surfaceLight : AppTheme.lightSurfaceLight,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                          validator: (value) {
-                            if (_selectedCategory == 'Other' && (value == null || value.trim().isEmpty)) {
-                              return 'Custom category is required';
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
                     ],
                   ),
                 ),

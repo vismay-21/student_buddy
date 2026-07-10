@@ -103,12 +103,108 @@ class SemesterService:
                     f"({overlapping.start_date} to {overlapping.end_date})"
                 )
 
+        dates_changed = (
+            (semester_in.start_date is not None and semester_in.start_date != semester.start_date) or
+            (semester_in.end_date is not None and semester_in.end_date != semester.end_date)
+        )
+
         if semester_in.start_date is not None:
             semester.start_date = semester_in.start_date
         if semester_in.end_date is not None:
             semester.end_date = semester_in.end_date
 
         await self.semester_repo.update(semester)
+
+        if dates_changed:
+            from datetime import timedelta
+            from sqlalchemy import select, delete
+            from app.models.academic.lecture_template import LectureTemplate
+            from app.models.academic.subject import Subject
+            from app.models.academic.lecture_instance import LectureInstance, LectureStatus, AttendanceStatus
+            from app.models.academic.holiday import Holiday
+
+            # 1. Delete holidays outside the new date range
+            holiday_delete_stmt = (
+                delete(Holiday)
+                .where(Holiday.semester_id == semester_id)
+                .where(
+                    (Holiday.holiday_date < new_start) |
+                    (Holiday.holiday_date > new_end)
+                )
+            )
+            await self.db.execute(holiday_delete_stmt)
+
+            # 2. Delete lecture instances outside the new date range
+            instance_delete_stmt = (
+                delete(LectureInstance)
+                .where(
+                    LectureInstance.lecture_template_id.in_(
+                        select(LectureTemplate.lecture_template_id)
+                        .join(Subject)
+                        .where(Subject.semester_id == semester_id)
+                    )
+                )
+                .where(
+                    (LectureInstance.lecture_date < new_start) |
+                    (LectureInstance.lecture_date > new_end)
+                )
+            )
+            await self.db.execute(instance_delete_stmt)
+            await self.db.flush()
+
+            # 3. Fetch all templates for this semester
+            templates_stmt = (
+                select(LectureTemplate)
+                .join(Subject)
+                .where(Subject.semester_id == semester_id)
+            )
+            templates_res = await self.db.execute(templates_stmt)
+            templates = templates_res.scalars().all()
+
+            # 4. Fetch remaining holidays
+            holidays_stmt = (
+                select(Holiday.holiday_date)
+                .where(Holiday.semester_id == semester_id)
+            )
+            holidays_res = await self.db.execute(holidays_stmt)
+            holiday_dates = set(holidays_res.scalars().all())
+
+            # 5. Generate new instances for each template
+            # Fetch all existing lecture dates for all templates in this semester in a single query
+            existing_stmt = (
+                select(LectureInstance.lecture_template_id, LectureInstance.lecture_date)
+                .join(LectureTemplate)
+                .join(Subject)
+                .where(Subject.semester_id == semester_id)
+            )
+            existing_res = await self.db.execute(existing_stmt)
+            from collections import defaultdict
+            existing_map = defaultdict(set)
+            for template_id, l_date in existing_res:
+                existing_map[template_id].add(l_date)
+
+            for template in templates:
+                existing_dates = existing_map[template.lecture_template_id]
+                current_date = new_start
+                new_instances = []
+                while current_date <= new_end:
+                    if current_date.isoweekday() == template.day_of_week:
+                        if current_date not in existing_dates:
+                            is_holiday = current_date in holiday_dates
+                            new_instances.append(
+                                LectureInstance(
+                                    lecture_template_id=template.lecture_template_id,
+                                    lecture_date=current_date,
+                                    lecture_status=LectureStatus.HOLIDAY if is_holiday else LectureStatus.SCHEDULED,
+                                    attendance_status=AttendanceStatus.UNMARKED,
+                                )
+                            )
+                    current_date += timedelta(days=1)
+                
+                if new_instances:
+                    self.db.add_all(new_instances)
+
+            await self.db.flush()
 
         # Log Activity (Sprint 11)
         from app.services.activity_logs import log_activity

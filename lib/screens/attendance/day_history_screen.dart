@@ -6,8 +6,10 @@ import '../../../core/utils/app_state.dart';
 import '../../../core/utils/color_helper.dart';
 import '../../../core/widgets/app_snackbar.dart';
 import '../../../data/dto/lecture/lecture_instance_dto.dart';
+import '../../../data/dto/holiday/holiday_dto.dart';
 import '../../../data/repositories/lecture_instance_repository.dart';
 import '../../../data/repositories/attendance_settings_repository.dart';
+import '../../../data/repositories/holiday_repository.dart';
 import 'widgets/lecture_card.dart';
 
 class DayHistoryScreen extends StatefulWidget {
@@ -27,10 +29,12 @@ class DayHistoryScreen extends StatefulWidget {
 class _DayHistoryScreenState extends State<DayHistoryScreen> {
   final _instanceRepo = LectureInstanceRepository();
   final _settingsRepo = AttendanceSettingsRepository();
+  final _holidayRepo = HolidayRepository();
 
   bool _isLoading = true;
   List<LectureInstanceDto> _instances = [];
   Map<String, Map<String, dynamic>> _subjectsMetrics = {};
+  HolidayDto? _holidayToday;
 
   @override
   void initState() {
@@ -50,11 +54,23 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
       final dateStr = DateFormat('yyyy-MM-dd').format(widget.date);
       final list = await _instanceRepo.getTodayLectures(date: dateStr, semesterId: activeSem.semesterId);
 
-      // 2. Get settings for mode
+      // 2. Fetch holidays to check if this is a university holiday
+      final holidays = await _holidayRepo.getHolidays(semesterId: activeSem.semesterId);
+      HolidayDto? holidayToday;
+      for (final h in holidays) {
+        if (h.holidayDate.year == widget.date.year &&
+            h.holidayDate.month == widget.date.month &&
+            h.holidayDate.day == widget.date.day) {
+          holidayToday = h;
+          break;
+        }
+      }
+
+      // 3. Get settings for mode
       final settings = await _settingsRepo.getSettings(activeSem.semesterId);
       final mappedMode = settings.criteriaMode == 'subject' ? 'subject_wise' : settings.criteriaMode;
 
-      // 3. For each subject in today's lectures, get stats
+      // 4. For each subject in today's lectures, get stats
       final Map<String, Map<String, dynamic>> metrics = {};
       for (final inst in list) {
         final sub = inst.lectureTemplate.subject;
@@ -80,6 +96,7 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
       setState(() {
         _instances = list;
         _subjectsMetrics = metrics;
+        _holidayToday = holidayToday;
         _isLoading = false;
       });
     } catch (e) {
@@ -88,6 +105,7 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
   }
 
   void _onActionTapped(LectureInstanceDto inst, String action) async {
+    if (_holidayToday != null) return;
     String? newAttendanceStatus;
     String? newLectureStatus;
 
@@ -131,14 +149,24 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
   }
 
   void _onWholeDayAction(String action) async {
+    if (_holidayToday != null) return;
     String? newAttendanceStatus;
+    String? newLectureStatus;
 
     if (action == 'attended') {
       newAttendanceStatus = 'present';
+      newLectureStatus = 'scheduled';
     } else if (action == 'missed') {
       newAttendanceStatus = 'absent';
+      newLectureStatus = 'scheduled';
+    } else if (action == 'clear') {
+      newAttendanceStatus = 'unmarked';
+      newLectureStatus = 'scheduled';
+    } else if (action == 'off') {
+      newAttendanceStatus = 'unmarked';
+      newLectureStatus = 'holiday';
     } else {
-      AppSnackbar.warning(context, 'Only "attended" or "missed" can be bulk applied to the whole day.');
+      AppSnackbar.warning(context, 'Invalid action type.');
       return;
     }
 
@@ -152,6 +180,7 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
       await _instanceRepo.markWholeDay(LectureInstanceBulkUpdateRequest(
         lectureDate: DateFormat('yyyy-MM-dd').format(widget.date),
         attendanceStatus: newAttendanceStatus,
+        lectureStatus: newLectureStatus,
         semesterId: activeSem.semesterId,
       ));
       
@@ -187,7 +216,7 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
   }
 
   String _getAction(LectureInstanceDto inst) {
-    if (inst.lectureStatus == 'holiday' || inst.lectureStatus == 'cancelled') {
+    if (inst.lectureStatus == 'holiday') {
       return 'off';
     }
     if (inst.attendanceStatus == 'present') {
@@ -284,6 +313,55 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
             ),
           ),
 
+          if (_holidayToday != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1D4ED8).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF1D4ED8).withOpacity(0.3), width: 1.5),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      color: Color(0xFF1D4ED8),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'University Holiday',
+                            style: TextStyle(
+                              color: Color(0xFF1D4ED8),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _holidayToday!.holidayName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Whole day action panel
           if (_instances.isNotEmpty)
             Padding(
@@ -378,7 +456,9 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
                           total: metrics['total'],
                           statusMessage: metrics['statusMessage'],
                           isAboveTarget: metrics['isAboveTarget'],
-                          onActionChanged: (action) => _onActionTapped(inst, action),
+                          onActionChanged: _holidayToday == null
+                              ? (action) => _onActionTapped(inst, action)
+                              : null,
                         ),
                       );
                     },
@@ -390,37 +470,44 @@ class _DayHistoryScreenState extends State<DayHistoryScreen> {
   }
 
   Widget _buildWholeDayButton(String action, String label, Color color, IconData icon) {
+    final bool isClickable = _holidayToday == null;
     return InkWell(
-      onTap: () => _onWholeDayAction(action),
+      onTap: isClickable ? () => _onWholeDayAction(action) : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: isClickable ? color.withOpacity(0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2), width: 1),
+          border: Border.all(
+            color: isClickable ? color.withOpacity(0.2) : Colors.grey.withOpacity(0.12),
+            width: 1,
+          ),
         ),
         alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 13,
-                color: color,
-              ),
-              const SizedBox(width: 3),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
+        child: Opacity(
+          opacity: isClickable ? 1.0 : 0.35,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 15,
+                  color: isClickable ? color : AppTheme.textMuted,
                 ),
-              ),
-            ],
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isClickable ? color : AppTheme.textMuted,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

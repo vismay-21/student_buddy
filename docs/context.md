@@ -390,7 +390,7 @@ student_buddy/
 │   │   │   ├── add_class_screen.dart         # Dedicated screen to add class schedules with templates and clock pickers
 │   │   │   └── timetable_screen.dart         # Interactive weekly calendar detailing daily classroom routines
 │   │   └── todo/
-│   │       ├── add_todo_screen.dart          # Screen for creating new tasks with title, due dates, priority, and category
+│   │       ├── add_todo_screen.dart          # Screen for creating new tasks with title, due dates, and priority
 │   │       └── todo_screen.dart              # Screen listing, sorting, and managing due tasks and reminders
 │   ├── data/                                 # Clean Architecture Data Access Layer
 │   │   ├── api/
@@ -435,7 +435,7 @@ We are currently preparing for **Authentication (Sprint 13)**, having completed 
     * Reordered the History tab to place the overall status card (`AttendanceOverviewCard`) and Monthly Day Summary at the top of the history screen.
     * Converted calendar Month page swiping to horizontal.
     * Made Subject Cards in the Subjects tab clickable, navigating to a new, fully interactive `SubjectHistoryScreen` showing dynamic calculations and a class history log using `LectureCard`.
-    * Renamed settings from "Target" to "Criteria", implemented 3 criteria modes (Overall, Subject-Wise, Subject-Wise Custom) with a per-subject configuration dialog, and added Default Days Off chips.
+    * Renamed settings from "Target" to "Criteria", implemented 3 criteria modes (Overall, Subject-Wise, Subject-Wise Custom) with a per-subject configuration dialog, and removed legacy Default Days Off settings in favor of dynamically deriving default days off from the timetable/lecture templates at runtime.
     * Refactored `OverviewScreen` into a stateful panel displaying today's lectures via `LectureCard`, providing a "Mark Whole Day" quick-action bar, positioning the Review Queue warning card at the top of the dashboard (only shown if there are reviews pending), and removing the redundant Academic Status (with its To Do summary), Upcoming Events, Quick Shortcuts, and safe skip widgets to achieve a clean, focused layout.
   * **UI/UX Polish, Review Queue Forms & SnackBar Integration**:
     * Created a unified floating SnackBar component (`AppSnackbar` in `lib/core/widgets/app_snackbar.dart`) and migrated all 10 screen modules to use it.
@@ -449,11 +449,36 @@ We are currently preparing for **Authentication (Sprint 13)**, having completed 
     * Simplified `LectureCard` by removing duplicate Criteria and Attended metrics, merging the status message (font size: 13) and action buttons into a single row, and animating slightly larger action buttons to expand text only when selected.
     * Polished details inside `LectureCard`: set time column width to 44, subject name font size to 15.5, room text size to 13, and ensured start time uses a uniform primary text color.
     * Formatted safe skip status messages specifically: `"can skip X lectures"`, `"can't skip next lecture"`, and `"need to attend next X lectures"`.
-    * Reordered `HistoryTab` layout, merging the Calendar Month View and the Color Legend into the same outer card container (height: 395, page change animation: 500ms), separated by a Divider.
+    * Reordered `HistoryTab` layout, merging the Calendar Month View and the Color Legend into the same outer card container (dynamic height with smooth AnimatedContainer transition, page change animation: 500ms), separated by a Divider.
     * Implemented semester-wide stats aggregation and custom stats popup dialog showing detailed day and lecture statistics when tapping the Overall Attendance Card.
     * Redesigned `AppSnackbar` to be extremely lightweight: reduced heights, padding, font sizes, corner radius, and lowered floating margins (bottom: 8 when nav bar is present, 16 when not) to stay cleanly above navigation.
     * Standardized the bottom offset of the FloatingActionButton on the Timetable screen (padding: 60) to align with the main To Do FAB spacing.
     * Tuned main dashboard spacing (reduced heights of vertical separators to 16).
+    * **Timetable Class Editing & Deletion**: Integrated an edit pencil icon on `LectureCard` in the Timetable view, pushing the pre-filled `AddClassScreen` for editing, and added a confirmation-alerted "DELETE CLASS" button.
+    * **Attendance Calendar Refinements**:
+      * Restricted Blue dots (bright dark blue color) strictly to University Holidays.
+      * Mapped regular days off (all lectures marked day off) to a Yellow dot, and mixed/partial days off to a Purple dot.
+      * Removed calendar dots for dates outside the semester range.
+      * Implemented dynamic calendar card height sizing using `AnimatedContainer` that dynamically calculates the required height based on the number of calendar rows in the active month (`128 + rowCount * 48`) to ensure no empty space and zero legend overlap on all devices.
+      * Refactored the calendar legend to use a `Wrap` layout with Column items (dots above and names below) to ensure a perfectly aligned single row under restricted width conditions, and updated the Holiday dot to a bright dark blue.
+      * Restricted monthly totalDays calculations in history summaries to count only dates that fall inside the active semester range.
+      * Unified the "Off" statistics display to "Off/Holiday" across the main dashboard analytics card and the semester details stats dialog.
+      * Implemented an action lockout mechanism on University Holidays, disabling bulk day markers and individual lecture card update buttons, with clear disabled/faded styling.
+    * **University Holiday Banner**: Integrated `HolidayRepository` in `DayHistoryScreen` to fetch and display the custom name of the holiday at the top of the day logs list when clicking on a holiday date.
+    * **Attendance Analytics Modernization & Backend Sync**:
+      * Synced all dashboard statistics in `subjects_tab.dart`, `history_tab.dart`, and `overview_screen.dart` with the live PostgreSQL database.
+      * Standardized subject metrics text layout to `"Attended: X/Y • Total Lectures: Z"`.
+      * Removed redundant criteria target labels and faculty/room rows from Subject Cards on `SubjectsTab`.
+      * Streamlined `SubjectHistoryScreen` item layout to show only class times and a 4-button action row instead of full `LectureCard` components.
+      * Normalized the `SubjectHistoryScreen` circular progress ring in the summary card to use the custom `_RingPainter` and `AttendanceRingLabel` widget for visual alignment.
+      * Added holiday lock guards on bulk actions and individual lecture updates for days marked as holidays, displaying a clear Blue "University Holiday" banner on both the Overview Screen and Day History logs views.
+      * Expanded bulk action triggers on the Overview Screen to include all four core actions (Clear, Day Off, Missed, Attended).
+      * Aligned all action buttons (bulk action panel on Overview and Day History screens, plus individual lecture card buttons) to a standardized icon size of `15` and Title Case labels.
+      * Enhanced decimal precision of attendance percentages on the history screen/dialogs to display two decimal places (e.g. `X.XX%`).
+    * **Timetable Screen Improvements**:
+      * Made the entire class card tappable (using a Material `InkWell` ripple splash effect) to trigger the class editing/details sheet directly on the Timetable screen, eliminating the visual clutter of having edit buttons on each subject card.
+    * **Clean Up**: Removed unused `cancelled` and `future` statuses/cases across all frontend and backend codebase files to ensure clean architectures.
+
 
 * **What was intentionally NOT implemented (postponed/frozen)**:
   * **Finance Module (FROZEN)**: All Finance module development is officially frozen. It is now disabled by default on clean installs, and the toggle state is persisted via `SharedPreferences`.
@@ -530,11 +555,11 @@ We are currently preparing for **Authentication (Sprint 13)**, having completed 
   * Developed repository, service, and API controller layers exposing only GET settings and PUT settings operations.
   * Added custom validation and normalizations: case-insensitive theme parsing ('light', 'dark', 'system') and normalized OS file path strings.
   * Implemented active semester deletion protection (blocking deletion of semester currently selected as active via 409 conflict).
-  * Automated seed generation for default configuration in database migrations and clean test suite sessions.
+  * Automated seed generation in database migrations and clean test suite sessions.
 
 * **What was implemented (Sprint 8 - Todo Module)**:
   * Documented and enforced that todos are completely independent of semesters, subjects, attendance, notes, and academic modules.
-  * Designed `todos` database schema supporting categories, priorities, statuses, and custom created_by sources.
+  * Designed `todos` database schema supporting priorities, statuses, and custom created_by sources.
   * Developed repository, service, and API controller layers with full CRUD operations.
   * Implemented default ordering for list_todos (pending first, priority High->Med->Low, earliest due date with nulls last, newest created_at first).
   * Added query parameter case-insensitive title search (`q`) filtered inside the repository.
@@ -567,11 +592,18 @@ We are currently preparing for **Authentication (Sprint 13)**, having completed 
   - Bootstrapped, fetched, and selected academic semesters from local uvicorn host.
   - Completed active semester selector screen and new semester creation form dialog.
 
-* **What was implemented (Sprint 12.5 - Business Logic & Runtime Calculation Audit)**:
-  - Audited and verified backend services (Academic, Todo, Notes, Review Queue, Activity Logs) for schema consistency and non-persistent derived data philosophy (e.g. dynamic calculations of attendance rates, overdue counts, entity summaries).
-  - Validated business logic boundaries (e.g., blocking marking holidays or cancelled classes as present/absent) and transactional integrity (nested savepoints and rollback rules).
-  - Verified frontend integration state, confirming full replacement of static mockup/dummy data with live database repository calls.
-  - Ensured 100% backend unit and integration test pass rate (160 tests).
+* **What was implemented (Sprint 12.5 - MVP Backend Audit & Maintenance)**:
+  - Conducted Audit 1 (Architecture Audit) scoring a **94/100** health score. Standardized all backend database models, repositories, services, and tests to use timezone-aware UTC datetime. See detailed report: [docs/audit/audit_01_architecture.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_01_architecture.md).
+  - Conducted Audit 2 (Database Audit) scoring a **98/100** post-remediation health score. Implemented database unique constraint on `(lecture_template_id, lecture_date)` and check constraint `start_date < end_date` on `semesters`. Added indexes on holidays and todos. See detailed report: [docs/audit/audit_02_database.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_02_database.md).
+  - Conducted Audit 3 (Business Logic Audit) scoring a **98/100** post-remediation health score. Remediated the lecture template update rescheduling conflict and added time inversion checks. Optimized N+1 queries in statistics and semester updates using batch-fetching. See detailed report: [docs/audit/audit_03_business_logic.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_03_business_logic.md).
+  - Conducted Audit 4 (API Audit) scoring a **100/100** post-remediation health score. Standardized Activity Logs responses using `ApiResponse` and added optional pagination (`limit`/`offset`) to Todos and Lecture Instances. See detailed report: [docs/audit/audit_04_api.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_04_api.md).
+  - Conducted Audit 5 (Performance Audit) scoring a **100/100** post-remediation health score. Added standalone index on `lecture_instances(lecture_date)`, resolved Activity Logs and Review Queue N+1 query patterns using polymorphic batch loading, and consolidated holiday updates. See detailed report: [docs/audit/audit_05_performance.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_05_performance.md).
+  - Conducted Audit 6 (Security Audit) scoring a **100/100** post-remediation health score. Remediated insecure wildcard CORS middleware configurations, added future-compatible JWT settings, added backend `.gitignore` rules, and introduced HTTP bearer authentication dependency stubs. See detailed report: [docs/audit/audit_06_security.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_06_security.md).
+  - Conducted Audit 7 (Flutter Integration Audit) scoring a **100/100** post-remediation health score. Cleaned up global AppState, removing dead mock methods and state properties, keeping only active fields. Verified repository, DTO mapping, and endpoint consistency. See detailed report: [docs/audit/audit_07_flutter_integration.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_07_flutter_integration.md).
+  - Conducted Audit 8 (Code Quality Audit) scoring a **100/100** post-remediation health score. Resolved stale TODOs, implemented settings update activity logging, updated note upload sprint labels, and added context mounted guards in Flutter. See detailed report: [docs/audit/audit_08_code_quality.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_08_code_quality.md).
+  - Conducted Audit 9 (Testing Quality Audit) scoring a **100/100** post-remediation health score. Resolved FastAPI/Starlette deprecation warnings, fixed SQLAlchemy connection deassociation warnings, and added boundary tests for leap-year holidays and whitespace searches. See detailed report: [docs/audit/audit_09_testing.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_09_testing.md).
+  - Conducted Audit 10 (Production Readiness Audit) scoring a **100/100** post-remediation health score. Configured database connection pooling, dynamically disabled Swagger docs in production environments, overhauled the health check route to verify active database connections, and created a `Dockerfile` and `docker-compose.yaml` to run uvicorn backend and PostgreSQL services locally. See detailed report: [docs/audit/audit_10_production_readiness.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_10_production_readiness.md).
+  - Verified 174/174 backend automated tests pass successfully.
 
 * **What was intentionally NOT implemented (postponed)**:
   * Authentication & Supabase integration (postponed to Sprint 13)
@@ -596,7 +628,7 @@ We are currently preparing for **Authentication (Sprint 13)**, having completed 
 * **Sprint 10**: Review Queue Module (Completed + Refined)
 * **Sprint 11**: Activity Logs Module (Completed)
 * **Sprint 12**: Backend Verification & Flutter API Integration (MVP Mode) (Completed)
-* **Sprint 12.5**: Business Logic & Runtime Calculation Audit (Completed)
+* **Sprint 12.5**: MVP Backend Audit & Maintenance (In Progress)
 * **Sprint 13**: Authentication
 * **Sprint 14**: SQLite Synchronization Engine
 * **Sprint 15**: WhatsApp Integration

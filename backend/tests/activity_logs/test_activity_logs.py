@@ -9,7 +9,7 @@ from app.models.activity_logs.activity_log import ActivityLog, ActorType, Entity
 from app.models.todo.todo import Todo, TodoStatus
 from app.models.academic.semester import Semester
 from app.services.activity_logs.logger import log_activity
-from app.services.activity_logs.summary import get_activity_entity_summary
+from app.services.activity_logs.summary import get_activity_entity_summary, bulk_populate_activity_summaries
 from app.repositories.activity_logs.activity_log import ActivityLogRepository
 
 
@@ -112,28 +112,36 @@ async def test_api_list_activity_logs(client: AsyncClient, db_session: AsyncSess
     await db_session.commit()
 
     # Query API list all
-    response = await client.get("/api/v1/activity-logs/")
+    response = await client.get("/api/v1/activity-logs")
     assert response.status_code == 200
-    data = response.json()
+    res_json = response.json()
+    assert res_json["success"] is True
+    data = res_json["data"]
     assert len(data) >= 2
 
     # Query API with filter by actor_type
-    response = await client.get("/api/v1/activity-logs/?actor_type=system")
+    response = await client.get("/api/v1/activity-logs?actor_type=system")
     assert response.status_code == 200
-    data = response.json()
+    res_json = response.json()
+    assert res_json["success"] is True
+    data = res_json["data"]
     assert all(item["actor_type"] == "system" for item in data)
 
     # Query API with filter by correlation_id
-    response = await client.get(f"/api/v1/activity-logs/?correlation_id={correlation_id}")
+    response = await client.get(f"/api/v1/activity-logs?correlation_id={correlation_id}")
     assert response.status_code == 200
-    data = response.json()
+    res_json = response.json()
+    assert res_json["success"] is True
+    data = res_json["data"]
     assert len(data) == 1
     assert data[0]["activity_message"] == "First Log Message"
 
     # Query API search q
-    response = await client.get("/api/v1/activity-logs/?q=second")
+    response = await client.get("/api/v1/activity-logs?q=second")
     assert response.status_code == 200
-    data = response.json()
+    res_json = response.json()
+    assert res_json["success"] is True
+    data = res_json["data"]
     assert len(data) == 1
     assert data[0]["activity_message"] == "Second Log Message"
 
@@ -154,8 +162,59 @@ async def test_api_get_activity_log_by_id(client: AsyncClient, db_session: Async
     # Get by ID
     response = await client.get(f"/api/v1/activity-logs/{log.activity_id}")
     assert response.status_code == 200
-    data = response.json()
+    res_json = response.json()
+    assert res_json["success"] is True
+    data = res_json["data"]
     assert data["activity_id"] == str(log.activity_id)
     assert data["actor_type"] == "bot"
     assert data["activity_message"] == "API Details Log"
     assert data["entity_summary"] == "App Settings"
+
+
+@pytest.mark.asyncio
+async def test_bulk_populate_activity_summaries(db_session: AsyncSession):
+    # 1. Create a Todo
+    todo = Todo(
+        title="Todo Task for bulk log test",
+        status=TodoStatus.PENDING
+    )
+    db_session.add(todo)
+    await db_session.flush()
+
+    # 2. Create some ActivityLog mock objects (not committed to DB, just in memory)
+    log_todo = ActivityLog(
+        actor_type=ActorType.USER,
+        entity_type=EntityType.TODO,
+        entity_id=todo.todo_id,
+        action_type=ActionType.CREATED,
+        activity_message="Created todo"
+    )
+    log_settings = ActivityLog(
+        actor_type=ActorType.SYSTEM,
+        entity_type=EntityType.SETTINGS,
+        entity_id=uuid.uuid4(),
+        action_type=ActionType.UPDATED,
+        activity_message="Updated settings"
+    )
+    log_finance = ActivityLog(
+        actor_type=ActorType.USER,
+        entity_type=EntityType.FINANCE,
+        entity_id=uuid.uuid4(),
+        action_type=ActionType.CREATED,
+        activity_message="Finance log"
+    )
+
+    logs = [log_todo, log_settings, log_finance]
+
+    # Verify summaries are not yet set
+    for l in logs:
+        assert not hasattr(l, "entity_summary")
+
+    # Run bulk populate
+    await bulk_populate_activity_summaries(db_session, logs)
+
+    # Verify summaries are populated correctly
+    assert log_todo.entity_summary == "Todo Task for bulk log test"
+    assert log_settings.entity_summary == "App Settings"
+    assert log_finance.entity_summary == "Finance Record"
+

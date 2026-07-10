@@ -113,7 +113,7 @@ async def sample_instances(
         LectureInstance(
             lecture_template_id=test_template.lecture_template_id,
             lecture_date=date(2026, 1, 26),  # Monday
-            lecture_status=LectureStatus.CANCELLED,
+            lecture_status=LectureStatus.HOLIDAY,
             attendance_status=AttendanceStatus.UNMARKED,
             marked_by=None,
             marked_at=None
@@ -223,16 +223,16 @@ async def test_service_update_attendance_reset_unmarked(db_session: AsyncSession
 
 
 @pytest.mark.asyncio
-async def test_service_update_attendance_rejects_on_cancelled_or_holiday(
+async def test_service_update_attendance_rejects_on_holiday(
     db_session: AsyncSession, sample_instances: list[LectureInstance]
 ):
     repo = LectureInstanceRepository(db_session)
     service = LectureInstanceService(db_session, repo)
-    cancelled_inst = sample_instances[3]  # Cancelled
+    holiday_inst = sample_instances[3]  # Holiday
 
     with pytest.raises(ValidationException):
         await service.update_attendance(
-            cancelled_inst.lecture_instance_id,
+            holiday_inst.lecture_instance_id,
             LectureInstanceUpdate(attendance_status=AttendanceStatus.PRESENT)
         )
 
@@ -247,9 +247,9 @@ async def test_service_update_status_resets_attendance(
 
     updated = await service.update_attendance(
         inst.lecture_instance_id,
-        LectureInstanceUpdate(lecture_status=LectureStatus.CANCELLED)
+        LectureInstanceUpdate(lecture_status=LectureStatus.HOLIDAY)
     )
-    assert updated.lecture_status == LectureStatus.CANCELLED
+    assert updated.lecture_status == LectureStatus.HOLIDAY
     assert updated.attendance_status == AttendanceStatus.UNMARKED
     assert updated.marked_by is None
     assert updated.marked_at is None
@@ -257,15 +257,26 @@ async def test_service_update_status_resets_attendance(
 
 @pytest.mark.asyncio
 async def test_service_mark_whole_day(
-    db_session: AsyncSession, test_semester: Semester, sample_instances: list[LectureInstance]
+    db_session: AsyncSession, test_semester: Semester, test_subject: Subject, test_template: LectureTemplate, sample_instances: list[LectureInstance]
 ):
     repo = LectureInstanceRepository(db_session)
     service = LectureInstanceService(db_session, repo)
 
-    # Date 2026-01-26 has one cancelled class (sample_instances[3])
-    # Let's add a scheduled unmarked class on 2026-01-26
+    # Date 2026-01-26 has one holiday class (sample_instances[3])
+    # Let's add a second template for Monday 10:00-11:00
+    temp2 = LectureTemplate(
+        subject_id=test_subject.subject_id,
+        day_of_week=1,  # Monday
+        start_time=time(10, 0),
+        end_time=time(11, 0),
+        room="LH-101"
+    )
+    db_session.add(temp2)
+    await db_session.flush()
+
+    # Let's add a scheduled unmarked class on 2026-01-26 for the second template
     new_inst = LectureInstance(
-        lecture_template_id=sample_instances[3].lecture_template_id,
+        lecture_template_id=temp2.lecture_template_id,
         lecture_date=date(2026, 1, 26),
         lecture_status=LectureStatus.SCHEDULED,
         attendance_status=AttendanceStatus.UNMARKED
@@ -281,7 +292,7 @@ async def test_service_mark_whole_day(
     res = await service.mark_whole_day(bulk_in)
     
     assert res.updated_count == 1  # only new_inst is scheduled
-    assert res.skipped_count == 1  # sample_instances[3] is cancelled
+    assert res.skipped_count == 1  # sample_instances[3] is holiday
     
     # Reload new_inst and verify
     await db_session.refresh(new_inst)

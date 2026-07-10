@@ -124,14 +124,6 @@ class _TimetableScreenState extends State<TimetableScreen> {
       );
     }
 
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
     return Scaffold(
       body: Column(
         children: [
@@ -155,65 +147,95 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
           // ── Lecture list pager ─────────────────────────────────────────────
           Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: 7,
-              onPageChanged: (index) => setState(() => _selectedDayIndex = index),
-              itemBuilder: (context, dayIndex) {
-                final templatesForDay = _allTemplates.where((t) => t.dayOfWeek == (dayIndex + 1)).toList();
-                templatesForDay.sort((a, b) => a.startTime.compareTo(b.startTime));
+            child: Stack(
+              children: [
+                PageView.builder(
+                  controller: _pageController,
+                  itemCount: 7,
+                  onPageChanged: (index) => setState(() => _selectedDayIndex = index),
+                  itemBuilder: (context, dayIndex) {
+                    final templatesForDay = _allTemplates.where((t) => t.dayOfWeek == (dayIndex + 1)).toList();
+                    templatesForDay.sort((a, b) => a.startTime.compareTo(b.startTime));
 
-                if (templatesForDay.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.calendar_today_rounded,
-                          size: 64,
-                          color: AppTheme.textMuted.withAlpha(100),
+                    if (templatesForDay.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              size: 64,
+                              color: AppTheme.textMuted.withAlpha(100),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No classes scheduled',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Enjoy your free day!',
+                              style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No classes scheduled',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Enjoy your free day!',
-                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  );
-                }
+                      );
+                    }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: templatesForDay.length,
-                  itemBuilder: (context, index) {
-                    final template = templatesForDay[index];
-                    final subject = _subjectsMap[template.subjectId];
-                    final lectureMock = LectureMock(
-                      id: template.lectureTemplateId,
-                      name: subject?.subjectName ?? 'Unknown Subject',
-                      startTime: template.startTime.substring(0, 5),
-                      endTime: template.endTime.substring(0, 5),
-                      teacher: subject?.facultyName ?? 'N/A',
-                      room: template.room ?? 'N/A',
-                      colorValue: parseHexColor(subject?.themeColor).value,
-                    );
-                    return LectureCard(
-                      lecture: lectureMock,
-                      showAttendance: false,
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: templatesForDay.length,
+                      itemBuilder: (context, index) {
+                        final template = templatesForDay[index];
+                        final subject = _subjectsMap[template.subjectId];
+                        final lectureMock = LectureMock(
+                          id: template.lectureTemplateId,
+                          name: subject?.subjectName ?? 'Unknown Subject',
+                          startTime: template.startTime.substring(0, 5),
+                          endTime: template.endTime.substring(0, 5),
+                          teacher: subject?.facultyName ?? 'N/A',
+                          room: template.room ?? 'N/A',
+                          colorValue: parseHexColor(subject?.themeColor).value,
+                        );
+                        return LectureCard(
+                          lecture: lectureMock,
+                          showAttendance: false,
+                          onEdit: () async {
+                            final result = await Navigator.of(context).push<int>(
+                              MaterialPageRoute(
+                                builder: (_) => AddClassScreen(
+                                  template: template,
+                                  subject: subject,
+                                ),
+                              ),
+                            );
+                            _loadData();
+                            if (result != null && mounted) {
+                              setState(() {
+                                _selectedDayIndex = result;
+                              });
+                              if (_pageController.hasClients) {
+                                _pageController.jumpToPage(result);
+                              }
+                            }
+                          },
+                        );
+                      },
                     );
                   },
-                );
-              },
+                ),
+                if (_isLoading)
+                  Container(
+                    color: Theme.of(context).scaffoldBackgroundColor.withAlpha(150),
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+              ],
             ),
           ),
 
@@ -285,10 +307,18 @@ class _TimetableScreenState extends State<TimetableScreen> {
           backgroundColor: AppTheme.primary,
           foregroundColor: Colors.white,
           onPressed: () async {
-            await Navigator.of(context).push(
+            final result = await Navigator.of(context).push<int>(
               MaterialPageRoute(builder: (_) => const AddClassScreen()),
             );
             _loadData();
+            if (result != null && mounted) {
+              setState(() {
+                _selectedDayIndex = result;
+              });
+              if (_pageController.hasClients) {
+                _pageController.jumpToPage(result);
+              }
+            }
           },
           child: const Icon(Icons.add_rounded),
         ),

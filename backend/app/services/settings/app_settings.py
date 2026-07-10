@@ -73,7 +73,18 @@ class AppSettingsService:
 
         await self.settings_repo.update(settings)
 
-        # TODO (Sprint 11): Create Activity Log entry.
+        # Log Activity (Audit 08)
+        from app.core.constants import SYSTEM_SETTINGS_UUID
+        from app.services.activity_logs import log_activity
+        from app.models.activity_logs.activity_log import ActorType, EntityType, ActionType
+        await log_activity(
+            db=self.db,
+            actor_type=ActorType.USER,
+            entity_type=EntityType.SETTINGS,
+            entity_id=SYSTEM_SETTINGS_UUID,
+            action_type=ActionType.UPDATED,
+            activity_message="Updated global application settings."
+        )
 
         await self.db.commit()
         return settings

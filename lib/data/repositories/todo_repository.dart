@@ -14,13 +14,11 @@ class TodoRepository {
 
   Future<List<TodoDto>> getTodos({
     String? status,
-    String? category,
     String? priority,
     String? q,
   }) async {
     final response = await _api.getTodos(
       status: status,
-      category: category,
       priority: priority,
       q: q,
     );

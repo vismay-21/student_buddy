@@ -254,31 +254,13 @@ class HolidayService:
         )
 
         if to_status == LectureStatus.HOLIDAY:
-            # 1. Update status only if attendance metadata is already unmarked/reset
-            stmt1 = (
+            # Consolidate updates: unconditionally set lecture_status to HOLIDAY and reset attendance info
+            stmt = (
                 update(LectureInstance)
                 .where(
                     LectureInstance.lecture_template_id.in_(template_ids_subquery),
                     LectureInstance.lecture_date == target_date,
                     LectureInstance.lecture_status == from_status,
-                    LectureInstance.attendance_status == AttendanceStatus.UNMARKED,
-                    LectureInstance.marked_by.is_(None),
-                    LectureInstance.marked_at.is_(None)
-                )
-                .values(
-                    lecture_status=LectureStatus.HOLIDAY
-                )
-            )
-            # 2. Update status and reset attendance metadata only if actually needed
-            stmt2 = (
-                update(LectureInstance)
-                .where(
-                    LectureInstance.lecture_template_id.in_(template_ids_subquery),
-                    LectureInstance.lecture_date == target_date,
-                    LectureInstance.lecture_status == from_status,
-                    (LectureInstance.attendance_status != AttendanceStatus.UNMARKED) |
-                    (LectureInstance.marked_by.isnot(None)) |
-                    (LectureInstance.marked_at.isnot(None))
                 )
                 .values(
                     lecture_status=LectureStatus.HOLIDAY,
@@ -287,8 +269,7 @@ class HolidayService:
                     marked_at=None
                 )
             )
-            await self.db.execute(stmt1)
-            await self.db.execute(stmt2)
+            await self.db.execute(stmt)
         else:
             stmt = (
                 update(LectureInstance)

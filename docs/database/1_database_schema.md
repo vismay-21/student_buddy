@@ -1032,7 +1032,6 @@ Actual files are stored in Supabase Storage.
 | section_id | UUID (FK) |
 | resource_name | VARCHAR(255) |
 | file_name | VARCHAR(255) |
-| file_extension | VARCHAR(20) |
 | mime_type | VARCHAR(100) |
 | file_size_bytes | BIGINT |
 | storage_path | TEXT |
@@ -1049,6 +1048,9 @@ Actual files are stored in Supabase Storage.
 ```
 app
 whatsapp
+ocr
+review_queue
+api
 ```
 
 ---

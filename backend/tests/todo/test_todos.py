@@ -7,7 +7,7 @@ from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models.todo.todo import Todo, TodoCategory, TodoPriority, TodoStatus, TodoCreatedBy
+from app.models.todo.todo import Todo, TodoPriority, TodoStatus, TodoCreatedBy
 from app.repositories.todo.todo import TodoRepository
 from app.services.todo.todo import TodoService
 
@@ -24,7 +24,6 @@ async def todo_service(db_session: AsyncSession) -> TodoService:
 async def test_create_todo_success(client: AsyncClient):
     payload = {
         "title": "Clean room",
-        "category": "personal",
         "priority": "high",
         "due_datetime": "2026-08-15T10:00:00Z"
     }
@@ -34,7 +33,6 @@ async def test_create_todo_success(client: AsyncClient):
     assert data["success"] is True
     todo = data["data"]
     assert todo["title"] == "Clean room"
-    assert todo["category"] == "personal"
     assert todo["priority"] == "high"
     assert todo["status"] == "pending"
     assert todo["created_by"] == "user"
@@ -53,7 +51,6 @@ async def test_create_todo_defaults(client: AsyncClient):
     response = await client.post("/api/v1/todos", json=payload)
     assert response.status_code == status.HTTP_201_CREATED
     todo = response.json()["data"]
-    assert todo["category"] == "other"
     assert todo["priority"] == "medium"
     assert todo["status"] == "pending"
     assert todo["created_by"] == "user"
@@ -66,13 +63,13 @@ async def test_create_todo_invalid_title(client: AsyncClient):
         "title": ""  # empty
     }
     response = await client.post("/api/v1/todos", json=payload)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     payload = {
         "title": "A" * 256  # too long
     }
     response = await client.post("/api/v1/todos", json=payload)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio
@@ -83,14 +80,14 @@ async def test_due_date_validation(client: AsyncClient):
         "due_datetime": "1999-12-31T23:59:59Z"
     }
     response = await client.post("/api/v1/todos", json=payload)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     payload = {
         "title": "Invalid due date future",
         "due_datetime": "2101-01-01T00:00:00Z"
     }
     response = await client.post("/api/v1/todos", json=payload)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     # Permitted past due date (e.g. year 2024 is permitted since 2000 <= 2024 <= 2100)
     payload = {
@@ -106,7 +103,6 @@ async def test_get_todo_by_id(client: AsyncClient, db_session: AsyncSession):
     # Insert a todo directly
     todo = Todo(
         title="Check details",
-        category=TodoCategory.ACADEMIC,
         priority=TodoPriority.LOW,
         status=TodoStatus.PENDING
     )
@@ -162,16 +158,11 @@ async def test_title_search(client: AsyncClient, db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_list_filtering(client: AsyncClient, db_session: AsyncSession):
-    todo1 = Todo(title="T1", category=TodoCategory.ACADEMIC, priority=TodoPriority.HIGH, status=TodoStatus.PENDING)
-    todo2 = Todo(title="T2", category=TodoCategory.PERSONAL, priority=TodoPriority.LOW, status=TodoStatus.COMPLETED)
-    todo3 = Todo(title="T3", category=TodoCategory.ACADEMIC, priority=TodoPriority.MEDIUM, status=TodoStatus.PENDING)
+    todo1 = Todo(title="T1", priority=TodoPriority.HIGH, status=TodoStatus.PENDING)
+    todo2 = Todo(title="T2", priority=TodoPriority.LOW, status=TodoStatus.COMPLETED)
+    todo3 = Todo(title="T3", priority=TodoPriority.MEDIUM, status=TodoStatus.PENDING)
     db_session.add_all([todo1, todo2, todo3])
     await db_session.commit()
-
-    # Filter by category
-    response = await client.get("/api/v1/todos?category=academic")
-    data = response.json()["data"]
-    assert len(data) == 2
 
     # Filter by status
     response = await client.get("/api/v1/todos?status=completed")
@@ -334,3 +325,68 @@ async def test_timezone_aware_due_dates(client: AsyncClient, db_session: AsyncSe
     
     dt = datetime.fromisoformat(get_data["due_datetime"].replace("Z", "+00:00"))
     assert dt.astimezone(timezone.utc) == datetime(2026, 9, 10, 10, 0, 0, tzinfo=timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_timezone_naive_due_dates(client: AsyncClient):
+    # Timezone naive due date (like Flutter sends: 2026-07-08T18:21:00.000)
+    naive_due = "2026-07-08T18:21:00.000"
+    
+    payload = {
+        "title": "Naive Due Date Task",
+        "due_datetime": naive_due
+    }
+    response = await client.post("/api/v1/todos", json=payload)
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.json()["data"]
+    
+    assert data["title"] == "Naive Due Date Task"
+    assert data["due_datetime"].startswith("2026-07-08T18:21:00")
+
+
+@pytest.mark.asyncio
+async def test_api_todos_pagination(client: AsyncClient, db_session: AsyncSession):
+    # Create 5 todos
+    todos = [
+        Todo(title=f"Task {i}", priority=TodoPriority.HIGH, status=TodoStatus.PENDING)
+        for i in range(1, 6)
+    ]
+    db_session.add_all(todos)
+    await db_session.commit()
+
+    # Query first 2 items
+    response = await client.get("/api/v1/todos?limit=2&offset=0")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()["data"]
+    assert len(data) == 2
+    assert data[0]["title"] == "Task 5"
+    assert data[1]["title"] == "Task 4"
+
+    # Query next 2 items
+    response = await client.get("/api/v1/todos?limit=2&offset=2")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()["data"]
+    assert len(data) == 2
+    assert data[0]["title"] == "Task 3"
+    assert data[1]["title"] == "Task 2"
+
+
+@pytest.mark.asyncio
+async def test_api_todos_search_empty_or_whitespace(client: AsyncClient, db_session: AsyncSession):
+    # 1. Create a couple of todos
+    todo1 = Todo(title="First Task", priority=TodoPriority.HIGH, status=TodoStatus.PENDING)
+    todo2 = Todo(title="Second Task", priority=TodoPriority.LOW, status=TodoStatus.PENDING)
+    db_session.add_all([todo1, todo2])
+    await db_session.commit()
+
+    # 2. Search with empty query -> should return all (2 items)
+    response_empty = await client.get("/api/v1/todos?q=")
+    assert response_empty.status_code == status.HTTP_200_OK
+    assert len(response_empty.json()["data"]) == 2
+
+    # 3. Search with whitespace query -> should strip and return all (2 items)
+    response_whitespace = await client.get("/api/v1/todos?q=   ")
+    assert response_whitespace.status_code == status.HTTP_200_OK
+    assert len(response_whitespace.json()["data"]) == 2
+
+

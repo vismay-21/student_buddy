@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:math' as math;
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/dummy_data.dart';
 import '../../core/utils/color_helper.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../core/widgets/attendance_ring_label.dart';
 import '../../data/dto/lecture/lecture_instance_dto.dart';
 import '../../data/repositories/lecture_instance_repository.dart';
-import 'widgets/lecture_card.dart';
 
 class SubjectHistoryScreen extends StatefulWidget {
   final String subjectId;
   final String subjectName;
   final int criteriaPercentage;
+  final String facultyName;
+  final String roomName;
   final Function(DateTime date, LectureMock lecture, String action) onLectureActionChanged;
 
   const SubjectHistoryScreen({
@@ -20,6 +23,8 @@ class SubjectHistoryScreen extends StatefulWidget {
     required this.subjectId,
     required this.subjectName,
     required this.criteriaPercentage,
+    required this.facultyName,
+    required this.roomName,
     required this.onLectureActionChanged,
   });
 
@@ -80,6 +85,7 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
   }
 
   void _onActionTapped(LectureInstanceDto inst, String action) async {
+    if (inst.lectureStatus == 'holiday') return;
     String newAttendanceStatus = 'unmarked';
     String newLectureStatus = 'scheduled';
     if (action == 'attended') {
@@ -106,6 +112,67 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
         AppSnackbar.error(context, 'Failed to update attendance: $e');
       }
     }
+  }
+
+  Widget _buildActionButton(
+    BuildContext context,
+    String currentAction,
+    String action,
+    IconData icon,
+    Color color,
+    Function(String)? onActionChanged,
+  ) {
+    final bool isSelected = currentAction == action;
+    final bool isClickable = onActionChanged != null;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return GestureDetector(
+      onTap: isClickable
+          ? () {
+              onActionChanged(action);
+            }
+          : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: EdgeInsets.symmetric(horizontal: isSelected ? 10 : 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? (isClickable ? color.withOpacity(0.12) : color.withOpacity(0.06)) 
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected 
+                ? (isClickable ? color.withOpacity(0.5) : color.withOpacity(0.25)) 
+                : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)).withOpacity(isClickable ? 1.0 : 0.4),
+            width: 1,
+          ),
+        ),
+        child: Opacity(
+          opacity: isClickable ? 1.0 : (isSelected ? 0.75 : 0.25),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? color : AppTheme.textMuted,
+              ),
+              if (isSelected) ...[
+                const SizedBox(width: 4),
+                Text(
+                  action.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -151,24 +218,28 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
                         children: [
                           // Circular Progress Ring
                           SizedBox(
-                            width: 64,
-                            height: 64,
+                            width: 52,
+                            height: 52,
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
-                                CircularProgressIndicator(
-                                  value: attendancePercent / 100,
-                                  strokeWidth: 6,
-                                  backgroundColor: ringColor.withOpacity(0.12),
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    isAboveTarget ? AppTheme.accent : AppTheme.danger,
+                                CustomPaint(
+                                  size: const Size(52, 52),
+                                  painter: _RingPainter(
+                                    progress: attendancePercent / 100,
+                                    ringColor: isAboveTarget ? AppTheme.accent : AppTheme.danger,
+                                    backgroundColor: (isAboveTarget ? AppTheme.accent : AppTheme.danger).withOpacity(0.15),
                                   ),
                                 ),
-                                Text(
-                                  '${attendancePercent.toInt()}%',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4.0),
+                                    child: AttendanceRingLabel(
+                                      current: attendancePercent,
+                                      target: widget.criteriaPercentage.toDouble(),
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -188,11 +259,44 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Classes Logged: ${_stats?.presentLectures ?? 0}/${_stats?.totalLectures ?? 0}',
+                                  'Attended: ${_stats?.presentLectures ?? 0}/${(_stats?.presentLectures ?? 0) + (_stats?.absentLectures ?? 0)} • Total Lectures: ${_stats?.totalLectures ?? 0}',
                                   style: const TextStyle(
                                     color: AppTheme.textMuted,
                                     fontSize: 12,
+                                    fontWeight: FontWeight.w600,
                                   ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.person_outline_rounded,
+                                      size: 12,
+                                      color: isDark ? AppTheme.textMuted : AppTheme.lightTextSecondary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      widget.facultyName,
+                                      style: TextStyle(
+                                        color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Icon(
+                                      Icons.meeting_room_outlined,
+                                      size: 12,
+                                      color: isDark ? AppTheme.textMuted : AppTheme.lightTextSecondary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      widget.roomName,
+                                      style: TextStyle(
+                                        color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -297,17 +401,78 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
                                       ],
                                     ),
                                   ),
-                                  LectureCard(
-                                    lecture: lecture,
-                                    showAttendance: true,
-                                    currentAction: action,
-                                    attendancePercent: attendancePercent,
-                                    targetPercent: widget.criteriaPercentage,
-                                    attended: _stats?.presentLectures ?? 0,
-                                    total: _stats?.totalLectures ?? 0,
-                                    statusMessage: _stats?.statusMessage ?? '',
-                                    isAboveTarget: isAboveTarget,
-                                    onActionChanged: (newAction) => _onActionTapped(inst, newAction),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                                    decoration: BoxDecoration(
+                                      color: cardBackground,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: borderColor, width: 1),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // Left side: Timing
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.access_time_rounded,
+                                              size: 15,
+                                              color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '${lecture.startTime} - ${lecture.endTime}',
+                                              style: TextStyle(
+                                                color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        // Right side: 4 action buttons
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _buildActionButton(
+                                              context,
+                                              action,
+                                              'clear',
+                                              Icons.remove_circle_outline,
+                                              isDark ? AppTheme.textMuted : Colors.black54,
+                                              !isHoliday ? (newAct) => _onActionTapped(inst, newAct) : null,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            _buildActionButton(
+                                              context,
+                                              action,
+                                              'off',
+                                              Icons.pause_circle_outline,
+                                              AppTheme.warning,
+                                              !isHoliday ? (newAct) => _onActionTapped(inst, newAct) : null,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            _buildActionButton(
+                                              context,
+                                              action,
+                                              'missed',
+                                              Icons.highlight_off,
+                                              AppTheme.danger,
+                                              !isHoliday ? (newAct) => _onActionTapped(inst, newAct) : null,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            _buildActionButton(
+                                              context,
+                                              action,
+                                              'attended',
+                                              Icons.check_circle_rounded,
+                                              AppTheme.accent,
+                                              !isHoliday ? (newAct) => _onActionTapped(inst, newAct) : null,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -318,5 +483,42 @@ class _SubjectHistoryScreenState extends State<SubjectHistoryScreen> {
               ],
             ),
     );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  final double progress;
+  final Color ringColor;
+  final Color backgroundColor;
+
+  _RingPainter({
+    required this.progress,
+    required this.ringColor,
+    required this.backgroundColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Offset.zero & size;
+    canvas.drawArc(rect, 0, math.pi * 2, false, stroke..color = backgroundColor);
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      math.pi * 2 * progress.clamp(0.0, 1.0),
+      false,
+      stroke..color = ringColor,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.ringColor != ringColor ||
+        oldDelegate.backgroundColor != backgroundColor;
   }
 }

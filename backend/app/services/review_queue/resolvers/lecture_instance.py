@@ -25,9 +25,9 @@ class LectureInstanceResolver(BaseResolver):
         target_status = inst_update.attendance_status
         if target_status is not None:
             current_lecture_status = inst_update.lecture_status or instance.lecture_status
-            if current_lecture_status in [LectureStatus.HOLIDAY, LectureStatus.CANCELLED]:
+            if current_lecture_status == LectureStatus.HOLIDAY:
                 if target_status in [AttendanceStatus.PRESENT, AttendanceStatus.ABSENT]:
-                    raise ValidationException("Cannot mark holiday or cancelled lectures as present or absent.")
+                    raise ValidationException("Cannot mark holiday lectures as present or absent.")
 
             instance.attendance_status = target_status
             if target_status == AttendanceStatus.UNMARKED:
@@ -39,7 +39,7 @@ class LectureInstanceResolver(BaseResolver):
 
         if inst_update.lecture_status is not None:
             instance.lecture_status = inst_update.lecture_status
-            if inst_update.lecture_status in [LectureStatus.HOLIDAY, LectureStatus.CANCELLED]:
+            if inst_update.lecture_status == LectureStatus.HOLIDAY:
                 instance.attendance_status = AttendanceStatus.UNMARKED
                 instance.marked_by = None
                 instance.marked_at = None

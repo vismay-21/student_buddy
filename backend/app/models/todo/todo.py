@@ -1,17 +1,9 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Enum, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
-
-
-class TodoCategory(str, enum.Enum):
-    ACADEMIC = "academic"
-    PERSONAL = "personal"
-    WORK = "work"
-    HEALTH = "health"
-    OTHER = "other"
 
 
 class TodoPriority(str, enum.Enum):
@@ -47,11 +39,6 @@ class Todo(Base):
         String(255),
         nullable=False
     )
-    category: Mapped[TodoCategory] = mapped_column(
-        Enum(TodoCategory, name="todo_category"),
-        default=TodoCategory.OTHER,
-        nullable=False
-    )
     priority: Mapped[TodoPriority] = mapped_column(
         Enum(TodoPriority, name="todo_priority"),
         default=TodoPriority.MEDIUM,
@@ -60,7 +47,8 @@ class Todo(Base):
     status: Mapped[TodoStatus] = mapped_column(
         Enum(TodoStatus, name="todo_status"),
         default=TodoStatus.PENDING,
-        nullable=False
+        nullable=False,
+        index=True
     )
     created_by: Mapped[TodoCreatedBy] = mapped_column(
         Enum(TodoCreatedBy, name="todo_created_by"),
@@ -69,7 +57,8 @@ class Todo(Base):
     )
     due_datetime: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
-        nullable=True
+        nullable=True,
+        index=True
     )
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
@@ -77,12 +66,12 @@ class Todo(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )

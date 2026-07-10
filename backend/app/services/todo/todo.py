@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.todo.todo import Todo, TodoCategory, TodoPriority, TodoStatus
+from app.models.todo.todo import Todo, TodoPriority, TodoStatus
 from app.schemas.todo.todo import TodoCreate, TodoUpdate
 from app.repositories.todo.todo import TodoRepository
 from app.core.exceptions import NotFoundException
@@ -32,19 +32,21 @@ class TodoService:
     async def list_todos(
         self,
         status: TodoStatus | None = None,
-        category: TodoCategory | None = None,
         priority: TodoPriority | None = None,
-        q: str | None = None
+        q: str | None = None,
+        limit: int = 50,
+        offset: int = 0
     ) -> Sequence[Todo]:
         """
-        Lists all todos with optional status, category, priority filters and title search.
+        Lists all todos with optional status, priority filters and title search.
         Delegates the sorting logic directly to the repository.
         """
         return await self.todo_repo.list_todos(
             status=status,
-            category=category,
             priority=priority,
-            q=q
+            q=q,
+            limit=limit,
+            offset=offset
         )
 
     async def create_todo(self, todo_in: TodoCreate) -> Todo:
@@ -54,7 +56,6 @@ class TodoService:
         """
         todo = Todo(
             title=todo_in.title,
-            category=todo_in.category,
             priority=todo_in.priority,
             due_datetime=todo_in.due_datetime,
             created_by=todo_in.created_by,
@@ -63,6 +64,7 @@ class TodoService:
         )
 
         await self.todo_repo.create(todo)
+        await self.db.flush()
 
         # Log Activity (Sprint 11)
         from app.services.activity_logs import log_activity
@@ -97,8 +99,6 @@ class TodoService:
         # Apply basic updates
         if todo_in.title is not None:
             todo.title = todo_in.title
-        if todo_in.category is not None:
-            todo.category = todo_in.category
         if todo_in.priority is not None:
             todo.priority = todo_in.priority
         if todo_in.due_datetime is not None:

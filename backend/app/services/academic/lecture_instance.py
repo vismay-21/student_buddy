@@ -42,7 +42,9 @@ class LectureInstanceService:
         start_date: date | None = None,
         end_date: date | None = None,
         attendance_status: AttendanceStatus | None = None,
-        lecture_status: LectureStatus | None = None
+        lecture_status: LectureStatus | None = None,
+        limit: int | None = None,
+        offset: int | None = None
     ) -> Sequence[LectureInstance]:
         return await self.lecture_instance_repo.list_instances(
             semester_id=semester_id,
@@ -50,7 +52,9 @@ class LectureInstanceService:
             start_date=start_date,
             end_date=end_date,
             attendance_status=attendance_status,
-            lecture_status=lecture_status
+            lecture_status=lecture_status,
+            limit=limit,
+            offset=offset
         )
 
     async def get_today_lectures(
@@ -65,14 +69,14 @@ class LectureInstanceService:
             raise NotFoundException(f"Lecture instance with ID {instance_id} not found")
 
         # Business validations:
-        # Holiday and cancelled lectures cannot be marked Present or Absent.
+        # Holiday lectures cannot be marked Present or Absent.
         # But we do allow resetting back to Unmarked.
         target_status = update_in.attendance_status
         if target_status is not None:
             current_lecture_status = update_in.lecture_status or instance.lecture_status
-            if current_lecture_status in [LectureStatus.HOLIDAY, LectureStatus.CANCELLED]:
+            if current_lecture_status == LectureStatus.HOLIDAY:
                 if target_status in [AttendanceStatus.PRESENT, AttendanceStatus.ABSENT]:
-                    raise ValidationException("Cannot mark holiday or cancelled lectures as present or absent.")
+                    raise ValidationException("Cannot mark holiday lectures as present or absent.")
 
             instance.attendance_status = target_status
             if target_status == AttendanceStatus.UNMARKED:
@@ -84,8 +88,8 @@ class LectureInstanceService:
 
         if update_in.lecture_status is not None:
             instance.lecture_status = update_in.lecture_status
-            # If state is changed to holiday or cancelled, reset attendance
-            if update_in.lecture_status in [LectureStatus.HOLIDAY, LectureStatus.CANCELLED]:
+            # If state is changed to holiday, reset attendance
+            if update_in.lecture_status == LectureStatus.HOLIDAY:
                 instance.attendance_status = AttendanceStatus.UNMARKED
                 instance.marked_by = None
                 instance.marked_at = None
@@ -138,18 +142,33 @@ class LectureInstanceService:
         skipped_count = 0
 
         for inst in instances:
-            if inst.lecture_status == LectureStatus.SCHEDULED:
-                inst.attendance_status = bulk_in.attendance_status
-                if bulk_in.attendance_status == AttendanceStatus.UNMARKED:
-                    inst.marked_by = None
-                    inst.marked_at = None
-                else:
-                    inst.marked_by = MarkedBy.USER
-                    inst.marked_at = datetime.now(timezone.utc)
-                updated_count += 1
+            status_changed = False
+            # 1. Update lecture_status if provided
+            if bulk_in.lecture_status is not None:
+                if inst.lecture_status != bulk_in.lecture_status:
+                    inst.lecture_status = bulk_in.lecture_status
+                    if bulk_in.lecture_status == LectureStatus.HOLIDAY:
+                        inst.attendance_status = AttendanceStatus.UNMARKED
+                        inst.marked_by = None
+                        inst.marked_at = None
+                    status_changed = True
 
-                # TODO (Sprint 13):
-                # Mark updated records as pending synchronization after local changes.
+            # 2. Update attendance_status if provided (only for scheduled instances)
+            if bulk_in.attendance_status is not None:
+                final_lecture_status = inst.lecture_status
+                if final_lecture_status == LectureStatus.SCHEDULED:
+                    if inst.attendance_status != bulk_in.attendance_status:
+                        inst.attendance_status = bulk_in.attendance_status
+                        if bulk_in.attendance_status == AttendanceStatus.UNMARKED:
+                            inst.marked_by = None
+                            inst.marked_at = None
+                        else:
+                            inst.marked_by = MarkedBy.USER
+                            inst.marked_at = datetime.now(timezone.utc)
+                        status_changed = True
+
+            if status_changed:
+                updated_count += 1
             else:
                 skipped_count += 1
 
@@ -157,10 +176,20 @@ class LectureInstanceService:
         from app.services.activity_logs import log_activity
         from app.models.activity_logs.activity_log import ActorType, EntityType, ActionType
         action_type = ActionType.UPDATED
-        if bulk_in.attendance_status == AttendanceStatus.PRESENT:
-            action_type = ActionType.MARKED_PRESENT
-        elif bulk_in.attendance_status == AttendanceStatus.ABSENT:
-            action_type = ActionType.MARKED_ABSENT
+        activity_parts = []
+        if bulk_in.lecture_status is not None:
+            activity_parts.append(f"status as {bulk_in.lecture_status.value}")
+        if bulk_in.attendance_status is not None:
+            activity_parts.append(f"attendance as {bulk_in.attendance_status.value}")
+            if bulk_in.attendance_status == AttendanceStatus.PRESENT:
+                action_type = ActionType.MARKED_PRESENT
+            elif bulk_in.attendance_status == AttendanceStatus.ABSENT:
+                action_type = ActionType.MARKED_ABSENT
+
+        if not activity_parts:
+            activity_msg = f"Bulk updated classes on {bulk_in.lecture_date}."
+        else:
+            activity_msg = f"Bulk marked {updated_count} classes on {bulk_in.lecture_date} as " + " and ".join(activity_parts) + "."
 
         await log_activity(
             db=self.db,
@@ -168,7 +197,7 @@ class LectureInstanceService:
             entity_type=EntityType.ATTENDANCE,
             entity_id=bulk_in.semester_id,
             action_type=action_type,
-            activity_message=f"Bulk marked {updated_count} classes on {bulk_in.lecture_date} as {bulk_in.attendance_status.value}."
+            activity_message=activity_msg
         )
 
         await self.db.commit()

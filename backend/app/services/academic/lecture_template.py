@@ -15,7 +15,7 @@ from app.repositories.academic.lecture_instance import LectureInstanceRepository
 from app.repositories.academic.subject import SubjectRepository
 from app.repositories.academic.semester import SemesterRepository
 from app.repositories.academic.holiday import HolidayRepository
-from app.core.exceptions import NotFoundException, ConflictException
+from app.core.exceptions import NotFoundException, ConflictException, ValidationException
 
 logger = logging.getLogger("app.services.lecture_template")
 
@@ -189,6 +189,9 @@ class LectureTemplateService:
         new_start = template_in.start_time if template_in.start_time is not None else old_start
         new_end = template_in.end_time if template_in.end_time is not None else old_end
 
+        if new_start >= new_end:
+            raise ValidationException("start_time must be strictly before end_time")
+
         # Validate schedule uniqueness if day or start_time is changing
         if new_day != old_day or new_start != old_start:
             existing = await self.lecture_template_repo.get_by_schedule(
@@ -231,6 +234,10 @@ class LectureTemplateService:
 
                     await self.lecture_instance_repo.delete_future_instances(template_id, today)
 
+                    # Fetch remaining future instances to avoid duplicate generation conflict
+                    existing_instances = await self.lecture_instance_repo.list_by_template(template_id)
+                    existing_dates = {inst.lecture_date for inst in existing_instances}
+
                     # Holidays never create or delete lecture instances. They only change lecture_status.
                     holidays = await self.holiday_repo.get_by_semester_id(semester.semester_id)
                     holiday_dates = {h.holiday_date for h in holidays}
@@ -240,15 +247,16 @@ class LectureTemplateService:
                     current_date = generation_start
                     while current_date <= semester.end_date:
                         if current_date.isoweekday() == template.day_of_week:
-                            is_holiday = current_date in holiday_dates
-                            instances.append(
-                                LectureInstance(
-                                    lecture_template_id=template.lecture_template_id,
-                                    lecture_date=current_date,
-                                    lecture_status=LectureStatus.HOLIDAY if is_holiday else LectureStatus.SCHEDULED,
-                                    attendance_status=AttendanceStatus.UNMARKED,
+                            if current_date not in existing_dates:
+                                is_holiday = current_date in holiday_dates
+                                instances.append(
+                                    LectureInstance(
+                                        lecture_template_id=template.lecture_template_id,
+                                        lecture_date=current_date,
+                                        lecture_status=LectureStatus.HOLIDAY if is_holiday else LectureStatus.SCHEDULED,
+                                        attendance_status=AttendanceStatus.UNMARKED,
+                                    )
                                 )
-                            )
                         current_date += timedelta(days=1)
 
                     if instances:

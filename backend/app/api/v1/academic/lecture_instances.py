@@ -76,6 +76,8 @@ async def list_instances(
     end_date: date | None = Query(default=None, description="Filter by end date (inclusive)"),
     attendance_status: AttendanceStatus | None = Query(default=None, description="Filter by attendance status"),
     lecture_status: LectureStatus | None = Query(default=None, description="Filter by lecture status"),
+    limit: int | None = Query(default=None, ge=1, le=100, description="Page limit (1-100, optional)"),
+    offset: int | None = Query(default=None, ge=0, description="Page offset (>=0, optional)"),
     service: LectureInstanceService = Depends(get_lecture_instance_service)
 ):
     instances = await service.list_instances(
@@ -84,7 +86,9 @@ async def list_instances(
         start_date=start_date,
         end_date=end_date,
         attendance_status=attendance_status,
-        lecture_status=lecture_status
+        lecture_status=lecture_status,
+        limit=limit,
+        offset=offset
     )
     responses = [LectureInstanceDetailResponse.model_validate(inst) for inst in instances]
     return ApiResponse(

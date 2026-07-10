@@ -55,6 +55,20 @@ async def test_semester_repo_unique_constraint(db_session: AsyncSession):
     await db_session.rollback()
 
 
+@pytest.mark.asyncio
+async def test_semester_repo_date_order_constraint(db_session: AsyncSession):
+    repo = SemesterRepository(db_session)
+    sem = Semester(
+        semester_number=999,
+        start_date=date(2026, 6, 30),
+        end_date=date(2026, 6, 1)  # Invalid: start_date >= end_date
+    )
+    await repo.create(sem)
+    with pytest.raises(IntegrityError):
+        await db_session.flush()
+    await db_session.rollback()
+
+
 # ---------------------------------------------------------------------------
 # Service Tests
 # ---------------------------------------------------------------------------
@@ -292,3 +306,73 @@ async def test_api_create_overlapping_semester(client: AsyncClient):
     })
     assert overlap_res.status_code == 409
     assert overlap_res.json()["success"] is False
+
+
+@pytest.mark.asyncio
+async def test_api_update_semester_dates_regenerates_instances(client: AsyncClient, db_session: AsyncSession):
+    # 1. Create a semester (June 1 to June 15, 2026)
+    sem_res = await client.post("/api/v1/academic/semesters", json={
+        "semester_number": 99,
+        "start_date": "2026-06-01",
+        "end_date": "2026-06-15"
+    })
+    assert sem_res.status_code == 201
+    sem = sem_res.json()["data"]
+    sem_id = sem["semester_id"]
+
+    # 2. Create a subject
+    sub_res = await client.post("/api/v1/academic/subjects", json={
+        "semester_id": sem_id,
+        "subject_name": "Dynamic Sync Subject",
+        "faculty_name": "Dr. Sync",
+        "theme_color": "#FF0000",
+        "attendance_goal": 75
+    })
+    assert sub_res.status_code == 201
+    sub_id = sub_res.json()["data"]["subject_id"]
+
+    # 3. Create a template for Monday (day_of_week=1, 9:00 - 10:00)
+    # June 1, 2026 is Monday
+    # June 8, 2026 is Monday
+    # June 15, 2026 is Monday
+    tmpl_res = await client.post("/api/v1/academic/lecture-templates", json={
+        "subject_id": sub_id,
+        "day_of_week": 1,
+        "start_time": "09:00:00",
+        "end_time": "10:00:00",
+        "room": "Room 99"
+    })
+    assert tmpl_res.status_code == 201
+
+    # 4. Verify count of instances is 3
+    from app.models.academic.lecture_instance import LectureInstance
+    from sqlalchemy import select, func
+    res = await db_session.execute(select(func.count()).select_from(LectureInstance))
+    count = res.scalar()
+    assert count == 3
+
+    # 5. Extend semester to June 25, 2026 (adds June 22, 2026 - Monday)
+    update_res = await client.put(f"/api/v1/academic/semesters/{sem_id}", json={
+        "end_date": "2026-06-25"
+    })
+    assert update_res.status_code == 200
+
+    # Verify count is now 4
+    res = await db_session.execute(select(func.count()).select_from(LectureInstance))
+    count = res.scalar()
+    assert count == 4
+
+    # 6. Shrink semester to June 5 to June 15, 2026 (deletes June 1, 2026 - Monday)
+    # Remaining should be: June 8, June 15 (2 instances)
+    update_res = await client.put(f"/api/v1/academic/semesters/{sem_id}", json={
+        "start_date": "2026-06-05",
+        "end_date": "2026-06-15"
+    })
+    assert update_res.status_code == 200
+
+    # Verify count is now 2
+    res = await db_session.execute(select(func.count()).select_from(LectureInstance))
+    count = res.scalar()
+    assert count == 2
+
+

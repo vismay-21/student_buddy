@@ -15,6 +15,7 @@ class LectureCard extends StatelessWidget {
   final String statusMessage;
   final bool isAboveTarget;
   final Function(String action)? onActionChanged;
+  final VoidCallback? onEdit;
 
   const LectureCard({
     super.key,
@@ -28,6 +29,7 @@ class LectureCard extends StatelessWidget {
     this.statusMessage = '',
     this.isAboveTarget = true,
     this.onActionChanged,
+    this.onEdit,
   });
 
   @override
@@ -38,6 +40,8 @@ class LectureCard extends StatelessWidget {
     final Color cardColor = Color(lecture.colorValue);
     final Color ringColor = isAboveTarget ? AppTheme.accent : AppTheme.danger;
 
+    final bool canTap = !showAttendance && onEdit != null;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       color: cardBackground,
@@ -46,22 +50,25 @@ class LectureCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: borderColor, width: 1),
       ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [
-              cardColor.withOpacity(0.12),
-              cardColor.withOpacity(0.03),
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: canTap ? onEdit : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: [
+                cardColor.withOpacity(0.12),
+                cardColor.withOpacity(0.03),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Top Row: Time, Divider, Subject/Faculty/Room details, Ring (optional)
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -215,7 +222,7 @@ class LectureCard extends StatelessWidget {
                       statusMessage,
                       style: TextStyle(
                         color: isAboveTarget ? AppTheme.accent : AppTheme.danger,
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -224,13 +231,13 @@ class LectureCard extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildActionButton('clear', Icons.remove_circle_outline, isDark ? AppTheme.textMuted : Colors.black54),
+                      _buildActionButton(context, 'clear', Icons.remove_circle_outline, isDark ? AppTheme.textMuted : Colors.black54),
                       const SizedBox(width: 4),
-                      _buildActionButton('off', Icons.pause_circle_outline, AppTheme.warning),
+                      _buildActionButton(context, 'off', Icons.pause_circle_outline, AppTheme.warning),
                       const SizedBox(width: 4),
-                      _buildActionButton('missed', Icons.highlight_off, AppTheme.danger),
+                      _buildActionButton(context, 'missed', Icons.highlight_off, AppTheme.danger),
                       const SizedBox(width: 4),
-                      _buildActionButton('attended', Icons.check_circle_rounded, AppTheme.accent),
+                      _buildActionButton(context, 'attended', Icons.check_circle_rounded, AppTheme.accent),
                     ],
                   ),
                 ],
@@ -239,48 +246,65 @@ class LectureCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildActionButton(String action, IconData icon, Color color) {
+  Widget _buildActionButton(BuildContext context, String action, IconData icon, Color color) {
+    const Map<String, String> actionLabels = {
+      'clear': 'Clear',
+      'off': 'Day Off',
+      'missed': 'Missed',
+      'attended': 'Attended',
+    };
     final bool isSelected = currentAction == action;
+    final bool isClickable = onActionChanged != null;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
-      onTap: () {
-        if (onActionChanged != null) {
-          onActionChanged!(action);
-        }
-      },
+      onTap: isClickable
+          ? () {
+              onActionChanged!(action);
+            }
+          : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.symmetric(horizontal: isSelected ? 10 : 8, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.12) : Colors.transparent,
+          color: isSelected 
+              ? (isClickable ? color.withOpacity(0.12) : color.withOpacity(0.06)) 
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? color.withOpacity(0.5) : const Color(0xFF1E293B),
+            color: isSelected 
+                ? (isClickable ? color.withOpacity(0.5) : color.withOpacity(0.25)) 
+                : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)).withOpacity(isClickable ? 1.0 : 0.4),
             width: 1,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 15,
-              color: isSelected ? color : AppTheme.textMuted,
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 4),
-              Text(
-                action.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
+        child: Opacity(
+          opacity: isClickable ? 1.0 : (isSelected ? 0.75 : 0.25),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color: isSelected ? color : AppTheme.textMuted,
               ),
+              if (isSelected) ...[
+                const SizedBox(width: 4),
+                Text(
+                  actionLabels[action] ?? action,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

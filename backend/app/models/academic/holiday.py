@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime, date
-from sqlalchemy import ForeignKey, Date, String, DateTime, UniqueConstraint
+from datetime import datetime, date, timezone
+from sqlalchemy import ForeignKey, Date, String, DateTime, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -27,18 +27,19 @@ class Holiday(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 
     __table_args__ = (
         UniqueConstraint("semester_id", "holiday_date", name="uq_holiday_per_semester"),
+        Index("ix_holidays_semester_id_holiday_date", "semester_id", "holiday_date"),
     )
 
     # Relationships

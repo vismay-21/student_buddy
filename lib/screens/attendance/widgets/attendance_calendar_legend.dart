@@ -15,14 +15,17 @@ class AttendanceCalendarLegend extends StatelessWidget {
     final Color cardBackground = isDark ? AppTheme.surface : AppTheme.lightSurface;
     final Color borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
 
-    final Widget legendRow = Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final Widget legendRow = Wrap(
+      alignment: WrapAlignment.spaceEvenly,
+      spacing: 30,
+      runSpacing: 8,
       children: [
-        _legendItem('Attended', AppTheme.accent),
-        _legendItem('Missed', AppTheme.danger),
-        _legendItem('Off', AppTheme.warning),
+        _legendItem('Present', AppTheme.accent),
+        _legendItem('Absent', AppTheme.danger),
         _legendItem('Mixed', AppTheme.secondary),
-        _legendItem('No Data', AppTheme.textMuted),
+        _legendItem('Day Off', AppTheme.warning),
+        _legendItem('Holiday', const Color(0xFF0033FF)),
+        _legendItem('Not Marked', AppTheme.textMuted),
       ],
     );
 
@@ -45,7 +48,9 @@ class AttendanceCalendarLegend extends StatelessWidget {
   }
 
   Widget _legendItem(String label, Color color) {
-    return Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
           width: 8,
@@ -55,7 +60,7 @@ class AttendanceCalendarLegend extends StatelessWidget {
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(height: 4),
         Text(
           label,
           style: const TextStyle(

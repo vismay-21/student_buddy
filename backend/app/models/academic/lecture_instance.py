@@ -1,7 +1,7 @@
 import enum
 import uuid
-from datetime import datetime, date
-from sqlalchemy import ForeignKey, Date, DateTime, Enum
+from datetime import datetime, date, timezone
+from sqlalchemy import ForeignKey, Date, DateTime, Enum, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -9,7 +9,6 @@ from app.core.database import Base
 class LectureStatus(str, enum.Enum):
     SCHEDULED = "scheduled"
     HOLIDAY = "holiday"
-    CANCELLED = "cancelled"
 
 
 class AttendanceStatus(str, enum.Enum):
@@ -27,6 +26,10 @@ class MarkedBy(str, enum.Enum):
 class LectureInstance(Base):
     __tablename__ = "lecture_instances"
 
+    __table_args__ = (
+        UniqueConstraint("lecture_template_id", "lecture_date", name="uq_lecture_instance_template_date"),
+    )
+
     lecture_instance_id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
         default=uuid.uuid4,
@@ -38,7 +41,8 @@ class LectureInstance(Base):
     )
     lecture_date: Mapped[date] = mapped_column(
         Date,
-        nullable=False
+        nullable=False,
+        index=True
     )
     lecture_status: Mapped[LectureStatus] = mapped_column(
         Enum(LectureStatus, name="lecture_status"),
@@ -60,13 +64,13 @@ class LectureInstance(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 

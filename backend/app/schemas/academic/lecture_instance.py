@@ -54,7 +54,7 @@ class LectureInstanceUpdate(BaseModel):
     )
     lecture_status: LectureStatus | None = Field(
         default=None,
-        description="Updated lecture status (scheduled, holiday, cancelled)."
+        description="Updated lecture status (scheduled, holiday)."
     )
 
 
@@ -63,9 +63,13 @@ class LectureInstanceBulkUpdate(BaseModel):
         ...,
         description="Date of the classes to bulk mark."
     )
-    attendance_status: AttendanceStatus = Field(
-        ...,
-        description="Attendance status to apply (present, absent)."
+    attendance_status: AttendanceStatus | None = Field(
+        default=None,
+        description="Attendance status to apply (present, absent, unmarked)."
+    )
+    lecture_status: LectureStatus | None = Field(
+        default=None,
+        description="Lecture status to apply (scheduled, holiday)."
     )
     semester_id: uuid.UUID | None = Field(
         default=None,
@@ -80,7 +84,7 @@ class LectureInstanceBulkUpdateResponse(BaseModel):
     )
     skipped_count: int = Field(
         ...,
-        description="Number of lecture instances skipped (holidays, cancelled classes)."
+        description="Number of lecture instances skipped (holidays)."
     )
 
 
@@ -113,7 +117,6 @@ class AttendanceStatsResponse(BaseModel):
         ...,
         description="Dynamic user guidance message (e.g. 'can skip X lectures')."
     )
-    # TODO (Sprint 5): Populate this field from Attendance Settings.
     criteria_mode: CriteriaMode | None = Field(
         default=None,
         description="Attendance settings criteria mode (overall, subject, custom)."

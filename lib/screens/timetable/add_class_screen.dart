@@ -16,7 +16,10 @@ import '../../data/repositories/lecture_template_repository.dart';
 ///  - Begin / End time via system clock picker (dial mode)
 ///  - Color swatch popup
 class AddClassScreen extends StatefulWidget {
-  const AddClassScreen({super.key});
+  final LectureTemplateDto? template;
+  final SubjectDto? subject;
+
+  const AddClassScreen({super.key, this.template, this.subject});
 
   @override
   State<AddClassScreen> createState() => _AddClassScreenState();
@@ -64,6 +67,33 @@ class _AddClassScreenState extends State<AddClassScreen> {
   void initState() {
     super.initState();
     _loadSubjects();
+    _initEditFields();
+  }
+
+  void _initEditFields() {
+    if (widget.template != null && widget.subject != null) {
+      _subjectController.text = widget.subject!.subjectName;
+      _roomController.text = widget.template!.room ?? '';
+      _teacherController.text = widget.subject!.facultyName ?? '';
+      _selectedColor = parseHexColor(widget.subject!.themeColor).value;
+      _selectedDay = _days[widget.template!.dayOfWeek - 1];
+      
+      final startParts = widget.template!.startTime.split(':');
+      final endParts = widget.template!.endTime.split(':');
+      if (startParts.length >= 2) {
+        _beginTime = TimeOfDay(
+          hour: int.parse(startParts[0]),
+          minute: int.parse(startParts[1]),
+        );
+      }
+      if (endParts.length >= 2) {
+        _endTime = TimeOfDay(
+          hour: int.parse(endParts[0]),
+          minute: int.parse(endParts[1]),
+        );
+      }
+      _selectedSubject = widget.subject;
+    }
   }
 
   @override
@@ -309,46 +339,123 @@ class _AddClassScreenState extends State<AddClassScreen> {
     setState(() => _isLoadingSubjects = true);
 
     try {
-      String subjectId;
       final typedName = _subjectController.text.trim();
-      SubjectDto? match;
-      for (final s in _existingSubjects) {
-        if (s.subjectName.toLowerCase() == typedName.toLowerCase()) {
-          match = s;
-          break;
-        }
-      }
-
-      if (match != null) {
-        subjectId = match.subjectId;
-      } else {
-        final newSub = await _subjectRepo.createSubject(SubjectCreateRequest(
-          semesterId: activeSem.semesterId,
-          subjectName: typedName,
-          facultyName: _teacherController.text.trim().isEmpty ? null : _teacherController.text.trim(),
-          themeColor: toHexColor(_selectedColor),
-        ));
-        subjectId = newSub.subjectId;
-      }
-
-      await _templateRepo.createTemplate(LectureTemplateCreateRequest(
-        subjectId: subjectId,
-        dayOfWeek: dayIndex,
-        startTime: startStr,
-        endTime: endStr,
-        room: _roomController.text.trim().isEmpty ? null : _roomController.text.trim(),
-      ));
-
-      if (mounted) {
-        AppSnackbar.success(
-          context,
-          '"$typedName" added successfully.',
+      if (widget.template != null && widget.subject != null) {
+        // 1. Update Subject Details
+        await _subjectRepo.updateSubject(
+          widget.subject!.subjectId,
+          SubjectUpdateRequest(
+            subjectName: typedName,
+            facultyName: _teacherController.text.trim().isEmpty ? null : _teacherController.text.trim(),
+            themeColor: toHexColor(_selectedColor),
+          ),
         );
-        Navigator.of(context).pop();
+
+        // 2. Update Template Details
+        await _templateRepo.updateTemplate(
+          widget.template!.lectureTemplateId,
+          LectureTemplateUpdateRequest(
+            dayOfWeek: dayIndex,
+            startTime: startStr,
+            endTime: endStr,
+            room: _roomController.text.trim().isEmpty ? null : _roomController.text.trim(),
+          ),
+        );
+
+        if (mounted) {
+          AppSnackbar.success(
+            context,
+            '"$typedName" updated successfully.',
+          );
+          Navigator.of(context).pop(dayIndex - 1);
+        }
+      } else {
+        // Add mode
+        SubjectDto? match;
+        for (final s in _existingSubjects) {
+          if (s.subjectName.toLowerCase() == typedName.toLowerCase()) {
+            match = s;
+            break;
+          }
+        }
+
+        String subjectId;
+        if (match != null) {
+          subjectId = match.subjectId;
+        } else {
+          final newSub = await _subjectRepo.createSubject(SubjectCreateRequest(
+            semesterId: activeSem.semesterId,
+            subjectName: typedName,
+            facultyName: _teacherController.text.trim().isEmpty ? null : _teacherController.text.trim(),
+            themeColor: toHexColor(_selectedColor),
+          ));
+          subjectId = newSub.subjectId;
+        }
+
+        await _templateRepo.createTemplate(LectureTemplateCreateRequest(
+          subjectId: subjectId,
+          dayOfWeek: dayIndex,
+          startTime: startStr,
+          endTime: endStr,
+          room: _roomController.text.trim().isEmpty ? null : _roomController.text.trim(),
+        ));
+
+        if (mounted) {
+          AppSnackbar.success(
+            context,
+            '"$typedName" added successfully.',
+          );
+          Navigator.of(context).pop(dayIndex - 1);
+        }
       }
     } catch (e) {
       setState(() => _isLoadingSubjects = false);
-      _showError('Failed to add class: $e');
+      _showError('Failed to save class: $e');
+    }
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Class?'),
+        content: const Text(
+          'Are you sure you want to delete this class template from your timetable? '
+          'This will remove all future attendance instances of this class.',
+        ),
+        actions: [
+          TextButton(
+            child: const Text('CANCEL'),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('DELETE'),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _handleDelete();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleDelete() async {
+    if (widget.template == null) return;
+    setState(() => _isLoadingSubjects = true);
+    try {
+      await _templateRepo.deleteTemplate(widget.template!.lectureTemplateId);
+      if (mounted) {
+        AppSnackbar.success(context, 'Class deleted successfully.');
+        Navigator.of(context).pop(widget.template!.dayOfWeek - 1);
+      }
+    } catch (e) {
+      setState(() => _isLoadingSubjects = false);
+      _showError('Failed to delete class: $e');
     }
   }
 
@@ -368,7 +475,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Add Class'),
+        title: Text(widget.template != null ? 'Edit Class' : 'Add Class'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -382,7 +489,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
                 elevation: 0,
                 textStyle: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
               ),
-              child: const Text('ADD'),
+              child: Text(widget.template != null ? 'SAVE' : 'ADD'),
             ),
           ),
         ],
@@ -393,11 +500,13 @@ class _AddClassScreenState extends State<AddClassScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             // ── Template section ────────────────────────────────────────────
-            _SectionCard(
-              label: 'TEMPLATE',
-              children: [_buildTemplateRow()],
-            ),
-            const SizedBox(height: 16),
+            if (widget.template == null) ...[
+              _SectionCard(
+                label: 'TEMPLATE',
+                children: [_buildTemplateRow()],
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // ── Subject / Room / Teacher ────────────────────────────────────
             _SectionCard(
@@ -441,6 +550,23 @@ class _AddClassScreenState extends State<AddClassScreen> {
               label: 'APPEARANCE',
               children: [_buildColorRow()],
             ),
+            if (widget.template != null) ...[
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.danger,
+                  side: const BorderSide(color: AppTheme.danger, width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text(
+                  'DELETE CLASS',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.5),
+                ),
+                onPressed: _showDeleteConfirmation,
+              ),
+            ],
             const SizedBox(height: 32),
           ],
         ),
@@ -511,9 +637,11 @@ class _AddClassScreenState extends State<AddClassScreen> {
     required String hint,
     required IconData icon,
     bool required = false,
+    TextCapitalization textCapitalization = TextCapitalization.words,
   }) {
     return TextFormField(
       controller: controller,
+      textCapitalization: textCapitalization,
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: Icon(icon, size: 20, color: AppTheme.textMuted),

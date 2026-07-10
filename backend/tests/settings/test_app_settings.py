@@ -149,7 +149,7 @@ async def test_active_semester_invalid_uuid(client: AsyncClient):
         "active_semester_id": "not-a-valid-uuid"
     }
     response = await client.put("/api/v1/app-settings", json=payload)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     # Valid UUID structure but non-existent semester
     random_uuid = str(uuid.uuid4())
@@ -206,3 +206,27 @@ async def test_singleton_row_missing(db_session: AsyncSession, client: AsyncClie
     payload = {"theme_mode": "dark"}
     response_put = await client.put("/api/v1/app-settings", json=payload)
     assert response_put.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.asyncio
+async def test_update_settings_creates_activity_log(client: AsyncClient, db_session: AsyncSession):
+    from app.core.constants import SYSTEM_SETTINGS_UUID
+    from app.models.activity_logs.activity_log import ActivityLog, EntityType, ActionType
+    from sqlalchemy import select
+
+    # 1. Update settings
+    payload = {"theme_mode": "dark"}
+    response = await client.put("/api/v1/app-settings", json=payload)
+    assert response.status_code == status.HTTP_200_OK
+
+    # 2. Query ActivityLog directly
+    stmt = select(ActivityLog).where(
+        ActivityLog.entity_type == EntityType.SETTINGS,
+        ActivityLog.entity_id == SYSTEM_SETTINGS_UUID,
+        ActivityLog.action_type == ActionType.UPDATED
+    )
+    result = await db_session.execute(stmt)
+    logs = result.scalars().all()
+    assert len(logs) > 0
+    assert logs[0].activity_message == "Updated global application settings."
+

@@ -13,6 +13,9 @@ from app.services.activity_logs.activity_log import ActivityLogService
 router = APIRouter()
 
 
+from app.schemas.common import ApiResponse
+
+
 async def get_activity_log_service(db: AsyncSession = Depends(get_db)) -> ActivityLogService:
     return ActivityLogService(
         db=db,
@@ -20,7 +23,7 @@ async def get_activity_log_service(db: AsyncSession = Depends(get_db)) -> Activi
     )
 
 
-@router.get("/", response_model=List[ActivityLogResponse])
+@router.get("", response_model=ApiResponse[List[ActivityLogResponse]])
 async def list_activity_logs(
     actor_type: Optional[ActorType] = Query(None, description="Filter by actor type"),
     entity_type: Optional[EntityType] = Query(None, description="Filter by entity type"),
@@ -33,7 +36,7 @@ async def list_activity_logs(
     limit: int = Query(50, ge=1, le=100, description="Page limit (1-100)"),
     offset: int = Query(0, ge=0, description="Page offset (>=0)"),
     service: ActivityLogService = Depends(get_activity_log_service)
-) -> List[ActivityLogResponse]:
+) -> ApiResponse[List[ActivityLogResponse]]:
     """
     Retrieves the activity logs timeline based on query parameters and filters.
     """
@@ -49,15 +52,26 @@ async def list_activity_logs(
         limit=limit,
         offset=offset
     )
-    return list(logs)
+    responses = [ActivityLogResponse.model_validate(log) for log in logs]
+    return ApiResponse(
+        success=True,
+        message="Activity logs retrieved successfully.",
+        data=responses
+    )
 
 
-@router.get("/{activity_id}", response_model=ActivityLogResponse)
+@router.get("/{activity_id}", response_model=ApiResponse[ActivityLogResponse])
 async def get_activity_log(
     activity_id: uuid.UUID = Path(..., description="The ID of the activity log to retrieve"),
     service: ActivityLogService = Depends(get_activity_log_service)
-) -> ActivityLogResponse:
+) -> ApiResponse[ActivityLogResponse]:
     """
     Retrieves a single activity log by its ID.
     """
-    return await service.get_log(activity_id)
+    log = await service.get_log(activity_id)
+    return ApiResponse(
+        success=True,
+        message="Activity log retrieved successfully.",
+        data=ActivityLogResponse.model_validate(log)
+    )
+

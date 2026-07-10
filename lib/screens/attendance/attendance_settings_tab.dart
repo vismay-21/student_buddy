@@ -9,7 +9,6 @@ class AttendanceSettingsTab extends StatelessWidget {
   final DateTime semesterEndDate;
   final List<Map<String, dynamic>> holidays;
   final Map<String, int> subjectCustomTargets;
-  final String defaultDaysOff; // 'None', 'Sunday Only', 'Saturday & Sunday'
   
   final Function(String mode) onCriteriaModeChanged;
   final Function(int percentage) onTargetPercentageChanged;
@@ -18,7 +17,6 @@ class AttendanceSettingsTab extends StatelessWidget {
   final Function(String name, DateTime date) onHolidayAdded;
   final Function(String holidayId) onHolidayDeleted;
   final Function(String subjectName, int target) onSubjectCustomTargetChanged;
-  final Function(String daysOff) onDefaultDaysOffChanged;
 
   const AttendanceSettingsTab({
     super.key,
@@ -28,7 +26,6 @@ class AttendanceSettingsTab extends StatelessWidget {
     required this.semesterEndDate,
     required this.holidays,
     required this.subjectCustomTargets,
-    required this.defaultDaysOff,
     required this.onCriteriaModeChanged,
     required this.onTargetPercentageChanged,
     required this.onSemesterStartDateChanged,
@@ -36,7 +33,6 @@ class AttendanceSettingsTab extends StatelessWidget {
     required this.onHolidayAdded,
     required this.onHolidayDeleted,
     required this.onSubjectCustomTargetChanged,
-    required this.onDefaultDaysOffChanged,
   });
 
   @override
@@ -176,28 +172,47 @@ class AttendanceSettingsTab extends StatelessWidget {
                     ],
 
                     const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Criteria Percentage',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                    IgnorePointer(
+                      ignoring: criteriaMode == 'custom',
+                      child: Opacity(
+                        opacity: criteriaMode == 'custom' ? 0.38 : 1.0,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Criteria Percentage',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                                ),
+                                Text(
+                                  '$targetPercentage%',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                ),
+                              ],
+                            ),
+                            Slider(
+                              value: targetPercentage.toDouble(),
+                              min: 50,
+                              max: 100,
+                              divisions: 10,
+                              label: '$targetPercentage%',
+                              onChanged: (val) {
+                                onTargetPercentageChanged(val.toInt());
+                              },
+                            ),
+                            if (criteriaMode == 'custom')
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2, bottom: 4),
+                                child: Text(
+                                  'Not used in Custom mode — configure individual targets below.',
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                ),
+                              ),
+                          ],
                         ),
-                        Text(
-                          '$targetPercentage%',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                        ),
-                      ],
-                    ),
-                    Slider(
-                      value: targetPercentage.toDouble(),
-                      min: 50,
-                      max: 100,
-                      divisions: 10, // Gives steps/jumps of 5% (50, 55, 60, ..., 100)
-                      label: '$targetPercentage%',
-                      onChanged: (val) {
-                        onTargetPercentageChanged(val.toInt());
-                      },
+                      ),
                     ),
                   ],
                 ),
@@ -205,50 +220,7 @@ class AttendanceSettingsTab extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Default Days Off Section
-            _buildSectionHeader('DEFAULT DAYS OFF'),
-            const SizedBox(height: 10),
-            Card(
-              color: cardBackground,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: borderColor),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: ['None', 'Sunday Only', 'Saturday & Sunday'].map((option) {
-                        final bool isSelected = defaultDaysOff == option;
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                            child: ChoiceChip(
-                              label: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  option,
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                if (selected) {
-                                  onDefaultDaysOffChanged(option);
-                                }
-                              },
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
+
 
             // Semester Duration
             _buildSectionHeader('SEMESTER DURATION'),

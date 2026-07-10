@@ -11,7 +11,7 @@ from app.models.academic.subject import Subject
 from app.models.academic.lecture_template import LectureTemplate
 from app.models.academic.lecture_instance import LectureInstance, LectureStatus, AttendanceStatus, MarkedBy
 from app.models.academic.attendance_settings import AttendanceSettings, CriteriaMode
-from app.models.todo.todo import Todo, TodoCategory, TodoPriority, TodoStatus, TodoCreatedBy
+from app.models.todo.todo import Todo, TodoPriority, TodoStatus, TodoCreatedBy
 from app.models.review_queue.review_queue import ReviewQueue, ReviewType, EntityType, ReviewStatus, ResolvedBy
 from app.repositories.academic.semester import SemesterRepository
 from app.repositories.academic.subject import SubjectRepository
@@ -92,7 +92,6 @@ async def test_todo(db_session: AsyncSession) -> Todo:
     repo = TodoRepository(db_session)
     todo = Todo(
         title="Study Virtual Memory",
-        category=TodoCategory.ACADEMIC,
         priority=TodoPriority.HIGH,
         status=TodoStatus.PENDING,
         created_by=TodoCreatedBy.USER,
@@ -120,7 +119,7 @@ def make_review(entity_type: EntityType, entity_id: uuid.UUID, message: str, **k
         review_message=message,
         review_status=ReviewStatus.PENDING,
         resolved_by=ResolvedBy.USER,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     defaults.update(kwargs)
     return ReviewQueue(**defaults)
@@ -229,10 +228,10 @@ async def test_lecture_instance_resolver_resolve_success(
 
 
 @pytest.mark.asyncio
-async def test_lecture_instance_resolver_rejects_present_on_cancelled(
+async def test_lecture_instance_resolver_rejects_present_on_holiday(
     db_session: AsyncSession, test_lecture_instance: LectureInstance
 ):
-    test_lecture_instance.lecture_status = LectureStatus.CANCELLED
+    test_lecture_instance.lecture_status = LectureStatus.HOLIDAY
     await LectureInstanceRepository(db_session).update(test_lecture_instance)
     await db_session.flush()
 
@@ -250,7 +249,7 @@ async def test_get_item_returns_entity_summary(
     db_session: AsyncSession, review_queue_service: ReviewQueueService, test_todo: Todo
 ):
     repo = ReviewQueueRepository(db_session)
-    r = make_review(EntityType.TODO, test_todo.todo_id, "Missing todo category")
+    r = make_review(EntityType.TODO, test_todo.todo_id, "Missing todo details")
     await repo.create(r)
     await db_session.flush()
 
@@ -337,7 +336,7 @@ async def test_list_pagination_offset(db_session: AsyncSession, test_todo: Todo)
             EntityType.TODO,
             test_todo.todo_id,
             f"Offset Item {i}",
-            created_at=datetime.utcnow() - timedelta(minutes=10 - i)
+            created_at=datetime.now(timezone.utc) - timedelta(minutes=10 - i)
         )
         await repo.create(r)
     await db_session.flush()
@@ -406,8 +405,8 @@ async def test_resolve_already_resolved_throws(
         review_message="Study help",
         review_status=ReviewStatus.RESOLVED,
         resolved_by=ResolvedBy.USER,
-        created_at=datetime.utcnow(),
-        resolved_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        resolved_at=datetime.now(timezone.utc)
     )
     await repo.create(r)
     await db_session.flush()
@@ -482,16 +481,16 @@ async def test_api_list_pagination(
 @pytest.mark.asyncio
 async def test_api_list_limit_out_of_range(client: AsyncClient):
     response = await client.get("/api/v1/review-queue?limit=200")
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     response = await client.get("/api/v1/review-queue?limit=0")
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio
 async def test_api_list_negative_offset(client: AsyncClient):
     response = await client.get("/api/v1/review-queue?offset=-1")
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio

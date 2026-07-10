@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'widgets/attendance_overview_card.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/color_helper.dart';
 import '../../../core/utils/dummy_data.dart';
@@ -68,6 +67,8 @@ class SubjectsTab extends StatelessWidget {
                         subjectId: sub['id'] as String,
                         subjectName: sub['name'] as String,
                         criteriaPercentage: sub['target'] as int,
+                        facultyName: sub['faculty'] as String? ?? 'Faculty TBD',
+                        roomName: sub['room'] as String? ?? 'Room TBD',
                         onLectureActionChanged: onLectureActionChanged,
                       ),
                     ),
@@ -135,12 +136,12 @@ class SubjectsTab extends StatelessWidget {
                     fontSize: 15,
                   ),
                 ),
-                const SizedBox(height: 4),
                 Text(
-                  'Criteria: ${sub['target']}% • Attended: ${sub['attended']}/${sub['total']}',
+                  'Attended: ${sub['attended']}/${(sub['attended'] as int) + (sub['absent'] as int)} • Total Lectures: ${sub['total']}',
                   style: TextStyle(
                     color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
-                    fontSize: 12,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),

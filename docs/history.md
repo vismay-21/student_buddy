@@ -853,3 +853,420 @@ This log tracks architectural decisions, feature implementations, and refinement
   - Updated `docs/context.md` and `docs/history.md` to record the completion of the business logic audit, preparing the codebase structure for Sprint 13 (Authentication).
 * **Verification**:
   - Ran the full backend test suite (`venv/bin/pytest`); all 160 unit and integration tests passed successfully.
+
+---
+
+## 2026-07-07 (Phase 3: Todo Module Refactoring — Category Feature Removal)
+
+### Decisions
+1. **Architectural Simplification**: Remove the Todo "Category" feature completely across all layers of the application to reduce feature bloat and align the task management module with core focus.
+2. **Database Cleanliness**: Drop the `category` column and `todo_category` enum type from the database via an Alembic migration to ensure the schema remains clean.
+3. **UI/UX Streamlining**: Remove all category chips, custom category inputs, dialog prompts, and label renderings from the Flutter frontend to keep the user interface simple and clean.
+
+### Implementation Details
+* **Backend Refactoring**:
+  - Removed `TodoCategory` enum and the `category` column from the `Todo` database model.
+  - Dropped `category` from Pydantic schemas (`TodoBase`, `TodoCreate`, `TodoUpdate`, `TodoResponse`).
+  - Removed category parameter, filtering, and assignment logic from `TodoRepository` and `TodoService`.
+  - Refactored `TodoResolver` in the Review Queue module to remove category updates.
+  - Removed category query parameter and references from the GET `/api/v1/todos` endpoint in `todos.py`.
+* **Database Migration**:
+  - Generated and executed Alembic migration `9a79ee8c5960` dropping the `category` column and `todo_category` ENUM type from PostgreSQL.
+* **Frontend Refactoring**:
+  - Updated `TodoDto`, `TodoCreateRequest`, and `TodoUpdateRequest` in `todo_dto.dart` to drop category properties and JSON serialization logic.
+  - Removed category parameter from `TodoApi` and `TodoRepository` client interfaces.
+  - Overhauled `AddTodoScreen` to remove custom category text controllers, Chip choice lists, dialog helper popups, and the Category Selector Card widget from the UI form.
+  - Overhauled `TodoScreen` to remove the category subtitle rendering from the task listing card layout.
+  - Overhauled `ReviewQueueEditScreen` to drop the category dropdown selector from the Todo resolution fields and resolution data mapping.
+* **Test Suite Updates**:
+  - Refactored backend tests in `tests/todo/test_todos.py` and `tests/review_queue/test_review_queue.py` to remove category variables, query filters, and assertions.
+* **Verification**:
+  - Verified backend test suite successfully passed all 161 unit and integration tests.
+  - Verified frontend static code analysis passed with 0 compilation errors using `flutter analyze`.
+
+---
+
+## 2026-07-07 (Phase 3: Attendance History Refactoring — Dynamic Day Off & Holiday Indicator)
+
+### Decisions
+1. **Dynamic Day Off Calculations**: Removed the legacy client-side "Default Days Off" settings completely and replaced them with runtime-derived calculations based on timetable configuration (`LectureTemplate` records). A day is a default day off if and only if no classes/lecture templates are scheduled for that weekday.
+2. **Dedicated Holiday Indicator**: Added a dedicated "Holiday" (Dark Blue) calendar dot and legend entry to visually distinguish official school holidays from regular days off. Holidays override default day off indicators.
+3. **Clean Codebase and UI/UX**: Removed the "Default Days Off" cards, parameters, and references from the Attendance Settings screen, History Tab calendar constructor, and `AppState` properties.
+
+### Implementation Details
+* **Frontend Refactoring**:
+  - Removed `defaultDaysOff` notifier from `lib/core/utils/app_state.dart`.
+  - Updated `getCalculatedSubjects()` to compute default days off dynamically using `DummyData.getLecturesForDay(date.weekday - 1).isEmpty` for mock datasets.
+  - Removed `defaultDaysOff` fields, parameters, and settings widgets from `lib/screens/attendance/attendance_screen.dart` and `lib/screens/attendance/attendance_settings_tab.dart` (removing the ChoiceChips section entirely).
+  - Modified `_getDateStatus(DateTime date)` in `lib/screens/attendance/history_tab.dart` to check if a date is a Holiday (returning `'holiday'`), if its weekday has no lecture templates scheduled (returning `'default_day_off'`), or if it is a future scheduled class day without attendance marked (returning `'future'`).
+  - Updated calendar dot coloring switch-case in `HistoryTab` to map `'holiday'` to Dark Blue (`Color(0xFF1E3A8A)`), `'default_day_off'` to Yellow (`AppTheme.warning`), and `'future'`/`'cancelled'` to Grey (`AppTheme.textMuted`).
+  - Updated `lib/screens/attendance/widgets/attendance_calendar_legend.dart` to present: Present (Green), Absent (Red), Default Day Off (Yellow), Holiday (Dark Blue), and Future (Grey).
+* **Verification**:
+  - Verified compilation cleanliness using `flutter analyze` (no compile errors).
+
+---
+
+## 2026-07-08 (Phase 3: Timetable Management, Holiday Integration, and Calendar Logic Refinements)
+
+### Decisions
+1. **Class Editing and Deletion Flow**: Provide a way to edit or delete scheduled classes from the Timetable view. Add an edit pencil icon to timetable cards that opens the `AddClassScreen` pre-filled with the existing lecture template and subject details. Add a "DELETE CLASS" button with confirmations to remove templates.
+2. **Strict Calendar Status Logic**: Reserve the blue dot (bright dark blue color) strictly for official university holidays.
+3. **Day Off Mapping**: When all lectures of a particular day are marked as a day off, color that calendar dot yellow (Day Off status). If only some classes are day off and others are attended/missed, color the dot purple (Mixed status).
+4. **Calendar Visual Layout**: Hide dots for calendar days outside the active semester date range to prevent offset layouts. Use a responsive `Wrap` for the legend to accommodate the new statuses.
+5. **Dynamic Holiday Banner**: Display the custom name of the university holiday on the day logs subscreen (`DayHistoryScreen`) when clicking on a holiday date.
+6. **Redundant Data and Status Removal**: Remove all unused `cancelled` and `future` statuses/code blocks from all frontend views, database models, schemas, and repositories.
+
+### Implementation Details
+* **Timetable Edit & Delete Flow**:
+  - `lib/screens/attendance/widgets/lecture_card.dart`: Added `onEdit` callback parameter and integrated a pencil icon button shown when `showAttendance` is false.
+  - `lib/screens/timetable/timetable_screen.dart`: Wired the callback to push the `AddClassScreen` pre-populated with active subject and template data.
+  - `lib/screens/timetable/add_class_screen.dart`: Added logic to process existing templates. Updated AppBar headers to display "Edit Class" when in edit mode. Configured the form to hide the Template selection card. Appended a confirmation-alerted "DELETE CLASS" button at the bottom of the form.
+* **Attendance Calendar Refinement**:
+  - `lib/screens/attendance/history_tab.dart`: Refactored `_getDateStatus` logic. If a day is a university holiday, return `'holiday'`. If all lectures on that day are marked day off, return `'day_off'`. If there is a mix of day-off and attendance markings, return `'mixed'`. If there are no scheduled lectures, return `'no_classes'`.
+  - Hidden calendar dot rendering for cells outside the semester date range.
+  - Updated calendar dot coloring to map `'holiday'` to bright dark blue (`Color(0xFF0033FF)`), `'day_off'` to yellow (`AppTheme.warning`), and `'mixed'` to purple (`AppTheme.secondary`).
+  - Implemented dynamic calendar card height sizing using `AnimatedContainer` that dynamically calculates the required height based on the number of calendar rows in the active month (`128 + rowCount * 48`) to ensure no empty space and zero legend overlap on all devices.
+  - `lib/screens/attendance/widgets/attendance_calendar_legend.dart`: Refactored layout to use a responsive `Wrap` widget. Changed legend items to Column layout (dots above, text below) so they align beautifully on a single row, and updated the Holiday dot to a bright dark blue.
+* **University Holiday Banner**:
+  - `lib/screens/attendance/day_history_screen.dart`: Imported `HolidayRepository` and fetched the list of active semester holidays during initialization. Added a themed banner containing the holiday's official name right below the date header if the clicked date matches a university holiday.
+* **Redundant Code Removal**:
+  - Cleaned up and removed all unused instances/references of `cancelled` and `future` statuses across frontend screens (Overview, Day History, History Tab, etc.) and backend files.
+* **Verification**:
+  - Ran `pytest` to confirm all 161 backend tests passed successfully.
+
+### **Sprint 12/13: Dynamic Boundaries, Off/Holiday Labeling & Holiday Action Lockout**
+* **Dynamic Month Total Days**:
+  - `lib/screens/attendance/history_tab.dart`: Restricted monthly `totalDays` counting to only the days of the month falling strictly within the semester range (`widget.semesterStartDate` to `widget.semesterEndDate`).
+* **Consolidated Off/Holiday Labeling**:
+  - `lib/screens/attendance/history_tab.dart` (Semester Statistics Dialog) & `lib/screens/attendance/widgets/attendance_analytics_card.dart` (Consolidated Analytics Card): Renamed the statistics display labels from "Off" to "Off/Holiday".
+* **University Holiday Action Lockout**:
+  - `lib/screens/attendance/day_history_screen.dart`: Prevented bulk whole-day updates and individual lecture updates when the active day is a University Holiday. Faded bulk buttons (`0.35` opacity) and disabled tapping.
+  - `lib/screens/attendance/widgets/lecture_card.dart`: Modified action buttons to display with disabled, low-opacity styles when update callbacks are null, locking the active status as "Day Off/Holiday" (`0.75` opacity) while fading other options (`0.25` opacity) and blocking click actions.
+
+---
+
+## 2026-07-08 (Phase 3: Attendance Analytics Modernization & Backend Integration)
+
+### Decisions
+1. **Direct Backend Integration**: Connect `AttendanceScreen` to dynamically load and broadcast statistics to the `HistoryTab` and `SubjectsTab` dashboards, replacing all residual static calculations or mock maps.
+2. **Dashboard UI Refinement**: Remove redundant "Criteria" labels on `SubjectsTab` card displays (as criteria is already presented within the progress rings). Keep classroom and faculty details exclusively inside the `SubjectHistoryScreen` to declutter the main subjects list.
+3. **Simplified Subject Instance View**: Replace the legacy `LectureCard` container inside the `SubjectHistoryScreen` list view with a simplified row showing only the class time range and 4 action buttons (Clear, Day Off, Missed, Attended) to avoid UI clutter.
+4. **All 4 Bulk Actions**: Expand bulk actions on the main `OverviewScreen` from the legacy 2 actions to the full set of 4 core actions (Clear, Day Off, Missed, Attended).
+5. **Holiday Protection & Feedback**: Enforce strict locks that disable all bulk actions and individual update buttons on days marked as university holidays on both `OverviewScreen` and `SubjectHistoryScreen`. Present a clear "University Holiday" banner on the Overview Screen (analogous to the Day History logs view) explaining why actions are disabled.
+6. **Progress Ring UI Consistency**: Refactor the custom CircularProgressIndicator in `SubjectHistoryScreen`'s header card to match the custom `_RingPainter` and `AttendanceRingLabel` styling used in `lecture_card.dart` for visual consistency across all attendance rings.
+
+### Implementation Details
+* **Frontend Syncing**:
+  - Wired `AttendanceScreen` to pull stats using `LectureInstanceRepository.getSubjectStats(...)` and compute the overall attendance average across all subjects using: `(totalPresent / (totalPresent + totalAbsent)) * 100`.
+  - Passed dynamic stats parameters directly down to `HistoryTab` and `SubjectsTab`.
+* **Subjects Tab & Card Polish**:
+  - Removed criteria string label from `SubjectsTab` card view.
+  - Removed Faculty name and Classroom metadata row from `SubjectsTab` cards.
+  - Standardized the stats text block to `"Attended: X/Y • Total Lectures: Z"`.
+  - Restored `import 'dart:math' as math;` in `subjects_tab.dart` for circular progress ring drawing.
+* **Subject History Screen Refactoring**:
+  - Added faculty and room name arguments to the screen constructor to populate the summary card.
+  - Replaced the list layout of `LectureCard` components with a custom Row containing a time text column and an action buttons row.
+  - Replaced flat `CircularProgressIndicator` inside header card with the custom `_RingPainter` and `AttendanceRingLabel` to display criteria target and percentage in a consistent fraction layout (`current/target %`).
+  - Implemented holiday checks and locked updates.
+* **Overview Screen Upgrades**:
+  - Connected Today's Classes metrics to the database.
+  - Replaced 2-button bulk panel with 4-button quick bar.
+  - Checked for and stored `_holidayToday` in local state. If today is a holiday, rendered the Blue "University Holiday" banner at the top of the Today's Classes section and disabled bulk/individual attendance actions.
+
+---
+
+## 2026-07-08 (LectureCard Action Button UI Polish)
+---
+
+## 2026-07-08 (LectureCard & Bulk Action Buttons UI Polish & Spacing Alignment)
+
+### Decisions
+1. **Title Case Action Labels**: Align individual lecture card actions with bulk actions (e.g. `"Attended"` instead of `"ATTENDED"`, `"Day Off"` instead of `"OFF"`).
+2. **Icon Size Alignment**: Standardize all icon sizes in action buttons (both bulk action bars and individual lecture card buttons) to `15`.
+3. **Bulk Button Consistency**: Match the styling, margins, padding, and spacing of the bulk action panel on the Day History logs view exactly to the Overview Screen bulk action panel.
+4. **Attendance Decimal Precision**: Render all history screen attendance stats percentages to two decimal places (e.g. `X.XX%`) for maximum clarity and detail.
+
+### Implementation Details
+* `lib/screens/attendance/widgets/lecture_card.dart`:
+  - Retained/set the action button icon size to `15`.
+  - Replaced `action.toUpperCase()` with a title-case label map (`'clear' → 'Clear'`, `'off' → 'Day Off'`, `'missed' → 'Missed'`, `'attended' → 'Attended'`) to match the style of the bulk action panel.
+* `lib/screens/overview/overview_screen.dart`:
+  - Increased the bulk action button icon size from `13` to `15` to match the new standardized size.
+* `lib/screens/attendance/day_history_screen.dart`:
+  - Increased the bulk action button icon size from `13` to `15`.
+  - Adjusted the inner icon-to-text gap width from `3` to `4` to align with the Overview Screen bulk button spacing.
+* `lib/screens/attendance/widgets/attendance_analytics_card.dart`:
+  - Formatted the overall average attendance percentage using `toStringAsFixed(2)` to display two decimal places.
+* `lib/screens/attendance/history_tab.dart`:
+  - Updated the semester stats dialog popup stats row for the active semester attendance average to format with `toStringAsFixed(2)`.
+---
+
+## 2026-07-08 (Attendance Settings — Custom Mode Bug Fixes)
+
+### Decisions
+1. **Faded/Disabled Criteria Percentage in Custom Mode**: When criteria mode is `custom`, the Criteria Percentage slider has no meaning (each subject has its own goal). The slider and label should be visually faded and non-interactive to prevent confusion.
+2. **Seed Subjects on Custom Mode Switch**: When a user switches from `overall` or `subject_wise` to `custom`, all subjects should be pre-initialized to the current `targetPercentage` as a starting baseline. Previously, subjects retained stale/default values which did not reflect the user's intent.
+
+### Implementation Details
+* `lib/screens/attendance/attendance_settings_tab.dart`:
+  - Wrapped the Criteria Percentage row and `Slider` inside an `IgnorePointer` + `Opacity(opacity: 0.38)` when `criteriaMode == 'custom'`.
+  - Added a helper hint text below the slider reading *"Not used in Custom mode — configure individual targets below."* when mode is `'custom'`.
+* `lib/screens/attendance/attendance_screen.dart`:
+  - In `_updateCriteriaMode`, added a guard: when the new mode is `'custom'`, iterate all subjects in `_subjectsList` and call `_updateSubjectCustomTarget(name, targetPercentage)` for each, seeding them to the current overall target before `_loadStats()` runs.
+
+---
+
+## 2026-07-08 (Timetable Card Tap-To-Edit Redesign)
+
+### Decisions
+1. **Interactive Timetable Cards**: Instead of showing a cluttered/awkward edit icon on each subject card, make the entire card tappable (using a standard Material `InkWell` ripple effect) on the Timetable screen to open the edit sheet. This removes visual noise while providing an intuitive, full-card interactive target.
+
+### Implementation Details
+* `lib/screens/attendance/widgets/lecture_card.dart`:
+  - Wrapped the card's child container inside an `InkWell` with `borderRadius: BorderRadius.circular(16)`.
+  - Configured `onTap` to execute the `onEdit` callback only when `!showAttendance && onEdit != null` is true.
+  - Completely removed the redundant edit icon button from the top-right of the card structure.
+
+---
+
+## 2026-07-08 (Audit No 1: MVP Architecture Audit & Timezone Standardization)
+
+### Decisions
+1. **Audit Documentation Structure**: Created a dedicated audit documentation structure under `docs/audit/` consisting of 10 audit stubs/reports and a master dashboard `docs/audit/audit_summary.md`.
+2. **Audit 1 (Architecture) Decisions**:
+   - Standardized timezone usage across the backend from `datetime.utcnow()` to timezone-aware `datetime.now(timezone.utc)`.
+   - Deferred standardized repository Dependency Injection style across FastAPI router constructors (keep as-is for now, stable/tested).
+   - Rejected proposal to remove `/app/dependencies/database.py` (maintain it as an abstraction boundary for authentication middleware).
+3. **Timezone Standardization**: Replaced deprecated `datetime.utcnow()` with timezone-aware `datetime.now(timezone.utc)` across all models, repositories, services, utilities, and tests to future-proof date formatting and eliminate pytest warnings.
+
+### Implementation Details
+* `docs/audit/`:
+  - Created `audit_01_architecture.md` containing the full Architecture Audit report with a Health Score of **94/100**.
+  - Created `audit_summary.md` tracking overall audit status, health scores, and deferred/rejected findings.
+  - Created placeholders `audit_02_database.md` through `audit_10_production_readiness.md`.
+* `backend/app/services/review_queue/review_queue.py`:
+  - Replaced `datetime.utcnow()` with `datetime.now(timezone.utc)`.
+* `backend/app/models/`:
+  - Replaced `datetime.utcnow` with `lambda: datetime.now(timezone.utc)` defaults across `ActivityLog`, `ReviewQueue`, `NotesSection`, `NotesSubject`, `AppSettings`, `Todo`, `LectureInstance`, `AttendanceSettings`, `LectureTemplate`, `Subject`, `Semester`, `Holiday`, and `NotesResource` models.
+* `backend/tests/review_queue/test_review_queue.py`:
+  - Replaced test queue item construction `datetime.utcnow()` calls with `datetime.now(timezone.utc)`.
+
+---
+
+## 2026-07-09 (Audit No 2: MVP Database Audit & Remediation)
+
+### Decisions
+1. **Remediation Plan Approval**: Approved and implemented remediation items for the Database Audit (Audit 02), boosting the post-remediation health score from **88/100** to **98/100**.
+2. **Lecture Instance Integrity**: Added database-level unique constraint to block duplicate instances for the same template on the same date.
+3. **Semester Integrity**: Added check constraint verifying that `start_date < end_date`.
+4. **Performance Improvements**: Added index on `holidays(semester_id, holiday_date)` and indexes on `todos` for `status` and `due_datetime`.
+5. **Deferred Items**:
+   - Deferred enum casing alignment (lowercase in Python / uppercase in PostgreSQL enums) to avoid schema churn, as serialization/mapping layers seamlessly handle translation.
+   - Deferred updating historical migrations containing Postgres-specific `NOW()` seed calls.
+
+### Implementation Details
+* **SQLAlchemy Model Updates**:
+  - `backend/app/models/academic/lecture_instance.py`: Added unique constraint `uq_lecture_instance_template_date`.
+  - `backend/app/models/academic/semester.py`: Added check constraint `semester_date_order`.
+  - `backend/app/models/academic/holiday.py`: Added index `ix_holidays_semester_id_holiday_date`.
+  - `backend/app/models/todo/todo.py`: Added `index=True` to `status` and `due_datetime` columns.
+* **Alembic Migrations**:
+  - Created and executed migration `5c85b9ed5223_remediate_database_audit_02.py` containing unique constraint, check constraint, and indexes.
+* **Test Suite Updates**:
+  - `backend/tests/academic/test_lecture_instances.py`: Updated `test_service_mark_whole_day` to use two separate templates to satisfy the new unique constraint.
+  - `backend/tests/academic/test_semesters.py`: Added unit test `test_semester_repo_date_order_constraint` to verify CheckConstraint.
+* **Documentation**:
+  - `docs/database/1_database_schema.md`: Removed obsolete `file_extension` column and added missing values (`ocr`, `review_queue`, `api`) to `uploaded_via` enum.
+  - `docs/audit/audit_02_database.md` & `docs/audit/audit_summary.md`: Documented resolutions and updated health score to **98/100**.
+
+---
+
+## 2026-07-09 (Audit No 3: MVP Business Logic Audit & Remediation)
+
+### Decisions
+1. **Remediation Plan Approval**: Approved and implemented remediation items for the Business Logic Audit (Audit 03), boosting the post-remediation health score from **90/100** to **98/100**.
+2. **Lecture Rescheduling Conflict**: Avoid `IntegrityError` by filtering out template dates where future instances have already been generated/retained.
+3. **Chronological Validity**: Enforce `new_start < new_end` on all partial template updates in the service layer to prevent time range inversion.
+4. **N+1 Performance Improvements**: Batch-query lecture instances and dates in a single database roundtrip, optimizing statistic calculations and semester date changes.
+5. **Deferred Items**:
+   - Deferred N+1 queries in polymorphic entity log/review-queue summaries, as pagination limits performance impact and will be addressed in a future general performance sweep.
+
+### Implementation Details
+* **Academic Services**:
+  - `backend/app/services/academic/lecture_template.py`: Added chronological validation check inside `update_template` and retrieved existing future instances to skip duplicate dates.
+  - `backend/app/services/academic/semester.py`: Refactored update logic to batch-query existing template dates in a single SQL query instead of fetching in a loop.
+  - `backend/app/services/academic/attendance_statistics.py`: Refactored subject/custom statistics aggregation to query all semester lecture instances in one query and group them in memory.
+* **Test Suite Updates**:
+  - `backend/tests/academic/test_lecture_templates.py`: Added `test_update_template_conflict_with_retained_instance` and `test_update_template_time_inversion` unit tests.
+* **Documentation**:
+  - `docs/audit/audit_03_business_logic.md` & `docs/audit/audit_summary.md`: Documented findings, post-remediation status, and scorecard updates.
+
+---
+
+## 2026-07-09 (Audit No 4: MVP API Audit & Remediation)
+
+### Decisions
+1. **Remediation Plan Approval**: Approved and executed remediation items for the API Audit (Audit 04), raising the final post-remediation health score from **92/100** to **100/100**.
+2. **ApiResponse Standard Envelope Consistency**: Wrapped all Activity Logs endpoint responses in `ApiResponse[T]` to ensure a single, consistent JSON structure for the Flutter frontend client.
+3. **Trailing Route Slashes**: Normalized route definitions by converting `"/"` endpoints to `""` in activity logs routes.
+4. **Pagination Implementation**: Added `limit` and `offset` query parameters to list routes for Todos and Lecture Instances to support scalable lists and calendar retrievals.
+
+### Implementation Details
+* **API Endpoints**:
+  - `backend/app/api/v1/activity_logs/activity_logs.py`: Wrapped responses in `ApiResponse` and removed trailing slashes from routes.
+  - `backend/app/api/v1/todo/todos.py`: Added `limit` and `offset` query parameters, passing them to the service.
+  - `backend/app/api/v1/academic/lecture_instances.py`: Added optional `limit` and `offset` query parameters, passing them to the service.
+* **Services & Repositories**:
+  - `backend/app/services/todo/todo.py` & `backend/app/repositories/todo/todo.py`: Propagated limit/offset to database queries.
+  - `backend/app/services/academic/lecture_instance.py` & `backend/app/repositories/academic/lecture_instance.py`: Implemented optional limit/offset handling for lecture instance queries.
+* **Test Suite Updates**:
+  - `backend/tests/activity_logs/test_activity_logs.py`: Adjusted assertions to verify wrapped response envelopes and updated request paths.
+  - `backend/tests/todo/test_todos.py`: Added integration test `test_api_todos_pagination` validating pagination limit, offset, and correct default descending created_at sort order.
+* **Documentation**:
+  - `docs/audit/audit_04_api.md`: Created detailed audit report with resolution status.
+  - `docs/audit/audit_summary.md`, `docs/context.md`, & `docs/history.md`: Updated master dashboard tables and history details.
+
+---
+
+## 2026-07-09 (Audit No 5: MVP Performance Audit & Remediation)
+
+### Decisions
+1. **Remediation Plan Approval**: Approved and executed remediation items for the Performance Audit (Audit 05), boosting the post-remediation health score from **84/100** to **100/100**.
+2. **Database Indexing**: Optimized `lecture_instances.lecture_date` by adding a standalone index via Alembic migration to prevent sequential scans on schedule-related queries.
+3. **N+1 Query Resolution**: Implemented bulk loaders for Activity Log and Review Queue pagination to fetch human-readable entity summaries in a single polymorphic batch query rather than looping over individual service calls.
+4. **Statement Consolidation**: Refactored holiday status transitions to replace redundant two-step SQL update operations with a single, conditional database update query.
+
+### Implementation Details
+* **Alembic Migrations**:
+  - Generated and applied migration `905f6a12361e_add_lecture_date_index` introducing the index `ix_lecture_instances_lecture_date`.
+* **Database & Services**:
+  - `backend/app/services/activity_logs/activity_log.py`: Implemented `bulk_populate_activity_summaries` utilizing polymorphic batch queries.
+  - `backend/app/services/review_queue/review_queue.py`: Implemented `_bulk_populate_summaries` to batch load resolved entity details.
+  - `backend/app/services/academic/holiday.py`: Consolidated status updates inside `_update_lecture_instances_status` into a single query statement.
+* **Test Suite Updates**:
+  - `backend/tests/activity_logs/test_activity_logs.py`: Added `test_bulk_populate_activity_summaries` to verify batch-fetching logic.
+* **Documentation**:
+  - `docs/audit/audit_05_performance.md`: Compiled detailed Performance Audit report.
+  - `docs/audit/audit_summary.md`, `docs/context.md`, & `docs/history.md`: Updated dashboards and files.
+
+---
+
+## 2026-07-09 (Audit No 6: MVP Security Audit & Remediation)
+
+### Decisions
+1. **Remediation Plan Approval**: Approved and executed remediation items for the Security Audit (Audit 06), raising the final post-remediation health score from **88/100** to **100/100**.
+2. **Secure CORS Middleware Configuration**: Enforce strict browser security rules by dynamicizing CORS allowed origins via `settings.ALLOWED_ORIGINS` and automatically turning off credentials support if wildcards `"*"` are declared.
+3. **JWT Configuration Preparedness**: Populated `JWT_SECRET`, `JWT_ALGORITHM`, and `ACCESS_TOKEN_EXPIRE_MINUTES` configuration parameters in settings to prepare the environment for Sprint 13.
+4. **Local Ignored Files Security**: Prevent leakage of local environments, caches, databases, and log files by generating a local `backend/.gitignore` file.
+5. **Future-Compatible Auth Stubs**: Implemented a pass-through bearer authentication dependency stub `get_current_user` in `app/dependencies/auth.py` and exported it globally.
+
+### Implementation Details
+* **Core & Config**:
+  - `backend/app/core/config.py`: Declared `ALLOWED_ORIGINS`, `JWT_SECRET`, `JWT_ALGORITHM`, and `ACCESS_TOKEN_EXPIRE_MINUTES`.
+  - `backend/app/main.py`: Restructured `CORSMiddleware` configuration block to parse custom list and disable credentials under wildcards.
+* **Ignored Files**:
+  - `backend/.gitignore`: Initialized with Python caches, directories, and database/log ignores.
+* **Authentication Dependencies**:
+  - `backend/app/dependencies/auth.py`: Implemented `get_current_user` using FastAPI `HTTPBearer` scheme.
+  - `backend/app/dependencies/__init__.py`: Exported `get_current_user` helper.
+* **Test Suite Updates**:
+  - `backend/tests/security/test_security.py`: Added 4 integration/unit tests validating origin-matching, invalid-origin rejection, credentials wildcards behavior, and bearer authentication stubs.
+* **Documentation**:
+  - `docs/audit/audit_06_security.md`: Created detailed Security Audit report with resolution status.
+  - `docs/audit/audit_summary.md`, `docs/context.md`, & `docs/history.md`: Updated master dashboard tables and history details.
+
+---
+
+## 2026-07-10 (Audit No 7: MVP Flutter Integration Audit & Remediation)
+
+### Decisions
+1. **Remediation Plan Approval**: Approved and executed remediation items for the Flutter Integration Audit (Audit 07), raising the final post-remediation health score from **95/100** to **100/100**.
+2. **AppState Mock Decoupling**: Completely removed legacy mock methods and ValueNotifier objects from the global AppState, ensuring the frontend's calculations are 100% backend-driven.
+3. **DTO and Repository Layer Consistency**: Confirmed that all DTO models, endpoint serializations, and repository mapping systems are consistent with the live FastAPI endpoints.
+4. **Finance Exception Acknowledgment**: Explicitly documented that the Finance screen remains the sole user view utilising Mock data fallbacks, as the entire Finance module is frozen for Phase 1.
+
+### Implementation Details
+* **Frontend Refactoring**:
+  - `lib/core/utils/app_state.dart`: Deleted unused methods `getCalculatedSubjects()`, `getOverallStats()`, `setLectureAction()`, `setWholeDayAction()`, and `addHoliday()`. Removed unused `holidays` and `dateActions` ValueNotifier fields, and deleted redundant imports of `dummy_data.dart` and `intl/intl.dart`.
+* **Testing & Verification**:
+  - Executed static code analysis (`flutter analyze`), resolving all compile errors. Verified that the app builds and operates correctly with clean state.
+  - Ran backend test suite verifying all 170/170 unit and integration tests pass successfully.
+* **Documentation**:
+  - `docs/audit/audit_07_flutter_integration.md`: Created detailed Flutter Integration Audit report with scorecard and findings resolution.
+  - `docs/audit/audit_summary.md`, `docs/context.md`, & `docs/history.md`: Updated master dashboard tables, context summaries, and history details.
+
+---
+
+## 2026-07-10 (Audit No 8: MVP Code Quality Audit & Remediation)
+
+### Decisions
+1. **Remediation Plan Approval**: Approved and executed remediation items for the Code Quality Audit (Audit 08), raising the final post-remediation health score from **90/100** to **100/100**.
+2. **Activity Logging for System Settings**: Enforced system preference logging by recording activities when global app settings are updated, utilizing a newly defined constant `SYSTEM_SETTINGS_UUID` in the backend.
+3. **Flutter BuildContext Mounting Safeguards**: Avoid runtime crashes across async network gaps in Flutter screens by introducing `context.mounted` and `mounted` state checks in creation dialog forms.
+4. **Stale Code Quality Cleaning**: Removed obsolete TODO markers in DTO schemas and updated stale sprint labels in notes service files.
+
+### Implementation Details
+* **Backend Core & Services**:
+  - `backend/app/core/constants.py`: Defined `SYSTEM_SETTINGS_UUID` placeholder for global app settings logs.
+  - `backend/app/schemas/academic/lecture_instance.py`: Removed stale criteria mode TODO comment.
+  - `backend/app/services/settings/app_settings.py`: Implemented `log_activity` in settings update flow.
+  - `backend/app/services/notes/notes.py`: Updated sprint references to "Future Storage Integration" inside resource upload/delete operations.
+* **Frontend Refactoring**:
+  - `lib/screens/settings/semester_selection_screen.dart`: Protected dialog callbacks and state setters with `context.mounted` and widget-mounted safety guards.
+* **Testing & Verification**:
+  - `backend/tests/settings/test_app_settings.py`: Added `test_update_settings_creates_activity_log` to verify correct activity recording on settings mutation.
+  - Ran backend test suite verifying all 171/171 unit and integration tests pass successfully.
+  - Executed static code analysis (`flutter analyze`), successfully resolving both `use_build_context_synchronously` warnings.
+* **Documentation**:
+  - `docs/audit/audit_08_code_quality.md`: Populated the detailed Code Quality Audit report with final status.
+  - `docs/audit/audit_summary.md`, `docs/context.md`, & `docs/history.md`: Updated master dashboard tables, context summaries, and history details.
+
+---
+
+## 2026-07-10 (Audit No 9: Testing Quality Audit & Remediation)
+
+### Decisions
+1. **Remediation Plan Approval**: Approved and executed remediation items for the Testing Quality Audit (Audit 09), raising the final post-remediation health score from **94/100** to **100/100**.
+2. **Pytest Warning Remediation**: Resolved FastAPI/Starlette deprecation warnings by replacing `status.HTTP_422_UNPROCESSABLE_ENTITY` with `status.HTTP_422_UNPROCESSABLE_CONTENT` across all test suites.
+3. **Transactional Cleanup Safety**: Mitigated connection deassociation warnings (`SAWarning: transaction already deassociated from connection`) in `tests/conftest.py` by verifying `transaction.is_active` prior to rolling back in the `db_session` fixture.
+4. **Boundary and Leap Year Test Expansion**: Implemented leap-year holiday date-boundary validations and empty/whitespace Todo query search cases.
+
+### Implementation Details
+* **Backend Configurations**:
+  - `backend/tests/conftest.py`: Updated `db_session` transaction rollback safety checks.
+* **Test Suite Updates**:
+  - `backend/tests/academic/test_attendance_settings.py`, `backend/tests/review_queue/test_review_queue.py`, `backend/tests/settings/test_app_settings.py`, and `backend/tests/todo/test_todos.py`: Replaced deprecated validation status codes.
+  - `backend/tests/academic/test_holidays.py`: Added `test_leap_year_holiday_boundary` verifying holiday adjustments on Feb 29.
+  - `backend/tests/todo/test_todos.py`: Added `test_api_todos_search_empty_or_whitespace` verifying whitespace search queries.
+* **Documentation**:
+  - `docs/audit/audit_09_testing.md`: Documented complete findings and remediation status.
+  - `docs/audit/audit_summary.md`, `docs/context.md`, & `docs/history.md`: Updated master dashboard tables, context summaries, and history details.
+
+---
+
+## 2026-07-10 (Audit No 10: Production Readiness Audit & Remediation)
+
+### Decisions
+1. **Remediation Plan Approval**: Approved and executed remediation items for the Production Readiness Audit (Audit 10), raising the final post-remediation health score from **85/100** to **100/100**.
+2. **Infrastructure Verification & DB Health**: Overhauled the health check API `/api/v1/health` to execute a `SELECT 1` query using `session.execute` to actively confirm database connectivity, raising a `503 Service Unhealthy` status if PostgreSQL is unreachable.
+3. **Docs Protection**: Set FastAPI's `docs_url` and `redoc_url` parameters to `None` when `APP_ENV == "production"`.
+4. **Environment & Pooling Settings**: Added `SUPABASE_URL`, `SUPABASE_KEY`, `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_RECYCLE`, and `ENABLE_FILE_LOGGING` settings parameters. Configured custom database pooling attributes on engine initialization.
+5. **Deployment Containers**: Created a lightweight `Dockerfile` and local `docker-compose.yaml` to provision local development instances.
+6. **Documentation Restoration**: Re-drafted the corrupted backend `README.md` and over-written root `README.md` with complete details.
+
+### Implementation Details
+* **Backend Configurations**:
+  - `backend/app/core/config.py`: Added new settings keys for Supabase, database connection pool, and file logging.
+  - `backend/app/core/database.py`: Instantiated database async engine using the pool configurations.
+  - `backend/app/main.py`: Set logging toggle and conditionally disabled OpenAPI docs.
+* **API Endpoints**:
+  - `backend/app/api/v1/health.py`: Rewrote the health route to run `SELECT 1` and handle failures gracefully.
+* **Test Suite Updates**:
+  - `backend/tests/test_health.py`: Updated healthy assertions and added `test_health_check_database_offline` database exception test.
+* **Deployments**:
+  - `backend/Dockerfile` & `backend/docker-compose.yaml`: Created minimal Docker assets.
+* **Documentation**:
+  - `backend/README.md` & `README.md`: Overhauled both README guides.
+  - `docs/audit/audit_10_production_readiness.md`: Documented complete findings and remediation status.
+  - `docs/audit/audit_summary.md`, `docs/context.md`, & `docs/history.md`: Updated master dashboard tables, context summaries, and history details.

@@ -12,6 +12,10 @@ import '../../data/repositories/review_queue_repository.dart';
 import '../review_queue/review_queue_screen.dart';
 import '../settings/semester_selection_screen.dart';
 import '../attendance/widgets/lecture_card.dart';
+import '../../data/repositories/subject_repository.dart';
+import '../../data/repositories/attendance_settings_repository.dart';
+import '../../data/repositories/holiday_repository.dart';
+import '../../data/dto/holiday/holiday_dto.dart';
 
 class OverviewScreen extends StatefulWidget {
   const OverviewScreen({super.key});
@@ -28,6 +32,9 @@ class _OverviewScreenState extends State<OverviewScreen> {
   int _pendingReviewsCount = 0;
   bool _isLoading = false;
   late VoidCallback _stateListener;
+  Map<String, Map<String, dynamic>> _subjectMetricsMap = {};
+  bool _isTodayHoliday = false;
+  HolidayDto? _holidayToday;
 
   @override
   void initState() {
@@ -55,6 +62,8 @@ class _OverviewScreenState extends State<OverviewScreen> {
       setState(() {
         _todayInstances = [];
         _pendingReviewsCount = 0;
+        _subjectMetricsMap = {};
+        _isTodayHoliday = false;
       });
       return;
     }
@@ -68,9 +77,50 @@ class _OverviewScreenState extends State<OverviewScreen> {
       );
       final reviews = await _reviewRepo.getReviewQueue(status: 'pending');
 
+      final subjectRepo = SubjectRepository();
+      final subjects = await subjectRepo.getSubjects(activeSem.semesterId);
+      final settings = await AttendanceSettingsRepository().getSettings(activeSem.semesterId);
+      final mappedMode = settings.criteriaMode == 'subject' ? 'subject_wise' : settings.criteriaMode;
+
+      final Map<String, Map<String, dynamic>> subjectMetricsMap = {};
+      for (final sub in subjects) {
+        final stats = await _lectureRepo.getSubjectStats(sub.subjectId);
+        int target = settings.overallAttendanceGoal;
+        if (mappedMode == 'custom') {
+          target = sub.attendanceGoal;
+        }
+        final bool isAboveTarget = stats.attendancePercentage >= target;
+        subjectMetricsMap[sub.subjectName] = {
+          'percent': stats.attendancePercentage,
+          'target': target,
+          'attended': stats.presentLectures,
+          'total': stats.totalLectures,
+          'statusMessage': stats.statusMessage,
+          'isAboveTarget': isAboveTarget,
+        };
+      }
+
+      // Check if today is a holiday
+      final today = DateTime.now();
+      final todayDateOnly = DateTime(today.year, today.month, today.day);
+      final holidays = await HolidayRepository().getHolidays(semesterId: activeSem.semesterId);
+      HolidayDto? holidayToday;
+      for (final h in holidays) {
+        if (h.holidayDate.year == todayDateOnly.year &&
+            h.holidayDate.month == todayDateOnly.month &&
+            h.holidayDate.day == todayDateOnly.day) {
+          holidayToday = h;
+          break;
+        }
+      }
+      final bool isTodayHoliday = holidayToday != null;
+
       setState(() {
         _todayInstances = instances;
         _pendingReviewsCount = reviews.length;
+        _subjectMetricsMap = subjectMetricsMap;
+        _isTodayHoliday = isTodayHoliday;
+        _holidayToday = holidayToday;
         _isLoading = false;
       });
     } catch (e) {
@@ -223,6 +273,53 @@ class _OverviewScreenState extends State<OverviewScreen> {
               subtitle: ' (${_todayInstances.length})',
               showFrame: true,
               children: [
+                if (_isTodayHoliday && _holidayToday != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1D4ED8).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF1D4ED8).withOpacity(0.3), width: 1.5),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          color: Color(0xFF1D4ED8),
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'University Holiday',
+                                style: TextStyle(
+                                  color: Color(0xFF1D4ED8),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _holidayToday!.holidayName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (_todayInstances.isNotEmpty) ...[
                   _buildSectionHeader('MARK WHOLE DAY'),
                   const SizedBox(height: 6),
@@ -310,8 +407,12 @@ class _OverviewScreenState extends State<OverviewScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Expanded(child: _buildWholeDayButton('clear', 'Clear', isDark ? AppTheme.textMuted : Colors.black54, Icons.remove_circle_outline)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildWholeDayButton('off', 'Day Off', AppTheme.warning, Icons.pause_circle_outline)),
+              const SizedBox(width: 4),
               Expanded(child: _buildWholeDayButton('missed', 'Missed', AppTheme.danger, Icons.highlight_off)),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Expanded(child: _buildWholeDayButton('attended', 'Attended', AppTheme.accent, Icons.check_circle_rounded)),
             ],
           ),
@@ -321,15 +422,25 @@ class _OverviewScreenState extends State<OverviewScreen> {
   }
 
   Widget _buildWholeDayButton(String action, String label, Color color, IconData icon) {
+    final bool isClickable = !_isTodayHoliday;
     return InkWell(
-      onTap: () async {
+      onTap: isClickable ? () async {
         String? newAttendanceStatus;
+        String? newLectureStatus;
+
         if (action == 'attended') {
           newAttendanceStatus = 'present';
+          newLectureStatus = 'scheduled';
         } else if (action == 'missed') {
           newAttendanceStatus = 'absent';
+          newLectureStatus = 'scheduled';
+        } else if (action == 'clear') {
+          newAttendanceStatus = 'unmarked';
+          newLectureStatus = 'scheduled';
+        } else if (action == 'off') {
+          newAttendanceStatus = 'unmarked';
+          newLectureStatus = 'holiday';
         } else {
-          AppSnackbar.warning(context, 'Only "attended" or "missed" can be bulk applied to the whole day.');
           return;
         }
 
@@ -340,6 +451,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
           await _lectureRepo.markWholeDay(LectureInstanceBulkUpdateRequest(
             lectureDate: DateFormat('yyyy-MM-dd').format(DateTime.now()),
             attendanceStatus: newAttendanceStatus,
+            lectureStatus: newLectureStatus,
             semesterId: activeSem.semesterId,
           ));
           _loadData();
@@ -356,32 +468,38 @@ class _OverviewScreenState extends State<OverviewScreen> {
             AppSnackbar.error(context, 'Failed to bulk update: $e');
           }
         }
-      },
+      } : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: isClickable ? color.withOpacity(0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2), width: 1),
+          border: Border.all(
+            color: isClickable ? color.withOpacity(0.2) : Colors.grey.withOpacity(0.12),
+            width: 1,
+          ),
         ),
         alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 13, color: color),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
+        child: Opacity(
+          opacity: isClickable ? 1.0 : 0.35,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 15, color: isClickable ? color : AppTheme.textMuted),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isClickable ? color : AppTheme.textMuted,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -411,8 +529,6 @@ class _OverviewScreenState extends State<OverviewScreen> {
       );
     }
 
-    final calculatedSubjects = AppState.instance.getCalculatedSubjects();
-
     return Column(
       children: lectures.map((inst) {
         final lecture = _mapToMock(inst);
@@ -422,17 +538,14 @@ class _OverviewScreenState extends State<OverviewScreen> {
                 ? 'missed'
                 : (inst.lectureStatus == 'holiday' ? 'off' : 'clear'));
 
-        final metrics = calculatedSubjects.firstWhere(
-          (sub) => sub['name'] == lecture.name,
-          orElse: () => {
-            'percent': 0.0,
-            'target': 80,
-            'attended': 0,
-            'total': 0,
-            'statusMessage': 'No details',
-            'isAboveTarget': false,
-          },
-        );
+        final metrics = _subjectMetricsMap[lecture.name] ?? {
+          'percent': 0.0,
+          'target': 80,
+          'attended': 0,
+          'total': 0,
+          'statusMessage': 'No details',
+          'isAboveTarget': false,
+        };
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12.0),
@@ -446,32 +559,34 @@ class _OverviewScreenState extends State<OverviewScreen> {
             total: metrics['total'],
             statusMessage: metrics['statusMessage'],
             isAboveTarget: metrics['isAboveTarget'],
-            onActionChanged: (action) async {
-              String newAttendanceStatus = 'unmarked';
-              String newLectureStatus = 'scheduled';
-              if (action == 'attended') {
-                newAttendanceStatus = 'present';
-              } else if (action == 'missed') {
-                newAttendanceStatus = 'absent';
-              } else if (action == 'off') {
-                newLectureStatus = 'holiday';
-              }
+            onActionChanged: !_isTodayHoliday
+                ? (action) async {
+                    String newAttendanceStatus = 'unmarked';
+                    String newLectureStatus = 'scheduled';
+                    if (action == 'attended') {
+                      newAttendanceStatus = 'present';
+                    } else if (action == 'missed') {
+                      newAttendanceStatus = 'absent';
+                    } else if (action == 'off') {
+                      newLectureStatus = 'holiday';
+                    }
 
-              try {
-                await _lectureRepo.updateAttendance(
-                  inst.lectureInstanceId,
-                  LectureInstanceUpdateRequest(
-                    attendanceStatus: newAttendanceStatus,
-                    lectureStatus: newLectureStatus,
-                  ),
-                );
-                _loadData();
-              } catch (e) {
-                if (mounted) {
-                  AppSnackbar.error(context, 'Failed to update attendance: $e');
-                }
-              }
-            },
+                    try {
+                      await _lectureRepo.updateAttendance(
+                        inst.lectureInstanceId,
+                        LectureInstanceUpdateRequest(
+                          attendanceStatus: newAttendanceStatus,
+                          lectureStatus: newLectureStatus,
+                        ),
+                      );
+                      _loadData();
+                    } catch (e) {
+                      if (mounted) {
+                        AppSnackbar.error(context, 'Failed to update attendance: $e');
+                      }
+                    }
+                  }
+                : null,
           ),
         );
       }).toList(),

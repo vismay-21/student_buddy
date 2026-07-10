@@ -638,3 +638,79 @@ async def test_api_delete_lecture_template(client: AsyncClient, sample_subject: 
     # Try to GET it and assert 404
     get_res = await client.get(f"/api/v1/academic/lecture-templates/{template_id}")
     assert get_res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_update_template_conflict_with_retained_instance(
+    db_session: AsyncSession, sample_semester: Semester, sample_subject: Subject
+):
+    service = LectureTemplateService(
+        db=db_session,
+        lecture_template_repo=LectureTemplateRepository(db_session),
+        lecture_instance_repo=LectureInstanceRepository(db_session),
+        subject_repo=SubjectRepository(db_session),
+        semester_repo=SemesterRepository(db_session),
+    )
+
+    # Create template: Monday 09:00 - 10:00
+    template = await service.create_template(
+        LectureTemplateCreate(
+            subject_id=sample_subject.subject_id,
+            day_of_week=1,
+            start_time=time(9, 0),
+            end_time=time(10, 0),
+            room="LH-1"
+        )
+    )
+
+    # Fetch future generated instances
+    instance_repo = LectureInstanceRepository(db_session)
+    instances = await instance_repo.list_by_template(template.lecture_template_id)
+    assert len(instances) > 0
+
+    # Mark one of the instances as present (simulate user action) so it is retained during rescheduling
+    retained_instance = instances[-1]
+    retained_instance.attendance_status = AttendanceStatus.PRESENT
+    await instance_repo.update(retained_instance)
+    await db_session.flush()
+
+    # Now update template schedule (start_time to 09:15)
+    # Without the fix, this would fail due to UniqueConstraint violation on the retained instance's date.
+    updated = await service.update_template(
+        template.lecture_template_id,
+        LectureTemplateUpdate(start_time=time(9, 15))
+    )
+    assert updated.start_time == time(9, 15)
+
+
+@pytest.mark.asyncio
+async def test_update_template_time_inversion(
+    db_session: AsyncSession, sample_semester: Semester, sample_subject: Subject
+):
+    service = LectureTemplateService(
+        db=db_session,
+        lecture_template_repo=LectureTemplateRepository(db_session),
+        lecture_instance_repo=LectureInstanceRepository(db_session),
+        subject_repo=SubjectRepository(db_session),
+        semester_repo=SemesterRepository(db_session),
+    )
+
+    # Create template: Monday 09:00 - 10:00
+    template = await service.create_template(
+        LectureTemplateCreate(
+            subject_id=sample_subject.subject_id,
+            day_of_week=1,
+            start_time=time(9, 0),
+            end_time=time(10, 0),
+            room="LH-1"
+        )
+    )
+
+    # Try updating only start_time to 11:00 (which is after end_time 10:00) -> expect ValidationException
+    from app.core.exceptions import ValidationException
+    with pytest.raises(ValidationException):
+        await service.update_template(
+            template.lecture_template_id,
+            LectureTemplateUpdate(start_time=time(11, 0))
+        )
+

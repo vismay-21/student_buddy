@@ -14,6 +14,7 @@ import '../../data/repositories/semester_repository.dart';
 import 'history_tab.dart';
 import 'subjects_tab.dart';
 import 'attendance_settings_tab.dart';
+import '../../data/repositories/lecture_template_repository.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
@@ -80,8 +81,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       final List<Map<String, dynamic>> subList = [];
       final List<Map<String, dynamic>> belowTarget = [];
 
+      final _templateRepo = LectureTemplateRepository();
       for (final sub in subjects) {
         final stats = await _instanceRepo.getSubjectStats(sub.subjectId);
+        final templates = await _templateRepo.getTemplates(sub.subjectId);
+        final String room = (templates.isNotEmpty && templates.first.room != null) ? templates.first.room! : 'Room TBD';
 
         int target = settings.overallAttendanceGoal;
         if (mappedMode == 'custom') {
@@ -96,10 +100,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           'percent': stats.attendancePercentage,
           'target': target,
           'attended': stats.presentLectures,
+          'absent': stats.absentLectures,
           'total': stats.totalLectures,
           'statusMessage': stats.statusMessage,
           'isAboveTarget': isAboveTarget,
           'color': sub.themeColor,
+          'faculty': sub.facultyName ?? 'Faculty TBD',
+          'room': room,
         });
 
         if (!isAboveTarget) {
@@ -118,8 +125,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         'date': h.holidayDate,
       }).toList();
 
+      final int totalTaken = semStats.presentLectures + semStats.absentLectures;
+      final double overallPercentageCalculated = totalTaken == 0
+          ? 0.0
+          : (semStats.presentLectures / totalTaken) * 100;
+
       setState(() {
-        _overallPercentage = semStats.attendancePercentage;
+        _overallPercentage = overallPercentageCalculated;
         _subjectsList = subList;
         _belowTargetSubjects = belowTarget;
         _holidaysList = mappedHolidays;
@@ -140,6 +152,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         AttendanceSettingsUpdateRequest(criteriaMode: backendMode),
       );
       AppState.instance.criteriaMode.value = val;
+
+      // When switching TO custom mode, seed every subject's goal to the
+      // current overall targetPercentage so the dialog starts with sensible
+      // baseline values (the user can then fine-tune per subject).
+      if (val == 'custom') {
+        final seedTarget = AppState.instance.targetPercentage.value;
+        for (final s in _subjectsList) {
+          await _updateSubjectCustomTarget(s['name'] as String, seedTarget);
+        }
+      }
+
       _loadStats();
     } catch (e) {
       if (mounted) {
@@ -302,7 +325,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           selectedDate: _selectedDate,
           holidays: _holidaysList,
           dateActions: const {},
-          defaultDaysOff: '',
           subjectsMetrics: const {},
           onDateSelected: (date) {
             setState(() {
@@ -310,6 +332,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             });
           },
           onLectureActionChanged: _onLectureActionChanged,
+          overallPercentage: _overallPercentage,
+          belowTargetSubjects: _belowTargetSubjects,
+          subjectsList: _subjectsList,
         );
         break;
       case 1:
@@ -336,7 +361,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           subjectCustomTargets: {
             for (var s in _subjectsList) s['name']: s['target'] as int
           },
-          defaultDaysOff: 'Saturday & Sunday',
           onCriteriaModeChanged: _updateCriteriaMode,
           onTargetPercentageChanged: _updateTargetPercentage,
           onSemesterStartDateChanged: _updateSemesterStartDate,
@@ -344,7 +368,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           onHolidayAdded: _addHoliday,
           onHolidayDeleted: _deleteHoliday,
           onSubjectCustomTargetChanged: _updateSubjectCustomTarget,
-          onDefaultDaysOffChanged: (val) {},
         );
         break;
       default:

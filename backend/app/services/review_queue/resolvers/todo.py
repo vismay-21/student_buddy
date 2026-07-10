@@ -24,8 +24,6 @@ class TodoResolver(BaseResolver):
         # Apply updates
         if todo_update.title is not None:
             todo.title = todo_update.title
-        if todo_update.category is not None:
-            todo.category = todo_update.category
         if todo_update.priority is not None:
             todo.priority = todo_update.priority
         if todo_update.due_datetime is not None:

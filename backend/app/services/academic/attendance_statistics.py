@@ -101,6 +101,11 @@ class AttendanceStatisticsService:
         else:
             # Subject or Custom Mode: aggregate subject-level calculations
             subjects = await self.subject_repo.list_by_semester(semester_id)
+            all_instances = await self.lecture_instance_repo.list_instances(semester_id=semester_id)
+            from collections import defaultdict
+            instances_by_subject = defaultdict(list)
+            for inst in all_instances:
+                instances_by_subject[inst.lecture_template.subject_id].append(inst)
             
             total_lectures = 0
             present_lectures = 0
@@ -119,7 +124,7 @@ class AttendanceStatisticsService:
                     # Custom Mode
                     sub_goal = subject.attendance_goal if subject.attendance_goal is not None else DEFAULT_ATTENDANCE_GOAL
 
-                instances = await self.lecture_instance_repo.get_by_subject(subject.subject_id)
+                instances = instances_by_subject[subject.subject_id]
                 scheduled_instances = [inst for inst in instances if inst.lecture_status == LectureStatus.SCHEDULED]
 
                 sub_present = sum(1 for inst in scheduled_instances if inst.attendance_status == AttendanceStatus.PRESENT)

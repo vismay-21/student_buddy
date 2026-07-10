@@ -1,7 +1,6 @@
 class TodoDto {
   final String todoId;
   final String title;
-  final String category; // 'academic', 'personal', 'work', 'health', 'other'
   final String priority; // 'low', 'medium', 'high'
   final String status; // 'pending', 'completed'
   final String createdBy; // 'user', 'bot', 'review_queue'
@@ -13,7 +12,6 @@ class TodoDto {
   TodoDto({
     required this.todoId,
     required this.title,
-    required this.category,
     required this.priority,
     required this.status,
     required this.createdBy,
@@ -27,7 +25,6 @@ class TodoDto {
     return TodoDto(
       todoId: json['todo_id'] as String,
       title: json['title'] as String,
-      category: json['category'] as String? ?? 'other',
       priority: json['priority'] as String? ?? 'medium',
       status: json['status'] as String? ?? 'pending',
       createdBy: json['created_by'] as String? ?? 'user',
@@ -42,7 +39,6 @@ class TodoDto {
     return {
       'todo_id': todoId,
       'title': title,
-      'category': category,
       'priority': priority,
       'status': status,
       'created_by': createdBy,
@@ -56,14 +52,12 @@ class TodoDto {
 
 class TodoCreateRequest {
   final String title;
-  final String category;
   final String priority;
   final String status;
   final DateTime? dueDatetime;
 
   TodoCreateRequest({
     required this.title,
-    this.category = 'other',
     this.priority = 'medium',
     this.status = 'pending',
     this.dueDatetime,
@@ -72,7 +66,6 @@ class TodoCreateRequest {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'title': title,
-      'category': category,
       'priority': priority,
       'status': status,
     };
@@ -85,14 +78,12 @@ class TodoCreateRequest {
 
 class TodoUpdateRequest {
   final String? title;
-  final String? category;
   final String? priority;
   final String? status;
   final DateTime? dueDatetime;
 
   TodoUpdateRequest({
     this.title,
-    this.category,
     this.priority,
     this.status,
     this.dueDatetime,
@@ -101,7 +92,6 @@ class TodoUpdateRequest {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {};
     if (title != null) data['title'] = title;
-    if (category != null) data['category'] = category;
     if (priority != null) data['priority'] = priority;
     if (status != null) data['status'] = status;
     if (dueDatetime != null) data['due_datetime'] = dueDatetime!.toIso8601String();

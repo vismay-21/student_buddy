@@ -1,11 +1,11 @@
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundException, ValidationException
-from app.models.review_queue.review_queue import ReviewQueue, ReviewStatus, ResolvedBy
+from app.models.review_queue.review_queue import ReviewQueue, ReviewStatus, ResolvedBy, EntityType
 from app.schemas.review_queue.review_queue import ReviewQueueCreate, ReviewQueueResolve
 from app.repositories.review_queue.review_queue import ReviewQueueRepository
 from app.services.review_queue.resolvers.registry import RESOLVERS
@@ -43,6 +43,86 @@ class ReviewQueueService:
         await self._populate_summary(item)
         return item
 
+    async def _bulk_populate_summaries(self, items: Sequence[ReviewQueue]) -> None:
+        """
+        Bulk populates entity_summary on a list of ReviewQueue items.
+        Reduces query counts from N+1 to exactly one query per entity type.
+        """
+        if not items:
+            return
+
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        for item in items:
+            grouped[item.entity_type].append(item.entity_id)
+
+        summaries = {}  # (entity_type, entity_id) -> summary_str
+
+        # 1. TODO
+        todo_ids = grouped.get(EntityType.TODO)
+        if todo_ids:
+            from app.models.todo.todo import Todo
+            from sqlalchemy import select
+            stmt = select(Todo).where(Todo.todo_id.in_(todo_ids))
+            res = await self.db.execute(stmt)
+            todos = res.scalars().all()
+            todo_map = {t.todo_id: t.title for t in todos}
+            for tid in todo_ids:
+                summaries[(EntityType.TODO, tid)] = todo_map.get(tid, "Unknown Todo")
+
+        # 2. ATTENDANCE (LectureInstance)
+        attendance_ids = grouped.get(EntityType.ATTENDANCE)
+        if attendance_ids:
+            from app.models.academic.lecture_instance import LectureInstance
+            from app.models.academic.lecture_template import LectureTemplate
+            from app.models.academic.subject import Subject
+            from sqlalchemy import select
+            from sqlalchemy.orm import joinedload
+            stmt = (
+                select(LectureInstance)
+                .options(
+                    joinedload(LectureInstance.lecture_template)
+                    .joinedload(LectureTemplate.subject)
+                )
+                .where(LectureInstance.lecture_instance_id.in_(attendance_ids))
+            )
+            res = await self.db.execute(stmt)
+            instances = res.scalars().all()
+
+            days = {
+                1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday",
+                5: "Friday", 6: "Saturday", 7: "Sunday"
+            }
+            instance_map = {}
+            for inst in instances:
+                subject_name = "Unknown"
+                day_str = "Unknown Day"
+                time_str = "00:00"
+                if inst.lecture_template:
+                    template = inst.lecture_template
+                    if template.subject:
+                        subject_name = template.subject.subject_name
+                    day_str = days.get(template.day_of_week, "Unknown Day")
+                    if template.start_time:
+                        time_str = template.start_time.strftime("%H:%M")
+                instance_map[inst.lecture_instance_id] = f"{subject_name} • {day_str} • {time_str}"
+
+            for aid in attendance_ids:
+                summaries[(EntityType.ATTENDANCE, aid)] = instance_map.get(aid, "Unknown Lecture")
+
+        # 3. FINANCE
+        finance_ids = grouped.get(EntityType.FINANCE)
+        if finance_ids:
+            for fid in finance_ids:
+                summaries[(EntityType.FINANCE, fid)] = "Finance Record"
+
+        # Assign summaries back to items
+        for item in items:
+            item.entity_summary = summaries.get(
+                (item.entity_type, item.entity_id),
+                "Unknown Entity"
+            )
+
     async def list_items(
         self,
         status: ReviewStatus | None = None,
@@ -54,8 +134,7 @@ class ReviewQueueService:
         Retrieves review queue items supporting pagination and search, and resolves their dynamic summaries.
         """
         items = await self.review_queue_repo.list_items(status=status, q=q, limit=limit, offset=offset)
-        for item in items:
-            await self._populate_summary(item)
+        await self._bulk_populate_summaries(items)
         return items
 
     async def create_item(self, review_in: ReviewQueueCreate) -> ReviewQueue:
@@ -79,7 +158,7 @@ class ReviewQueueService:
             review_message=review_in.review_message,
             review_status=ReviewStatus.PENDING,
             resolved_by=ResolvedBy.USER,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             resolved_at=None
         )
         await self.review_queue_repo.create(item)
@@ -123,7 +202,7 @@ class ReviewQueueService:
         # Mark review as resolved
         item.review_status = ReviewStatus.RESOLVED
         item.resolved_by = resolve_in.resolved_by
-        item.resolved_at = datetime.utcnow()
+        item.resolved_at = datetime.now(timezone.utc)
         await self.review_queue_repo.update(item)
         await self.db.flush()
 

@@ -25,7 +25,6 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
 
   // Todo Form State
   late TextEditingController _todoTitleController;
-  String _selectedTodoCategory = 'Academic';
   String _selectedTodoPriority = 'Medium';
   String _selectedTodoStatus = 'Pending';
 
@@ -69,13 +68,12 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
     } else if (widget.item.entityType == 'todo') {
       resolutionData = {
         'title': _todoTitleController.text.trim(),
-        'category': _selectedTodoCategory.toLowerCase(),
         'priority': _selectedTodoPriority.toLowerCase(),
         'status': _selectedTodoStatus.toLowerCase(),
       };
     } else {
       resolutionData = {
-        'status': _confirmCancel ? 'cancelled' : 'attended',
+        if (_confirmCancel) 'lecture_status': 'holiday' else 'attendance_status': 'present',
       };
     }
 
@@ -286,14 +284,6 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
           label: 'Title',
           icon: Icons.title_rounded,
           validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-        ),
-        const SizedBox(height: 16),
-        _buildDropdown(
-          label: 'Category',
-          value: _selectedTodoCategory,
-          items: ['Academic', 'Personal', 'Work', 'Health', 'Other'],
-          onChanged: (val) => setState(() => _selectedTodoCategory = val!),
-          icon: Icons.category_outlined,
         ),
         const SizedBox(height: 16),
         _buildDropdown(

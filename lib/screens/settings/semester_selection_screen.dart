@@ -180,13 +180,21 @@ class _SemesterSelectionScreenState extends State<SemesterSelectionScreen> {
                             endDate: endDate!,
                           ),
                         );
-                        AppSnackbar.success(context, 'Semester $semesterNumber created successfully!');
-                        await _loadSemesters();
+                        if (context.mounted) {
+                          AppSnackbar.success(context, 'Semester $semesterNumber created successfully!');
+                        }
+                        if (mounted) {
+                          await _loadSemesters();
+                        }
                       } catch (e) {
-                        AppSnackbar.error(context, 'Failed to create semester: $e');
-                        setState(() {
-                          _isLoading = false;
-                        });
+                        if (context.mounted) {
+                          AppSnackbar.error(context, 'Failed to create semester: $e');
+                        }
+                        if (mounted) {
+                          setState(() {
+                            _isLoading = false;
+                          });
+                        }
                       }
                     }
                   },

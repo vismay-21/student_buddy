@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: student_buddy_db
+    environment:
+      POSTGRES_DB: student_buddy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    container_name: student_buddy_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/student_buddy
+      - APP_ENV=development
+      - APP_NAME=Student Buddy
+      - LOG_LEVEL=INFO
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

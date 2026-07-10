@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.activity_logs.activity_log import ActivityLog, ActorType, EntityType, ActionType
 from app.repositories.activity_logs.activity_log import ActivityLogRepository
 from app.core.exceptions import NotFoundException
-from app.services.activity_logs.summary import get_activity_entity_summary
+from app.services.activity_logs.summary import get_activity_entity_summary, bulk_populate_activity_summaries
 
 
 class ActivityLogService:
@@ -52,6 +52,5 @@ class ActivityLogService:
             limit=limit,
             offset=offset
         )
-        for log in logs:
-            log.entity_summary = await get_activity_entity_summary(self.db, log.entity_type, log.entity_id)
+        await bulk_populate_activity_summaries(self.db, logs)
         return logs

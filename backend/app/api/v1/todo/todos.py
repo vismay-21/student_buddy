@@ -9,7 +9,7 @@ from app.schemas.todo.todo import (
     TodoUpdate,
     TodoResponse,
 )
-from app.models.todo.todo import TodoCategory, TodoPriority, TodoStatus
+from app.models.todo.todo import TodoPriority, TodoStatus
 from app.repositories.todo.todo import TodoRepository
 from app.services.todo.todo import TodoService
 
@@ -59,12 +59,13 @@ async def create_todo(
 )
 async def list_todos(
     status: TodoStatus | None = Query(default=None, description="Filter by task status."),
-    category: TodoCategory | None = Query(default=None, description="Filter by task category."),
     priority: TodoPriority | None = Query(default=None, description="Filter by task priority."),
     q: str | None = Query(default=None, description="Case-insensitive title search query."),
+    limit: int = Query(50, ge=1, le=100, description="Limit of items returned (1-100)"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
     service: TodoService = Depends(get_todo_service),
 ):
-    todos = await service.list_todos(status=status, category=category, priority=priority, q=q)
+    todos = await service.list_todos(status=status, priority=priority, q=q, limit=limit, offset=offset)
     responses = [TodoResponse.model_validate(t) for t in todos]
     return ApiResponse(
         success=True,
@@ -98,7 +99,7 @@ async def get_todo(
     "/{todo_id}",
     response_model=ApiResponse[TodoResponse],
     summary="Update a todo task",
-    description="Update a todo task's title, category, priority, status, or due date. "
+    description="Update a todo task's title, priority, status, or due date. "
                 "Todos are completely independent of semesters, subjects, attendance, notes, "
                 "and all academic modules.",
     response_description="The updated todo.",

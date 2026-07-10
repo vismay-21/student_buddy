@@ -309,38 +309,6 @@ async def test_update_holiday_to_existing_holiday_date(
         await holiday_service.update_holiday(h1.holiday_id, update_in)
 
 
-@pytest.mark.asyncio
-async def test_cancelled_lectures_remain_cancelled(
-    db_session: AsyncSession,
-    holiday_service: HolidayService,
-    test_semester: Semester,
-    test_lecture_template: LectureTemplate
-):
-    # Let's manually cancel the lecture on Jan 2nd
-    stmt = select(LectureInstance).where(LectureInstance.lecture_date == date(2026, 1, 2))
-    inst = (await db_session.execute(stmt)).scalar_one()
-    inst.lecture_status = LectureStatus.CANCELLED
-    await db_session.flush()
-
-    # Create Holiday on Jan 2nd
-    holiday_in = HolidayCreate(
-        semester_id=test_semester.semester_id,
-        holiday_date=date(2026, 1, 2),
-        holiday_name="Holiday on Jan 2nd"
-    )
-    holiday = await holiday_service.create_holiday(test_semester.semester_id, holiday_in)
-
-    # Verify that the lecture instance remains CANCELLED (not overwritten to HOLIDAY)
-    await db_session.refresh(inst)
-    assert inst.lecture_status == LectureStatus.CANCELLED
-
-    # Delete Holiday
-    await holiday_service.delete_holiday(holiday.holiday_id)
-
-    # Verify that it remains CANCELLED (not overwritten to SCHEDULED)
-    await db_session.refresh(inst)
-    assert inst.lecture_status == LectureStatus.CANCELLED
-
 
 # --- API ROUTE INTEGRATION TESTS ---
 
@@ -509,4 +477,91 @@ async def test_create_lecture_template_after_holiday_creation(
     inst2 = (await db_session.execute(stmt2)).scalar_one()
     assert inst2.lecture_status == LectureStatus.SCHEDULED
     assert inst2.attendance_status == AttendanceStatus.UNMARKED
+
+
+@pytest.mark.asyncio
+async def test_leap_year_holiday_boundary(
+    db_session: AsyncSession,
+    holiday_service: HolidayService
+):
+    # 1. Create a semester spanning a leap day (Feb 29, 2028)
+    sem_repo = SemesterRepository(db_session)
+    # Feb 29, 2028 is a Tuesday (day_of_week=2)
+    sem = Semester(
+        semester_number=2028,
+        start_date=date(2028, 2, 1),
+        end_date=date(2028, 3, 15)
+    )
+    await sem_repo.create(sem)
+    await db_session.flush()
+
+    # 2. Create subject
+    from app.repositories.academic.subject import SubjectRepository
+    sub_repo = SubjectRepository(db_session)
+    subject = Subject(
+        semester_id=sem.semester_id,
+        subject_name="Leap Sub",
+        theme_color="#00FF00",
+        attendance_goal=75
+    )
+    await sub_repo.create(subject)
+    await db_session.flush()
+
+    # 3. Create Tuesday Template
+    from app.repositories.academic.lecture_template import LectureTemplateRepository
+    from app.repositories.academic.lecture_instance import LectureInstanceRepository
+    from app.repositories.academic.subject import SubjectRepository
+    from app.services.academic.lecture_template import LectureTemplateService
+    lt_service = LectureTemplateService(
+        db=db_session,
+        lecture_template_repo=LectureTemplateRepository(db_session),
+        lecture_instance_repo=LectureInstanceRepository(db_session),
+        subject_repo=SubjectRepository(db_session),
+        semester_repo=SemesterRepository(db_session),
+    )
+    # Create Tuesday Template
+    from app.schemas.academic.lecture_template import LectureTemplateCreate
+    template = await lt_service.create_template(
+        LectureTemplateCreate(
+            subject_id=subject.subject_id,
+            day_of_week=2,
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+            room="Room Leap"
+        )
+    )
+
+    # 4. Verify lecture instance on leap day exists and is SCHEDULED
+    leap_date = date(2028, 2, 29)
+    stmt = select(LectureInstance).where(
+        LectureInstance.lecture_template_id == template.lecture_template_id,
+        LectureInstance.lecture_date == leap_date
+    )
+    inst = (await db_session.execute(stmt)).scalar_one()
+    assert inst.lecture_status == LectureStatus.SCHEDULED
+
+    # 5. Create Holiday on Feb 29, 2028
+    holiday = await holiday_service.create_holiday(
+        sem.semester_id,
+        HolidayCreate(
+            semester_id=sem.semester_id,
+            holiday_date=leap_date,
+            holiday_name="Leap Day Holiday"
+        )
+    )
+    assert holiday.holiday_id is not None
+
+    # Verify instance transitions to HOLIDAY
+    db_session.expire(inst)
+    inst = (await db_session.execute(stmt)).scalar_one()
+    assert inst.lecture_status == LectureStatus.HOLIDAY
+
+    # 6. Delete Holiday on Feb 29, 2028
+    await holiday_service.delete_holiday(holiday.holiday_id)
+
+    # Verify instance reverts to SCHEDULED
+    db_session.expire(inst)
+    inst = (await db_session.execute(stmt)).scalar_one()
+    assert inst.lecture_status == LectureStatus.SCHEDULED
+
 
