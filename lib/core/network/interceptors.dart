@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -21,15 +23,20 @@ class ApiException implements Exception {
 }
 
 class AppInterceptors extends Interceptor {
+  /// Optional navigator key — set by MaterialApp to enable auth redirects.
+  static GlobalKey<NavigatorState>? navigatorKey;
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // Add default headers here if needed (e.g. Content-Type)
     options.headers['Accept'] = 'application/json';
     options.headers['Content-Type'] = 'application/json';
-    
-    // Future expansion point: Adding Authorization Bearer tokens in Sprint 13.
-    // In Sprint 12 (MVP Mode), endpoints are public.
-    
+
+    // Inject JWT Bearer token from the active Supabase session.
+    final token = AuthService.instance.accessToken;
+    if (token != null) {
+      options.headers['Authorization'] = 'Bearer $token';
+    }
+
     super.onRequest(options, handler);
   }
 
@@ -40,6 +47,16 @@ class AppInterceptors extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    // Handle 401: sign the user out and navigate to login.
+    if (err.response?.statusCode == 401) {
+      AuthService.instance.signOut().then((_) {
+        final nav = navigatorKey?.currentState;
+        if (nav != null) {
+          nav.pushNamedAndRemoveUntil('/login', (route) => false);
+        }
+      });
+    }
+
     String errorMessage = 'An unexpected error occurred';
     List<String>? validationErrors;
 
@@ -48,7 +65,7 @@ class AppInterceptors extends Interceptor {
       if (data is Map<String, dynamic>) {
         // Match the FastAPI ApiResponse wrapper schema: { success: false, message: "...", errors: [...] }
         errorMessage = data['message'] ?? errorMessage;
-        
+
         final rawErrors = data['errors'];
         if (rawErrors is List) {
           validationErrors = rawErrors.map((e) => e.toString()).toList();
@@ -93,3 +110,4 @@ class AppInterceptors extends Interceptor {
     );
   }
 }
+

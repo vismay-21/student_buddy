@@ -13,6 +13,12 @@ class NotesSubject(Base):
         default=uuid.uuid4,
         index=True
     )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        default=lambda: __import__("app.core.database", fromlist=["get_default_user_id"]).get_default_user_id()
+    )
     semester_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("semesters.semester_id", ondelete="CASCADE"),
         nullable=False
@@ -38,6 +44,10 @@ class NotesSubject(Base):
     )
 
     # Relationships
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="notes_subjects"
+    )
     semester: Mapped["Semester"] = relationship(
         "Semester",
         back_populates="notes_subjects"

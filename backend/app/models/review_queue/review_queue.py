@@ -1,8 +1,8 @@
 import enum
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Enum, DateTime, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Enum, DateTime, Text, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
@@ -36,6 +36,12 @@ class ReviewQueue(Base):
         primary_key=True,
         default=uuid.uuid4,
         index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        default=lambda: __import__("app.core.database", fromlist=["get_default_user_id"]).get_default_user_id()
     )
     review_type: Mapped[ReviewType] = mapped_column(
         Enum(ReviewType, name="review_type"),
@@ -74,3 +80,5 @@ class ReviewQueue(Base):
         DateTime(timezone=True),
         nullable=True
     )
+
+    user: Mapped["User"] = relationship("User", back_populates="review_queue")

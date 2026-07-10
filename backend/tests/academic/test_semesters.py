@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import pytest
 from datetime import date
 from httpx import AsyncClient
@@ -21,6 +22,7 @@ from app.core.exceptions import ConflictException, ValidationException
 async def test_semester_repo_create(db_session: AsyncSession):
     repo = SemesterRepository(db_session)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=1,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 6, 30)
@@ -38,11 +40,13 @@ async def test_semester_repo_create(db_session: AsyncSession):
 async def test_semester_repo_unique_constraint(db_session: AsyncSession):
     repo = SemesterRepository(db_session)
     sem1 = Semester(
+        user_id=TEST_USER_ID,
         semester_number=2,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 6, 30)
     )
     sem2 = Semester(
+        user_id=TEST_USER_ID,
         semester_number=2,
         start_date=date(2026, 7, 1),
         end_date=date(2026, 12, 31)
@@ -59,6 +63,7 @@ async def test_semester_repo_unique_constraint(db_session: AsyncSession):
 async def test_semester_repo_date_order_constraint(db_session: AsyncSession):
     repo = SemesterRepository(db_session)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=999,
         start_date=date(2026, 6, 30),
         end_date=date(2026, 6, 1)  # Invalid: start_date >= end_date

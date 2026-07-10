@@ -9,6 +9,8 @@ from app.models.activity_logs.activity_log import ActorType, EntityType, ActionT
 from app.schemas.activity_logs.activity_log import ActivityLogResponse
 from app.repositories.activity_logs.activity_log import ActivityLogRepository
 from app.services.activity_logs.activity_log import ActivityLogService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
 
 router = APIRouter()
 
@@ -16,10 +18,13 @@ router = APIRouter()
 from app.schemas.common import ApiResponse
 
 
-async def get_activity_log_service(db: AsyncSession = Depends(get_db)) -> ActivityLogService:
+async def get_activity_log_service(
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ActivityLogService:
     return ActivityLogService(
         db=db,
-        activity_log_repo=ActivityLogRepository(db)
+        activity_log_repo=ActivityLogRepository(db, current_user.id)
     )
 
 

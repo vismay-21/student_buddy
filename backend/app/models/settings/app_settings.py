@@ -16,16 +16,20 @@ class AppSettings(Base):
     """
     App Settings store only global application preferences.
     They never store academic or attendance data.
-
-    Exactly one record exists in this table.
     """
     __tablename__ = "app_settings"
 
     settings_id: Mapped[int] = mapped_column(
         SmallInteger,
         primary_key=True,
-        default=1,
         nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=lambda: __import__("app.core.database", fromlist=["get_default_user_id"]).get_default_user_id()
     )
     active_semester_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("semesters.semester_id", ondelete="RESTRICT"),
@@ -72,9 +76,7 @@ class AppSettings(Base):
         nullable=False
     )
 
-    __table_args__ = (
-        CheckConstraint("settings_id = 1", name="app_settings_single_row"),
-    )
-
     # Relationship
+    user: Mapped["User"] = relationship("User", back_populates="app_settings")
     active_semester = relationship("Semester")
+

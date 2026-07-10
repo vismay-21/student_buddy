@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import String, Enum, DateTime, Text, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
@@ -46,6 +46,12 @@ class ActivityLog(Base):
         default=uuid.uuid4,
         index=True
     )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        default=lambda: __import__("app.core.database", fromlist=["get_default_user_id"]).get_default_user_id()
+    )
     actor_type: Mapped[ActorType] = mapped_column(
         Enum(ActorType, name="activity_actor_type"),
         nullable=False,
@@ -79,3 +85,5 @@ class ActivityLog(Base):
         nullable=False,
         index=True
     )
+
+    user: Mapped["User"] = relationship("User", back_populates="activity_logs")

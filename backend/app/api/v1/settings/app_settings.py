@@ -7,27 +7,20 @@ from app.schemas.settings.app_settings import AppSettingsResponse, AppSettingsUp
 from app.repositories.settings.app_settings import AppSettingsRepository
 from app.repositories.academic.semester import SemesterRepository
 from app.services.settings.app_settings import AppSettingsService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
 
 router = APIRouter()
 
 
-async def get_settings_repo(db: AsyncSession = Depends(get_db)) -> AppSettingsRepository:
-    return AppSettingsRepository(db)
-
-
-async def get_semester_repo(db: AsyncSession = Depends(get_db)) -> SemesterRepository:
-    return SemesterRepository(db)
-
-
 async def get_settings_service(
     db: AsyncSession = Depends(get_db),
-    settings_repo: AppSettingsRepository = Depends(get_settings_repo),
-    semester_repo: SemesterRepository = Depends(get_semester_repo),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> AppSettingsService:
     return AppSettingsService(
         db=db,
-        settings_repo=settings_repo,
-        semester_repo=semester_repo,
+        settings_repo=AppSettingsRepository(db, current_user.id),
+        semester_repo=SemesterRepository(db, current_user.id),
     )
 
 

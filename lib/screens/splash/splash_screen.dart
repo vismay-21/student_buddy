@@ -2,8 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
+import '../../core/services/auth_service.dart';
+import '../../data/api/user_api.dart';
 import '../../data/repositories/semester_repository.dart';
 import '../auth/login_screen.dart';
+import '../navigation_shell.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -42,21 +45,39 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   Future<void> _bootstrap() async {
     final startTime = DateTime.now();
-    try {
-      final list = await SemesterRepository().getSemesters();
-      if (list.isNotEmpty) {
-        final savedId = AppState.instance.savedActiveSemesterId;
-        final found = list.firstWhere(
-          (s) => s.semesterId == savedId,
-          orElse: () => list.first,
-        );
-        AppState.instance.setActiveSemester(found);
-      } else {
+
+    // Check if the user already has an active Supabase session.
+    final hasSession = AuthService.instance.isSignedIn;
+    Widget destination;
+
+    if (hasSession) {
+      // Session exists — initialize backend workspace (idempotent) and load semesters.
+      try {
+        await UserApi().initializeUser();
+      } catch (_) {
+        // Best-effort — don't block startup if backend is temporarily unavailable.
+      }
+
+      try {
+        final list = await SemesterRepository().getSemesters();
+        if (list.isNotEmpty) {
+          final savedId = AppState.instance.savedActiveSemesterId;
+          final found = list.firstWhere(
+            (s) => s.semesterId == savedId,
+            orElse: () => list.first,
+          );
+          AppState.instance.setActiveSemester(found);
+        } else {
+          AppState.instance.setActiveSemester(null);
+        }
+      } catch (e) {
+        debugPrint('Failed to bootstrap semesters: $e');
         AppState.instance.setActiveSemester(null);
       }
-    } catch (e) {
-      debugPrint('Failed to bootstrap semesters: $e');
-      AppState.instance.setActiveSemester(null);
+      destination = const NavigationShell();
+    } else {
+      // No session — go to login.
+      destination = const LoginScreen();
     }
 
     final elapsed = DateTime.now().difference(startTime);
@@ -68,7 +89,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (mounted) {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(),
+          pageBuilder: (context, animation, secondaryAnimation) => destination,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },

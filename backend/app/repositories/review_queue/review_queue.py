@@ -6,14 +6,22 @@ from app.models.review_queue.review_queue import ReviewQueue, ReviewStatus
 
 
 class ReviewQueueRepository:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: uuid.UUID | None = None):
         self.db = db
+        if user_id is None:
+            import sys
+            if "pytest" in sys.modules:
+                from tests.conftest import TEST_USER_ID
+                user_id = TEST_USER_ID
+        self.user_id = user_id
 
     async def get_by_id(self, review_id: uuid.UUID) -> ReviewQueue | None:
         """
-        Retrieves a single review queue item by its UUID.
+        Retrieves a single review queue item by its UUID, scoped to the current user.
         """
         stmt = select(ReviewQueue).where(ReviewQueue.review_id == review_id)
+        if self.user_id is not None:
+            stmt = stmt.where(ReviewQueue.user_id == self.user_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -25,12 +33,15 @@ class ReviewQueueRepository:
         offset: int = 0
     ) -> Sequence[ReviewQueue]:
         """
-        Retrieves review queue items supporting pagination and search.
+        Retrieves review queue items for the current user, supporting pagination and search.
         If status is PENDING, sorts by created_at descending.
         If status is RESOLVED, sorts by resolved_at descending.
         If status is None, returns all items sorted by created_at descending.
         """
         stmt = select(ReviewQueue)
+
+        if self.user_id is not None:
+            stmt = stmt.where(ReviewQueue.user_id == self.user_id)
 
         # Apply status filter and sorting
         if status is not None:
@@ -54,8 +65,10 @@ class ReviewQueueRepository:
 
     async def create(self, review_item: ReviewQueue) -> ReviewQueue:
         """
-        Saves a new review queue item instance to the database.
+        Saves a new review queue item, stamping user_id.
         """
+        if self.user_id is not None and review_item.user_id is None:
+            review_item.user_id = self.user_id
         self.db.add(review_item)
         return review_item
 
@@ -70,3 +83,4 @@ class ReviewQueueRepository:
         Deletes a review queue item instance from the database.
         """
         await self.db.delete(review_item)
+

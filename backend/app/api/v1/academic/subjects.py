@@ -8,18 +8,22 @@ from app.repositories.academic.subject import SubjectRepository
 from app.repositories.academic.semester import SemesterRepository
 from app.repositories.notes.notes_subject import NotesSubjectRepository
 from app.services.academic.subject import SubjectService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
+
 
 router = APIRouter()
 
 
 async def get_subject_service(
     db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> SubjectService:
     return SubjectService(
         db=db,
         subject_repo=SubjectRepository(db),
-        semester_repo=SemesterRepository(db),
-        notes_subject_repo=NotesSubjectRepository(db),
+        semester_repo=SemesterRepository(db, current_user.id),
+        notes_subject_repo=NotesSubjectRepository(db, current_user.id),
     )
 
 

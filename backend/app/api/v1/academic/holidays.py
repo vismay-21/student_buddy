@@ -13,17 +13,20 @@ from app.schemas.academic.holiday import (
 from app.repositories.academic.holiday import HolidayRepository
 from app.repositories.academic.semester import SemesterRepository
 from app.services.academic.holiday import HolidayService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
 
 router = APIRouter()
 
 
 async def get_holiday_service(
     db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> HolidayService:
     return HolidayService(
         db=db,
         holiday_repo=HolidayRepository(db),
-        semester_repo=SemesterRepository(db),
+        semester_repo=SemesterRepository(db, current_user.id),
     )
 
 

@@ -14,19 +14,23 @@ from app.repositories.academic.lecture_instance import LectureInstanceRepository
 from app.repositories.academic.subject import SubjectRepository
 from app.repositories.academic.semester import SemesterRepository
 from app.services.academic.lecture_template import LectureTemplateService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
+
 
 router = APIRouter()
 
 
 async def get_lecture_template_service(
     db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> LectureTemplateService:
     return LectureTemplateService(
         db=db,
         lecture_template_repo=LectureTemplateRepository(db),
         lecture_instance_repo=LectureInstanceRepository(db),
         subject_repo=SubjectRepository(db),
-        semester_repo=SemesterRepository(db),
+        semester_repo=SemesterRepository(db, current_user.id),
     )
 
 

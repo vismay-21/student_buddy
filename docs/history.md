@@ -1270,3 +1270,119 @@ This log tracks architectural decisions, feature implementations, and refinement
   - `backend/README.md` & `README.md`: Overhauled both README guides.
   - `docs/audit/audit_10_production_readiness.md`: Documented complete findings and remediation status.
   - `docs/audit/audit_summary.md`, `docs/context.md`, & `docs/history.md`: Updated master dashboard tables, context summaries, and history details.
+
+---
+
+## 2026-07-10 (Phase 3: Sprint 13 Implementation — Authentication & Multi-Tenancy)
+
+### Decisions
+1. **Multi-Tenant Scoping**: All database models are now strictly scoped to the authenticated `user_id` to enforce data isolation and multi-tenancy.
+2. **Decoupled Users Table**: Introduced a local `users` table that maps Supabase auth identities via UUID to the application. SUPABASE manages authentication while the local DB controls profile/settings ownership.
+3. **Automatic Workspace Provisioning**: Created an idempotent endpoint `POST /api/v1/users/me/initialize` to automatically register the user in the local `users` table and seed their default `app_settings` on first login.
+4. **FastAPI Auth Dependency**: Decoupled route-level security by using a centralized `get_current_user` dependency utilizing `PyJWT` to validate and extract JWT token contents.
+5. **Testing Auth Mocking**: Designed a global FastAPI dependency override scheme in `tests/conftest.py` that bypasses live Supabase calls, mounts a default `TEST_USER_ID`, and resets the DB with correct foreign key setups.
+6. **Robust Model Defaults**: Added a testing fallback mechanism (`get_default_user_id`) in model column declarations so that unit and service-level test instances automatically fallback to `TEST_USER_ID` during test execution when `user_id` is omitted.
+
+### Implementation Details
+* **Database & Migration**:
+  - `backend/alembic/versions/317f52aca7c2_create_users_and_ownership.py`: Created migration establishing the `users` table and adding foreign key checks/ownership columns to semesters, settings, todos, notes subjects, review queues, and activity logs.
+* **Core & Dependencies**:
+  - `backend/app/core/database.py`: Added `get_default_user_id` testing fallback helper.
+  - `backend/app/dependencies/auth.py`: Implemented robust token validation and FastAPI dependencies.
+* **Models**:
+  - Configured `Semester`, `AppSettings`, `Todo`, `NotesSubject`, `ReviewQueue`, and `ActivityLog` to default to `get_default_user_id` when instantiated in a testing environment.
+* **Repositories & API**:
+  - Standardized all repository constructors to inject `user_id`.
+  - Protected API endpoints using `get_current_user`.
+  - Added workspace initialization in `backend/app/api/v1/users/users.py`.
+* **Testing**:
+  - Rewrote `tests/security/test_security.py` to assert custom exception codes, missing headers, and JWT verification.
+  - Verified that all 175 backend tests pass successfully.
+
+---
+
+## 2026-07-10 (Phase 3: Android/Gradle Build Verification & Warning Resolutions)
+
+### Decisions
+1. **Migrate to Built-in Kotlin**: Migrated the Android project configuration to Built-in Kotlin to satisfy current/future Flutter Gradle requirements and avoid deprecated plugin errors.
+2. **Remove Compatibility Flags**: Safely removed the legacy `android.builtInKotlin=false` and `android.newDsl=false` compatibility overrides from `gradle.properties`.
+3. **Suppress Obsolete Java Options Warnings**: Added compilation configurations in the root `build.gradle.kts` to suppress warnings related to obsolete Java 8 compilation options.
+
+### Implementation Details
+* **Build Files**:
+  - `android/app/build.gradle.kts`: Removed legacy `kotlin-android` plugin application and `kotlinOptions {}` block. Configured the new top-level `kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_17 } }` block.
+  - `android/gradle.properties`: Cleaned up old migrator compatibility flags.
+  - `android/build.gradle.kts`: Added `options.compilerArgs.add("-Xlint:-options")` inside JavaCompile type configuration within the subprojects block.
+* **Verification**:
+  - Ran `flutter build apk --debug` which compiled the application successfully with `Exit code 0` and 0 compiler warnings.
+
+---
+
+## 2026-07-10 (Phase 4: JWKS Asymmetric Token Verification Integration)
+
+### Decisions
+1. **Dynamic Algorithm Validation**: Enabled support for both symmetric `HS256` signatures (essential for local testing/mocking) and asymmetric `ES256`/`RS256` signatures (used by modern Supabase Auth environments).
+2. **On-the-fly Public Key Fetching**: Configured the backend to fetch verification keys from Supabase's JWKS endpoint (`/.well-known/jwks.json`) dynamically using PyJWT's `PyJWKClient` to decode the tokens locally.
+
+### Implementation Details
+* **Auth Layer**:
+  - `backend/app/services/auth/authentication_service.py`: Updated `verify_token` to inspect the token's unverified header. If it uses an asymmetric algorithm, retrieve the key dynamically from the JWKS cache and verify using the corresponding public key.
+  - Successfully verified signup and login flow using authentic Supabase `ES256` JWTs.
+  - Verified backend test suite with `17Pass` results for `HS256` mock tokens.
+
+---
+
+## 2026-07-10 (Phase 5: Multi-Tenant Database Seeding Fixes)
+
+### Decisions
+1. **Scoping Seeding Data to User**: Updated the seed database script to truncate the new `users` table and seed a default user to prevent foreign key and NOT NULL violations.
+2. **Context-scoped default user ID resolution**: Implemented a request-scoped context variable `request_user_id` to hold the authenticated user's ID. Updated `get_default_user_id()` to return the context-scoped user ID dynamically, solving implicit `user_id` dependency resolution in model defaults (such as during `log_activity` calls in services).
+
+### Implementation Details
+* **Database & Core**:
+  - `backend/app/core/context.py`: Added contextvar `request_user_id` representing the active user.
+  - `backend/app/core/database.py`: Integrated `request_user_id` contextvar into `get_default_user_id()` fallback resolution.
+  - `backend/app/dependencies/auth.py`: Stamped the request-scoped user ID contextvar inside the `get_current_user` dependency.
+* **Scripts**:
+  - `backend/seed_db.py`: Configured default user seeding (`00000000-0000-0000-0000-000000000001` or customizable via env vars), passed `user_id` during repository instantiation, and set the thread contextvar on startup.
+* **Verification**:
+  - Successfully ran `python seed_db.py` without any errors.
+  - Verified that all 175 backend tests continue to pass.
+
+---
+
+## 2026-07-10 (Phase 6: Authentication Stabilization & Multi-Tenant Reconciliation)
+
+### Decisions
+1. **Solve Token Race Condition**: Updated the Flutter `UserApi().initializeUser()` call to accept an optional token parameter so that the signup and login screens can pass the fresh access token directly to avoid race conditions.
+2. **Resolve Stale Database Conflicts**: Implemented stale user cleansing in the backend `UserService.initialize_user`. If a user is deleted and recreated in Supabase (creating a new UUID with the same email), the backend detects the old UUID and proactively deletes it to prevent UniqueViolation database integrity errors.
+3. **Prevent Primary Key Sequence Collisions**: Reset the PostgreSQL `app_settings_settings_id_seq` sequence generator in the test fixtures inside `tests/conftest.py` to prevent out-of-sync sequence errors during automated test execution.
+4. **Extend Test Suite**: Added comprehensive test coverage in `tests/settings/test_user_service.py` to validate collision handling and idempotency.
+
+### Implementation Details
+* **Flutter Frontend**:
+  - `lib/data/api/user_api.dart`: Updated `initializeUser` signature.
+  - `lib/screens/auth/signup_screen.dart`: Passed Supabase access token to `initializeUser` immediately upon user creation.
+  - `lib/screens/auth/login_screen.dart`: Passed Supabase access token to `initializeUser` on login response.
+* **Backend Services & DB**:
+  - `backend/app/services/users/user.py`: Added stale identity detection and deletion in `initialize_user`.
+* **Testing & Verification**:
+  - `backend/tests/conftest.py`: Added sequence reset block for test suites.
+  - `backend/tests/settings/test_user_service.py`: Added test suite covering user initialization collisions.
+  - Verified that all 179 backend tests pass successfully.
+
+---
+
+## 2026-07-10 (Phase 7: Sprint 14 Refinement - Splitting Offline Foundation & Sync Engine)
+
+### Decisions
+1. **Divide Sprint 14**: Split the massive SQLite integration (Sprint 14) into two distinct phases: Sprint 14A (Offline Foundation) and Sprint 14B (Synchronization Engine).
+2. **Preserve Authenticated Architecture**: Mandated that the application transition to using SQLite as its primary local data store during Sprint 14A, utilizing the backend only for the initial user initialization.
+3. **Incremental Sync Roadmap**: Postponed all synchronization, queues, and conflict resolution capabilities to Sprint 14B.
+
+### Implementation Details
+* **Documentation & Planning**:
+  - `docs/4_backend_implementation_sprints.md`: Split Sprint 14 and updated goals, deliverables, and exclusions.
+  - `docs/2_STUDENT BUDDY DEVELOPMENT ROADMAP DCOUMENT DRD.md`: Updated Phase 8 structure and Official Development Order.
+  - `docs/context.md`: Updated Future Development Roadmap, status descriptions, and Riverpod postponement notes.
+  - `docs/history.md`: Recorded current historical entries.

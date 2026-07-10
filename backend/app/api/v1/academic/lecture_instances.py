@@ -11,6 +11,8 @@ from app.repositories.academic.subject import SubjectRepository
 from app.repositories.academic.semester import SemesterRepository
 from app.repositories.academic.attendance_settings import AttendanceSettingsRepository
 from app.services.academic.lecture_instance import LectureInstanceService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
 from app.services.academic.attendance_statistics import AttendanceStatisticsService
 from app.schemas.academic.lecture_instance import (
     LectureInstanceDetailResponse,
@@ -31,8 +33,8 @@ async def get_subject_repo(db: AsyncSession = Depends(get_db)) -> SubjectReposit
     return SubjectRepository(db)
 
 
-async def get_semester_repo(db: AsyncSession = Depends(get_db)) -> SemesterRepository:
-    return SemesterRepository(db)
+async def get_semester_repo(db: AsyncSession = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> SemesterRepository:
+    return SemesterRepository(db, current_user.id)
 
 
 async def get_attendance_settings_repo(db: AsyncSession = Depends(get_db)) -> AttendanceSettingsRepository:

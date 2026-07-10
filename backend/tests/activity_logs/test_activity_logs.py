@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import uuid
 from datetime import datetime, timezone, timedelta
 import pytest
@@ -37,6 +38,7 @@ async def test_log_activity_best_effort_isolation(db_session: AsyncSession):
     # Test that logging failure does not roll back the parent transaction.
     # We first create a Semester in the parent transaction.
     semester = Semester(
+        user_id=TEST_USER_ID,
         semester_number=1,
         start_date=datetime.now().date(),
         end_date=(datetime.now() + timedelta(days=90)).date()
@@ -69,6 +71,7 @@ async def test_log_activity_best_effort_isolation(db_session: AsyncSession):
 async def test_get_activity_entity_summary_todo(db_session: AsyncSession):
     # Create a Todo item
     todo = Todo(
+        user_id=TEST_USER_ID,
         title="Check activity log summary",
         status=TodoStatus.PENDING
     )
@@ -175,6 +178,7 @@ async def test_api_get_activity_log_by_id(client: AsyncClient, db_session: Async
 async def test_bulk_populate_activity_summaries(db_session: AsyncSession):
     # 1. Create a Todo
     todo = Todo(
+        user_id=TEST_USER_ID,
         title="Todo Task for bulk log test",
         status=TodoStatus.PENDING
     )

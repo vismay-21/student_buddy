@@ -1,3 +1,5 @@
+from tests.conftest import TEST_USER_ID
+from tests.conftest import TEST_USER_ID
 import pytest
 import pytest_asyncio
 import uuid
@@ -16,7 +18,7 @@ from app.services.todo.todo import TodoService
 async def todo_service(db_session: AsyncSession) -> TodoService:
     return TodoService(
         db=db_session,
-        todo_repo=TodoRepository(db_session),
+        todo_repo=TodoRepository(db_session, TEST_USER_ID),
     )
 
 
@@ -102,6 +104,7 @@ async def test_due_date_validation(client: AsyncClient):
 async def test_get_todo_by_id(client: AsyncClient, db_session: AsyncSession):
     # Insert a todo directly
     todo = Todo(
+        user_id=TEST_USER_ID,
         title="Check details",
         priority=TodoPriority.LOW,
         status=TodoStatus.PENDING
@@ -125,7 +128,8 @@ async def test_get_todo_not_found(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_delete_todo(client: AsyncClient, db_session: AsyncSession):
-    todo = Todo(title="To delete")
+    todo = Todo(
+        user_id=TEST_USER_ID,title="To delete")
     db_session.add(todo)
     await db_session.commit()
 
@@ -228,7 +232,8 @@ async def test_default_ordering(client: AsyncClient, db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_state_transitions(client: AsyncClient, db_session: AsyncSession):
     # 1. Create a pending task
-    todo = Todo(title="Transition task", status=TodoStatus.PENDING, completed_at=None)
+    todo = Todo(
+        user_id=TEST_USER_ID,title="Transition task", status=TodoStatus.PENDING, completed_at=None)
     db_session.add(todo)
     await db_session.commit()
 

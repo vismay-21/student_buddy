@@ -298,31 +298,96 @@ Users can login, logout, and access protected endpoints with valid JWT sessions.
 
 ---
 
-# Phase 8 - SQLite Synchronization Engine
+# Phase 8 — Offline-First Architecture (SQLite & Synchronization)
 
-**Estimated Duration:** 3 Days
+> [!NOTE]
+> Sprint 14 has been intentionally divided into two independent implementation phases.
+> Sprint 14A and Sprint 14B must be planned, implemented, verified, audited, and documented independently.
+> Documentation, implementation plans, and verification reports must never combine the two sprints into a single execution plan.
+
+---
+
+# Phase 8A - SQLite Offline Foundation
+
+**Estimated Duration:** 2 Days
 
 ### Goal
 
-Enable offline-first capability.
+Transform Student Buddy into a fully functional offline-first application by establishing a local offline database layer.
+* SQLite is introduced as the primary local data store for the running Flutter application.
+* PostgreSQL remains the authoritative cloud database.
+* The application reads and writes data only through SQLite.
+* Synchronization does not yet exist.
 
-### Architecture
+### Architecture (Sprint 14A / Phase 8A Flow)
 
 ```text
-Flutter
-↓
-Repository
-↓
+Flutter UI
+        ↓
+Riverpod
+        ↓
+Offline Repository Interfaces
+        ↓
+SQLite Repository Implementations
+        ↓
 SQLite
-↓
-FastAPI
-↓
-PostgreSQL
 ```
+*Note: The UI and Riverpod layers must never access SQLite directly; they communicate only via the Offline Repository Interfaces.*
+
+### Scope & Deliverables
+* **SQLite Database Setup**: Configure and initialize the local SQLite database client.
+* **Local Schema**: Create local tables mirroring the active academic and setting entities.
+* **Offline Repository Layer Interfaces**: Define abstraction interfaces decoupling the UI and state layers from the concrete database.
+* **SQLite Repositories**: Implement the offline interfaces to read and write data directly to the local SQLite database.
+* **Initial Workspace Bootstrap**: Download the baseline remote database records from the backend upon initial onboarding to populate SQLite.
+* **Offline Functionality**: Ensure all application features run completely offline using the local database.
+
+### Explicitly Excluded
+* Upload/download synchronization, conflict resolution, or retry logic.
+* Background workers, queue processing, sync metadata, and connectivity listeners.
 
 ### Deliverable
 
-Offline repositories and synchronization engine with conflict resolution and retry logic.
+A fully functional offline-first local application where SQLite serves as the primary local data store, utilizing the backend only for the initial user initialization.
+
+---
+
+# Phase 8B - Synchronization Engine
+
+**Estimated Duration:** 2 Days
+
+### Goal
+
+Synchronize the local SQLite database with PostgreSQL while preserving the offline-first architecture established in Phase 8A.
+
+### Target Architecture (Sprint 14B / Phase 8B Final Architecture)
+
+```text
+Flutter UI
+        ↓
+Riverpod
+        ↓
+Offline Repository Interfaces
+        ↓
+SQLite Repository Implementations
+        ↓
+SQLite ◄───► Synchronization Engine ◄───► FastAPI Backend ◄───► PostgreSQL (Authoritative Cloud DB)
+```
+
+### Scope & Deliverables
+* **Synchronization Engine**: Build the core components that coordinate data exchange between SQLite and the backend.
+* **Upload Queue**: Track and sequentially push pending local changes (inserts, updates, deletes) to the backend.
+* **Download Reconciliation**: Fetch and merge remote delta changes from the backend.
+* **Conflict Resolution**: Establish rules to detect and resolve data conflicts (e.g. client-wins vs server-wins).
+* **Retry Engine**: Build error recovery and back-off logic for failed network operations.
+* **Connectivity Monitoring**: Listen to device network status changes to automatically trigger sync.
+* **Sync Metadata**: Maintain tracking tables and timestamps to coordinate sync states.
+* **Background Workers**: Run synchronization tasks in the background.
+* **Sync Status UI**: Implement user interface indicators and manual sync triggers.
+
+### Deliverable
+
+Automatic and manual synchronization engine connecting SQLite with the FastAPI backend, featuring robust conflict resolution and network connectivity tolerance.
 
 ---
 
@@ -402,13 +467,14 @@ Keep these in Future Scope:
 0. Environment Setup (Completed)
 1. Flutter UI Skeleton (Completed)
 2. FastAPI Setup, Database Design & CRUD (Completed through Sprint 11)
-3. Backend Verification & Flutter API Integration (MVP Mode - Current Priority)
-4. Authentication (Phase 7)
-5. SQLite Synchronization Engine (Phase 8)
-6. WhatsApp Integration (Phase 9)
-7. Notification Engine (Phase 10)
-8. AI & OCR Integration (Phase 11)
-9. Finance Module (Phase 12)
+3. Backend Verification & Flutter API Integration (MVP Mode - Completed)
+4. Authentication & Multi-Tenancy (Phase 7 / Sprint 13) (Completed)
+5. SQLite Offline Foundation (Phase 8A / Sprint 14A)
+6. Synchronization Engine (Phase 8B / Sprint 14B)
+7. WhatsApp Integration (Phase 9 / Sprint 15)
+8. Notification Engine (Phase 10)
+9. AI & OCR Integration (Phase 11 / Sprint 16)
+10. Finance Module (Phase 12 / Sprint 17)
 
 ---
 

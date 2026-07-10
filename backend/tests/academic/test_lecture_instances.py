@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import pytest
 import pytest_asyncio
 import uuid
@@ -30,8 +31,9 @@ from app.core.constants import DEFAULT_ATTENDANCE_GOAL
 
 @pytest_asyncio.fixture(scope="function")
 async def test_semester(db_session: AsyncSession) -> Semester:
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=1,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 1, 31)

@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import pytest
 import pytest_asyncio
 import uuid
@@ -21,8 +22,9 @@ from app.core.constants import DEFAULT_ATTENDANCE_GOAL
 @pytest_asyncio.fixture(scope="function")
 async def sample_semester(db_session: AsyncSession) -> Semester:
     """Helper fixture to create a valid semester for subject tests."""
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=100,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 6, 30)
@@ -83,9 +85,9 @@ async def test_subject_repo_unique_constraint(db_session: AsyncSession, sample_s
 
 @pytest.mark.asyncio
 async def test_subject_service_create_sync_notes(db_session: AsyncSession, sample_semester: Semester):
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     subject_in = SubjectCreate(
@@ -109,9 +111,9 @@ async def test_subject_service_create_sync_notes(db_session: AsyncSession, sampl
 
 @pytest.mark.asyncio
 async def test_subject_service_create_duplicate_name(db_session: AsyncSession, sample_semester: Semester):
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     subject_in = SubjectCreate(
@@ -127,9 +129,9 @@ async def test_subject_service_create_duplicate_name(db_session: AsyncSession, s
 
 @pytest.mark.asyncio
 async def test_subject_service_create_invalid_semester(db_session: AsyncSession):
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     subject_in = SubjectCreate(
@@ -143,9 +145,9 @@ async def test_subject_service_create_invalid_semester(db_session: AsyncSession)
 
 @pytest.mark.asyncio
 async def test_subject_service_update_rename_notes(db_session: AsyncSession, sample_semester: Semester):
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     # Create subject
@@ -171,9 +173,9 @@ async def test_subject_service_update_rename_notes(db_session: AsyncSession, sam
 
 @pytest.mark.asyncio
 async def test_subject_service_delete_with_notes(db_session: AsyncSession, sample_semester: Semester):
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     # Create
@@ -197,9 +199,9 @@ async def test_subject_service_delete_with_notes(db_session: AsyncSession, sampl
 
 @pytest.mark.asyncio
 async def test_subject_service_delete_without_notes(db_session: AsyncSession, sample_semester: Semester):
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     # Create

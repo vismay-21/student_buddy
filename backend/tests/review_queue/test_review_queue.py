@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import pytest
 import pytest_asyncio
 import uuid
@@ -30,8 +31,9 @@ from app.core.exceptions import NotFoundException, ValidationException
 
 @pytest_asyncio.fixture(scope="function")
 async def test_semester(db_session: AsyncSession) -> Semester:
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=1,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 1, 31)
@@ -89,8 +91,9 @@ async def test_lecture_instance(db_session: AsyncSession, test_template: Lecture
 
 @pytest_asyncio.fixture(scope="function")
 async def test_todo(db_session: AsyncSession) -> Todo:
-    repo = TodoRepository(db_session)
+    repo = TodoRepository(db_session, TEST_USER_ID)
     todo = Todo(
+        user_id=TEST_USER_ID,
         title="Study Virtual Memory",
         priority=TodoPriority.HIGH,
         status=TodoStatus.PENDING,
@@ -107,12 +110,13 @@ async def test_todo(db_session: AsyncSession) -> Todo:
 async def review_queue_service(db_session: AsyncSession) -> ReviewQueueService:
     return ReviewQueueService(
         db=db_session,
-        review_queue_repo=ReviewQueueRepository(db_session)
+        review_queue_repo=ReviewQueueRepository(db_session, TEST_USER_ID)
     )
 
 
 def make_review(entity_type: EntityType, entity_id: uuid.UUID, message: str, **kwargs) -> ReviewQueue:
     defaults = dict(
+        user_id=TEST_USER_ID,
         review_type=ReviewType.MISSING_INFORMATION,
         entity_type=entity_type,
         entity_id=entity_id,
@@ -190,7 +194,7 @@ async def test_todo_resolver_resolve_success(db_session: AsyncSession, test_todo
         "title": "Study Virtual Memory (Updated)",
         "status": "completed"
     })
-    todo_repo = TodoRepository(db_session)
+    todo_repo = TodoRepository(db_session, TEST_USER_ID)
     todo = await todo_repo.get_by_id(test_todo.todo_id)
     assert todo.title == "Study Virtual Memory (Updated)"
     assert todo.status == TodoStatus.COMPLETED
@@ -248,7 +252,7 @@ async def test_lecture_instance_resolver_rejects_present_on_holiday(
 async def test_get_item_returns_entity_summary(
     db_session: AsyncSession, review_queue_service: ReviewQueueService, test_todo: Todo
 ):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.TODO, test_todo.todo_id, "Missing todo details")
     await repo.create(r)
     await db_session.flush()
@@ -262,7 +266,7 @@ async def test_get_item_returns_entity_summary(
 async def test_list_items_returns_entity_summary(
     db_session: AsyncSession, review_queue_service: ReviewQueueService, test_todo: Todo
 ):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.TODO, test_todo.todo_id, "Check this")
     await repo.create(r)
     await db_session.flush()
@@ -283,7 +287,7 @@ async def test_resolve_item_sets_resolved_by_user(
     db_session: AsyncSession, review_queue_service: ReviewQueueService, test_todo: Todo
 ):
     from app.schemas.review_queue.review_queue import ReviewQueueResolve
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.TODO, test_todo.todo_id, "Missing info")
     await repo.create(r)
     await db_session.flush()
@@ -300,7 +304,7 @@ async def test_resolve_item_sets_resolved_by_admin(
     db_session: AsyncSession, review_queue_service: ReviewQueueService, test_todo: Todo
 ):
     from app.schemas.review_queue.review_queue import ReviewQueueResolve
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.TODO, test_todo.todo_id, "Admin review")
     await repo.create(r)
     await db_session.flush()
@@ -318,7 +322,7 @@ async def test_resolve_item_sets_resolved_by_admin(
 
 @pytest.mark.asyncio
 async def test_list_pagination_limit(db_session: AsyncSession, test_todo: Todo):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     for i in range(5):
         r = make_review(EntityType.TODO, test_todo.todo_id, f"Item {i}")
         await repo.create(r)
@@ -330,7 +334,7 @@ async def test_list_pagination_limit(db_session: AsyncSession, test_todo: Todo):
 
 @pytest.mark.asyncio
 async def test_list_pagination_offset(db_session: AsyncSession, test_todo: Todo):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     for i in range(5):
         r = make_review(
             EntityType.TODO,
@@ -352,7 +356,7 @@ async def test_list_pagination_offset(db_session: AsyncSession, test_todo: Todo)
 
 @pytest.mark.asyncio
 async def test_list_search_matches_substring(db_session: AsyncSession, test_todo: Todo):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r1 = make_review(EntityType.TODO, test_todo.todo_id, "verify the ATTENDANCE record")
     r2 = make_review(EntityType.TODO, test_todo.todo_id, "check the FINANCE data")
     await repo.create(r1)
@@ -366,7 +370,7 @@ async def test_list_search_matches_substring(db_session: AsyncSession, test_todo
 
 @pytest.mark.asyncio
 async def test_list_search_is_case_insensitive(db_session: AsyncSession, test_todo: Todo):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.TODO, test_todo.todo_id, "Verify The Attendance Record")
     await repo.create(r)
     await db_session.flush()
@@ -379,7 +383,7 @@ async def test_list_search_is_case_insensitive(db_session: AsyncSession, test_to
 
 @pytest.mark.asyncio
 async def test_list_search_no_match_returns_empty(db_session: AsyncSession, test_todo: Todo):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.TODO, test_todo.todo_id, "Check attendance")
     await repo.create(r)
     await db_session.flush()
@@ -397,8 +401,9 @@ async def test_resolve_already_resolved_throws(
     db_session: AsyncSession, review_queue_service: ReviewQueueService, test_todo: Todo
 ):
     from app.schemas.review_queue.review_queue import ReviewQueueResolve
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = ReviewQueue(
+        user_id=TEST_USER_ID,
         review_type=ReviewType.MISSING_INFORMATION,
         entity_type=EntityType.TODO,
         entity_id=test_todo.todo_id,
@@ -427,7 +432,7 @@ async def test_resolve_already_resolved_throws(
 async def test_api_list_includes_entity_summary(
     client: AsyncClient, db_session: AsyncSession, test_todo: Todo
 ):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.TODO, test_todo.todo_id, "Need details")
     await repo.create(r)
     await db_session.flush()
@@ -446,7 +451,7 @@ async def test_api_list_includes_entity_summary(
 async def test_api_list_search_filter(
     client: AsyncClient, db_session: AsyncSession, test_todo: Todo
 ):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     await repo.create(make_review(EntityType.TODO, test_todo.todo_id, "verify attendance status"))
     await repo.create(make_review(EntityType.TODO, test_todo.todo_id, "check finance details"))
     await db_session.flush()
@@ -462,7 +467,7 @@ async def test_api_list_search_filter(
 async def test_api_list_pagination(
     client: AsyncClient, db_session: AsyncSession, test_todo: Todo
 ):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     for i in range(5):
         await repo.create(make_review(EntityType.TODO, test_todo.todo_id, f"Pagination item {i}"))
     await db_session.flush()
@@ -497,7 +502,7 @@ async def test_api_list_negative_offset(client: AsyncClient):
 async def test_api_resolve_with_resolved_by_admin(
     client: AsyncClient, db_session: AsyncSession, test_todo: Todo
 ):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.TODO, test_todo.todo_id, "Admin resolution test")
     await repo.create(r)
     await db_session.flush()
@@ -519,7 +524,7 @@ async def test_api_resolve_with_resolved_by_admin(
 async def test_api_resolve_todo_includes_entity_summary(
     client: AsyncClient, db_session: AsyncSession, test_todo: Todo
 ):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.TODO, test_todo.todo_id, "Missing info")
     await repo.create(r)
     await db_session.flush()
@@ -537,7 +542,7 @@ async def test_api_resolve_todo_includes_entity_summary(
 async def test_api_resolve_lecture_includes_entity_summary(
     client: AsyncClient, db_session: AsyncSession, test_lecture_instance: LectureInstance
 ):
-    repo = ReviewQueueRepository(db_session)
+    repo = ReviewQueueRepository(db_session, TEST_USER_ID)
     r = make_review(EntityType.ATTENDANCE, test_lecture_instance.lecture_instance_id, "Verify attendance")
     await repo.create(r)
     await db_session.flush()

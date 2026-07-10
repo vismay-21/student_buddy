@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import pytest
 import pytest_asyncio
 import uuid
@@ -19,8 +20,9 @@ from app.schemas.academic.subject import SubjectCreate
 
 @pytest_asyncio.fixture(scope="function")
 async def sample_semester(db_session: AsyncSession) -> Semester:
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=1,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 6, 30)
@@ -32,8 +34,9 @@ async def sample_semester(db_session: AsyncSession) -> Semester:
 
 @pytest_asyncio.fixture(scope="function")
 async def sample_semester_two(db_session: AsyncSession) -> Semester:
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=2,
         start_date=date(2026, 7, 1),
         end_date=date(2026, 12, 31)
@@ -45,9 +48,9 @@ async def sample_semester_two(db_session: AsyncSession) -> Semester:
 
 @pytest_asyncio.fixture(scope="function")
 async def sample_subject(db_session: AsyncSession, sample_semester: Semester) -> Subject:
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     subject_in = SubjectCreate(
@@ -237,9 +240,9 @@ async def test_resources_crud_and_validators(client: AsyncClient, sample_semeste
 async def test_notes_hierarchy_ordering(db_session: AsyncSession, client: AsyncClient, sample_semester: Semester):
     # Setup multiple Notes Subjects under same semester
     # (By creating academic subjects, which sync notes subjects)
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     sub_b = await service.create_subject(SubjectCreate(
@@ -321,9 +324,9 @@ async def test_notes_hierarchy_ordering(db_session: AsyncSession, client: AsyncC
 async def test_resources_joint_search_and_ordering(
     db_session: AsyncSession, client: AsyncClient, sample_semester: Semester, sample_semester_two: Semester
 ):
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     # 1. Semester 1 (2026-A) -> Subject Physics -> Unit 1 -> "Advanced Physics Notes.pdf"
@@ -420,9 +423,9 @@ async def test_resources_joint_search_and_ordering(
 async def test_resources_pagination(
     db_session: AsyncSession, client: AsyncClient, sample_semester: Semester
 ):
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     subject_repo = SubjectRepository(db_session)
-    notes_repo = NotesSubjectRepository(db_session)
+    notes_repo = NotesSubjectRepository(db_session, TEST_USER_ID)
     service = SubjectService(db_session, subject_repo, semester_repo, notes_repo)
 
     sub_phys = await service.create_subject(SubjectCreate(

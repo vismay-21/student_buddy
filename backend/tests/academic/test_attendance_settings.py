@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import pytest
 import pytest_asyncio
 import uuid
@@ -24,8 +25,9 @@ from app.core.exceptions import NotFoundException, ValidationException
 
 @pytest_asyncio.fixture(scope="function")
 async def test_semester(db_session: AsyncSession) -> Semester:
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=10,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 1, 10)
@@ -96,7 +98,7 @@ async def test_service_validation_goal_range(db_session: AsyncSession, test_seme
     service = AttendanceSettingsService(
         db=db_session,
         attendance_repo=AttendanceSettingsRepository(db_session),
-        semester_repo=SemesterRepository(db_session)
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID)
     )
 
     # Goal > 100 should raise ValidationException
@@ -127,7 +129,7 @@ async def test_service_validation_missing_goal(db_session: AsyncSession, test_se
     service = AttendanceSettingsService(
         db=db_session,
         attendance_repo=AttendanceSettingsRepository(db_session),
-        semester_repo=SemesterRepository(db_session)
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID)
     )
 
     # If updating to overall or subject mode, and the goal is None
@@ -154,7 +156,7 @@ async def test_service_custom_mode_ignores_semester_goal(db_session: AsyncSessio
     service = AttendanceSettingsService(
         db=db_session,
         attendance_repo=AttendanceSettingsRepository(db_session),
-        semester_repo=SemesterRepository(db_session)
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID)
     )
 
     # Custom mode allows goal to be None
@@ -175,7 +177,7 @@ async def test_service_transitions(db_session: AsyncSession, test_semester: Seme
     service = AttendanceSettingsService(
         db=db_session,
         attendance_repo=AttendanceSettingsRepository(db_session),
-        semester_repo=SemesterRepository(db_session)
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID)
     )
 
     # 1. overall -> subject
@@ -210,7 +212,7 @@ async def test_service_partial_updates(db_session: AsyncSession, test_semester: 
     service = AttendanceSettingsService(
         db=db_session,
         attendance_repo=AttendanceSettingsRepository(db_session),
-        semester_repo=SemesterRepository(db_session)
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID)
     )
 
     # Update goal only
@@ -240,7 +242,7 @@ async def test_stats_semester_without_subjects(db_session: AsyncSession, test_se
         db=db_session,
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
         attendance_settings_repo=AttendanceSettingsRepository(db_session)
     )
 
@@ -248,7 +250,7 @@ async def test_stats_semester_without_subjects(db_session: AsyncSession, test_se
     settings_service = AttendanceSettingsService(
         db=db_session,
         attendance_repo=AttendanceSettingsRepository(db_session),
-        semester_repo=SemesterRepository(db_session)
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID)
     )
     await settings_service.update_attendance_settings(
         test_semester.semester_id,
@@ -270,7 +272,7 @@ async def test_stats_semester_no_marked_lectures(
         db=db_session,
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
         attendance_settings_repo=AttendanceSettingsRepository(db_session)
     )
 
@@ -329,7 +331,7 @@ async def test_stats_immutability_of_history(
     service = AttendanceSettingsService(
         db=db_session,
         attendance_repo=AttendanceSettingsRepository(db_session),
-        semester_repo=SemesterRepository(db_session)
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID)
     )
 
     # Change settings

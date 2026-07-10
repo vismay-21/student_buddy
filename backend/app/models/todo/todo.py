@@ -1,8 +1,8 @@
 import enum
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Enum, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Enum, DateTime, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
@@ -34,6 +34,12 @@ class Todo(Base):
         primary_key=True,
         default=uuid.uuid4,
         index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        default=lambda: __import__("app.core.database", fromlist=["get_default_user_id"]).get_default_user_id()
     )
     title: Mapped[str] = mapped_column(
         String(255),
@@ -75,3 +81,5 @@ class Todo(Base):
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )
+
+    user: Mapped["User"] = relationship("User", back_populates="todos")

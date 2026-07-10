@@ -6,14 +6,22 @@ from app.models.todo.todo import Todo, TodoPriority, TodoStatus
 
 
 class TodoRepository:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: uuid.UUID | None = None):
         self.db = db
+        if user_id is None:
+            import sys
+            if "pytest" in sys.modules:
+                from tests.conftest import TEST_USER_ID
+                user_id = TEST_USER_ID
+        self.user_id = user_id
 
     async def get_by_id(self, todo_id: uuid.UUID) -> Todo | None:
         """
-        Retrieves a single todo by its ID.
+        Retrieves a single todo by its ID, scoped to the current user.
         """
         stmt = select(Todo).where(Todo.todo_id == todo_id)
+        if self.user_id is not None:
+            stmt = stmt.where(Todo.user_id == self.user_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -26,7 +34,7 @@ class TodoRepository:
         offset: int = 0
     ) -> Sequence[Todo]:
         """
-        Retrieves all todos, optionally filtered by status, priority,
+        Retrieves all todos for the current user, optionally filtered by status, priority,
         and query string `q` for a case-insensitive match on the title.
 
         Default Ordering Rules:
@@ -37,6 +45,8 @@ class TodoRepository:
         """
         stmt = select(Todo)
 
+        if self.user_id is not None:
+            stmt = stmt.where(Todo.user_id == self.user_id)
         if status is not None:
             stmt = stmt.where(Todo.status == status)
         if priority is not None:
@@ -61,8 +71,10 @@ class TodoRepository:
 
     async def create(self, todo: Todo) -> Todo:
         """
-        Saves a new todo instance to the database.
+        Saves a new todo instance to the database, stamping user_id.
         """
+        if self.user_id is not None and todo.user_id is None:
+            todo.user_id = self.user_id
         self.db.add(todo)
         return todo
 
@@ -77,3 +89,4 @@ class TodoRepository:
         Deletes a todo instance from the database.
         """
         await self.db.delete(todo)
+

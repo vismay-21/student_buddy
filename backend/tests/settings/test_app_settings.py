@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import pytest
 import pytest_asyncio
 import uuid
@@ -19,6 +20,7 @@ from app.services.settings.app_settings import AppSettingsService
 async def test_semester(db_session: AsyncSession) -> Semester:
     semester_repo = SemesterRepository(db_session)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=1,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 1, 15)

@@ -3,11 +3,13 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../core/services/auth_service.dart';
 import '../../data/dto/settings/app_settings_dto.dart';
 import '../../data/repositories/app_settings_repository.dart';
 import '../../data/dto/activity_log/activity_log_dto.dart';
 import '../../data/repositories/activity_log_repository.dart';
 import 'semester_selection_screen.dart';
+import '../auth/login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -129,7 +131,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSectionHeader('ABOUT'),
             const SizedBox(height: 10),
             _buildAboutCard(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
+
+            // Sign Out
+            _buildSignOutCard(),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -423,7 +429,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'v1.0.0 (Phase 1 Refactored)',
+                        'v1.0.0 — Sprint 13: Authentication',
                         style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                       ),
                     ],
@@ -438,6 +444,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSignOutCard() {
+    return Card(
+      color: AppTheme.danger.withOpacity(0.08),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppTheme.danger.withOpacity(0.25)),
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.logout_rounded, color: AppTheme.danger),
+        title: const Text(
+          'Sign Out',
+          style: TextStyle(
+            color: AppTheme.danger,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+        subtitle: Text(
+          AuthService.instance.currentUser?.email ?? '',
+          style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+        ),
+        onTap: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text('Sign Out'),
+              content: const Text('Are you sure you want to sign out?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child:
+                      Text('Sign Out', style: TextStyle(color: AppTheme.danger)),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true && mounted) {
+            await AuthService.instance.signOut();
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            }
+          }
+        },
       ),
     );
   }

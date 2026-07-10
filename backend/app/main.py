@@ -17,6 +17,7 @@ from app.api.v1.todo.todos import router as todos_router
 from app.api.v1.notes.notes import router as notes_router
 from app.api.v1.review_queue.review_queue import router as review_queue_router
 from app.api.v1.activity_logs.activity_logs import router as activity_logs_router
+from app.api.v1.users.users import router as users_router
 
 # Setup structured logging
 setup_logging(enable_file_logging=settings.ENABLE_FILE_LOGGING)
@@ -53,6 +54,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router, prefix=API_V1_PREFIX, tags=["Health"])
+app.include_router(users_router, prefix=f"{API_V1_PREFIX}/users", tags=["Users"])
 app.include_router(semesters_router, prefix=f"{API_V1_PREFIX}/academic/semesters", tags=["Semesters"])
 app.include_router(subjects_router, prefix=f"{API_V1_PREFIX}/academic/subjects", tags=["Subjects"])
 app.include_router(lecture_templates_router, prefix=f"{API_V1_PREFIX}/academic/lecture-templates", tags=["Lecture Templates"])

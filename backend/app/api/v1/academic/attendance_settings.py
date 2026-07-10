@@ -8,27 +8,20 @@ from app.schemas.academic.attendance_settings import AttendanceSettingsResponse,
 from app.repositories.academic.attendance_settings import AttendanceSettingsRepository
 from app.repositories.academic.semester import SemesterRepository
 from app.services.academic.attendance_settings import AttendanceSettingsService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
 
 router = APIRouter()
 
 
-async def get_attendance_repo(db: AsyncSession = Depends(get_db)) -> AttendanceSettingsRepository:
-    return AttendanceSettingsRepository(db)
-
-
-async def get_semester_repo(db: AsyncSession = Depends(get_db)) -> SemesterRepository:
-    return SemesterRepository(db)
-
-
 async def get_attendance_settings_service(
     db: AsyncSession = Depends(get_db),
-    attendance_repo: AttendanceSettingsRepository = Depends(get_attendance_repo),
-    semester_repo: SemesterRepository = Depends(get_semester_repo),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> AttendanceSettingsService:
     return AttendanceSettingsService(
         db=db,
-        attendance_repo=attendance_repo,
-        semester_repo=semester_repo,
+        attendance_repo=AttendanceSettingsRepository(db),
+        semester_repo=SemesterRepository(db, current_user.id),
     )
 
 

@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import pytest
 import pytest_asyncio
 import uuid
@@ -23,8 +24,9 @@ from app.core.constants import DEFAULT_ATTENDANCE_GOAL
 
 @pytest_asyncio.fixture(scope="function")
 async def sample_semester(db_session: AsyncSession) -> Semester:
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=10,
         start_date=date(2026, 9, 1),
         end_date=date(2026, 9, 30)  # exactly 30 days
@@ -112,7 +114,7 @@ async def test_lecture_template_service_create_generates_instances(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     template_in = LectureTemplateCreate(
@@ -148,7 +150,7 @@ async def test_timetable_overlap_validation_create(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     # 1. Create a class from 09:00 to 10:00 on Monday (Day 1)
@@ -196,7 +198,7 @@ async def test_timetable_overlap_validation_update(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     # 1. Create Template A: Monday 09:00 - 10:00
@@ -234,8 +236,9 @@ async def test_semester_with_zero_matching_weekdays(
     db_session: AsyncSession, sample_subject: Subject
 ):
     # Create a very short 3-day semester: Sept 1 (Tue) to Sept 3 (Thu) 2026
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=11,
         start_date=date(2026, 9, 1),
         end_date=date(2026, 9, 3),
@@ -258,7 +261,7 @@ async def test_semester_with_zero_matching_weekdays(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     # Create template on Monday (Day 1). Since there are no Mondays between Sept 1 and Sept 3, 0 instances should be created.
@@ -281,8 +284,9 @@ async def test_semester_boundary_generation(
     db_session: AsyncSession, sample_subject: Subject
 ):
     # Semester starts Monday Sept 7 and ends Monday Sept 14 (exactly 8 days)
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=12,
         start_date=date(2026, 9, 7),
         end_date=date(2026, 9, 14),
@@ -305,7 +309,7 @@ async def test_semester_boundary_generation(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     # Template on Monday (Day 1)
@@ -332,8 +336,9 @@ async def test_leap_year_generation(
     db_session: AsyncSession, sample_subject: Subject
 ):
     # Leap year semester: Feb 1, 2028 (Tuesday) to Feb 29, 2028 (Tuesday)
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=13,
         start_date=date(2028, 2, 1),
         end_date=date(2028, 2, 29),
@@ -356,7 +361,7 @@ async def test_leap_year_generation(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     # Template on Tuesday (Day 2)
@@ -386,7 +391,7 @@ async def test_update_only_room_does_not_regenerate(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     template = await service.create_template(
@@ -422,7 +427,7 @@ async def test_update_start_time_regenerates(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     template = await service.create_template(
@@ -453,7 +458,7 @@ async def test_update_end_time_regenerates(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     template = await service.create_template(
@@ -484,7 +489,7 @@ async def test_transaction_rollback_on_failed_regeneration(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     template = await service.create_template(
@@ -649,7 +654,7 @@ async def test_update_template_conflict_with_retained_instance(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     # Create template: Monday 09:00 - 10:00
@@ -692,7 +697,7 @@ async def test_update_template_time_inversion(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     # Create template: Monday 09:00 - 10:00

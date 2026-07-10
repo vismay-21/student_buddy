@@ -293,24 +293,103 @@ No APIs.
 
 ---
 
-# Sprint 13 — Authentication
+# Sprint 13 — Authentication (Completed)
 
 ## Deliverables
-- Supabase Authentication
-- JWT validation
-- Protected endpoints
-- User context
+- Supabase Authentication & Multi-Tenancy Architecture
+- PyJWT token validation & local signature verification
+- Protected REST API endpoints using FastAPI dependencies
+- Decoupled application-level `users` database table
+- Workspace provisioning auto-initialization flow (`POST /api/v1/users/me/initialize`)
+- Scoped repository constructors for data isolation
+- Multi-tenant test suite using mocked authentication overrides
+
+# Sprint 14A — Offline Foundation
+
+## Goal
+Transform Student Buddy into a fully functional offline-first application while preserving the existing authenticated architecture. 
+
+During Sprint 14A:
+* SQLite becomes the primary local data store for the running Flutter application.
+* PostgreSQL remains the authoritative cloud database.
+* The application reads and writes data only through SQLite.
+* Synchronization does not yet exist.
+* Sprint 14B will later reconcile SQLite with PostgreSQL.
+
+## Repository Architecture & Abstraction
+To ensure a clean separation of concerns and allow for future synchronization features, we enforce the following data layer flow:
+```text
+Flutter UI  ──>  Riverpod  ──>  Offline Repository Interfaces  ──>  SQLite Repository Implementations  ──>  SQLite
+```
+* **Strict Abstraction**: The Flutter UI and state controllers must never communicate directly with SQLite.
+* **Synchronization Readiness**: This interface abstraction is essential because Sprint 14B will later extend the repositories with synchronization behavior without changing the UI or Riverpod layers.
+
+## Deliverables & Responsibilities
+- **SQLite Initialization**: Configure the local database using sqflite, setting up database creation and lifecycle management.
+- **Local Database Schema**: Define tables matching semesters, subjects, lecture templates, lecture instances, holidays, settings, todos, notes, review queues, and activity logs.
+- **Offline Repository Layer**: Implement repositories implementing the offline interfaces for SQLite queries.
+- **Atomic Workspace Bootstrap**: Design the first-time download process to pull all remote database records from the backend and populate the SQLite database.
+- **Lightweight Bootstrap Metadata**: The application must persist enough bootstrap state to determine whether the initial workspace download has already completed. This state is *not* synchronization metadata.
+- **CRUD Operations**: Read and write all application data exclusively through SQLite during normal usage.
+- **App Startup**: Boot the application by immediately reading data from SQLite on startup.
+- **UI Behavior**: Ensure the interface behaves identically whether the device is online or offline.
+
+## Bootstrap Lifecycle
+To ensure the backend is only queried once for initial provisioning:
+```text
+[First Login]
+Login  ──>  Workspace Initialize  ──>  Download complete workspace  ──>  Populate SQLite  ──>  Store bootstrap metadata  ──>  Normal application usage
+
+[Future App Launches]
+Launch  ──>  Read SQLite immediately  ──>  Do NOT perform a complete bootstrap again
+```
+* **Single-Bootstrap Policy**: The bootstrap process runs only on first-time login/registration or during an explicit database reset. It must not run on subsequent app launches or normal session restorations.
+
+## UUID Consistency Rules
+- SQLite must preserve exactly the same UUIDs generated/used by PostgreSQL.
+- Existing backend UUIDs must never be replaced with local database identifiers.
+- Local SQLite tables must never use auto-incrementing integer IDs.
+- Primary keys and identifiers must remain identical across:
+  ```text
+  PostgreSQL  <──>  FastAPI  <──>  SQLite  <──>  Flutter DTOs
+  ```
+
+## User Isolation Rules
+- SQLite database data must be strictly user-scoped.
+- User A's local database must never be visible to User B.
+- Logging out must clear or safely isolate local user data (e.g. deleting or locking the local database file).
+- Logging in with another account must bootstrap only that specific user's workspace.
+
+## Atomic Workspace Bootstrap Integrity
+- The initial workspace bootstrap must behave as an atomic process.
+- If any stage of the download or database populate fails (e.g. semesters and subjects are imported but lecture templates fail), the bootstrap must fail safely without leaving a partial, corrupted local workspace state. The application must revert or mark the bootstrap state as incomplete to prompt a retry.
+
+## Explicitly Excluded
+The following features are strictly excluded from Sprint 14A:
+- Upload synchronization (no pending updates queued or pushed to backend)
+- Download synchronization (no background updates fetched from PostgreSQL)
+- Conflict resolution (no automatic or manual merging of data)
+- Retry engine and connectivity listeners
+- Background workers and queue processing
+- Synchronization metadata (such as pending operations, local mutation timestamps, etc.)
 
 ---
 
-# Sprint 14 — SQLite Synchronization Engine
+# Sprint 14B — Synchronization Engine
 
-## Deliverables
-- SQLite
-- Offline-first repositories
-- Synchronization engine
-- Conflict resolution
-- Retry logic
+## Goal
+Synchronize the local SQLite database with the PostgreSQL database on the backend while preserving the offline-first architecture established in Sprint 14A. 
+
+## Deliverables & Responsibilities
+- **Sync Metadata Tables**: Store local metadata tracking pending changes, local mutation timestamps, and last sync status details.
+- **Upload Queue**: Track and process pending local mutations (inserts, updates, deletes) sequentially to replicate them on PostgreSQL.
+- **Download Reconciler**: Retrieve and merge changes from PostgreSQL since the last sync timestamp.
+- **Background Sync**: Implement background workers and retry logic for failed requests.
+- **Conflict Resolution**: Establish conflict detection rules and strategies (e.g., client-wins, server-wins, manual merges).
+- **Connectivity Monitoring**: Integrate listeners to automatically trigger synchronization once network connection is recovered.
+- **UI Indicators**: Provide manual sync actions and status icons to show connection/sync state.
+
+*Note: Sprint 14B assumes that the Sprint 14A Offline Foundation is already fully implemented.*
 
 ---
 

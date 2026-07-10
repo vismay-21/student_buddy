@@ -1,3 +1,4 @@
+from tests.conftest import TEST_USER_ID
 import pytest
 import pytest_asyncio
 import uuid
@@ -24,8 +25,9 @@ from app.schemas.academic.holiday import HolidayCreate, HolidayUpdate
 
 @pytest_asyncio.fixture(scope="function")
 async def test_semester(db_session: AsyncSession) -> Semester:
-    semester_repo = SemesterRepository(db_session)
+    semester_repo = SemesterRepository(db_session, TEST_USER_ID)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=1,
         start_date=date(2026, 1, 1),
         end_date=date(2026, 1, 15)
@@ -90,7 +92,7 @@ async def holiday_service(db_session: AsyncSession) -> HolidayService:
     return HolidayService(
         db=db_session,
         holiday_repo=HolidayRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
 
@@ -447,7 +449,7 @@ async def test_create_lecture_template_after_holiday_creation(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
 
     template_in = LectureTemplateCreate(
@@ -485,9 +487,10 @@ async def test_leap_year_holiday_boundary(
     holiday_service: HolidayService
 ):
     # 1. Create a semester spanning a leap day (Feb 29, 2028)
-    sem_repo = SemesterRepository(db_session)
+    sem_repo = SemesterRepository(db_session, TEST_USER_ID)
     # Feb 29, 2028 is a Tuesday (day_of_week=2)
     sem = Semester(
+        user_id=TEST_USER_ID,
         semester_number=2028,
         start_date=date(2028, 2, 1),
         end_date=date(2028, 3, 15)
@@ -517,7 +520,7 @@ async def test_leap_year_holiday_boundary(
         lecture_template_repo=LectureTemplateRepository(db_session),
         lecture_instance_repo=LectureInstanceRepository(db_session),
         subject_repo=SubjectRepository(db_session),
-        semester_repo=SemesterRepository(db_session),
+        semester_repo=SemesterRepository(db_session, TEST_USER_ID),
     )
     # Create Tuesday Template
     from app.schemas.academic.lecture_template import LectureTemplateCreate

@@ -12,16 +12,19 @@ from app.schemas.todo.todo import (
 from app.models.todo.todo import TodoPriority, TodoStatus
 from app.repositories.todo.todo import TodoRepository
 from app.services.todo.todo import TodoService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
 
 router = APIRouter()
 
 
 async def get_todo_service(
     db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> TodoService:
     return TodoService(
         db=db,
-        todo_repo=TodoRepository(db),
+        todo_repo=TodoRepository(db, current_user.id),
     )
 
 

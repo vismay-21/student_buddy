@@ -15,7 +15,8 @@ async def log_activity(
     entity_id: uuid.UUID,
     action_type: ActionType,
     activity_message: str,
-    correlation_id: Optional[uuid.UUID] = None
+    correlation_id: Optional[uuid.UUID] = None,
+    user_id: Optional[uuid.UUID] = None
 ) -> Optional[ActivityLog]:
     """
     Records an application activity log in a best-effort, isolated transaction block.
@@ -30,12 +31,14 @@ async def log_activity(
                 entity_id=entity_id,
                 action_type=action_type,
                 activity_message=activity_message,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
+                user_id=user_id
             )
-            repo = ActivityLogRepository(db)
+            repo = ActivityLogRepository(db, user_id=user_id)
             await repo.create(log)
             await db.flush()
             return log
     except Exception as err:
         logger.error("Failed to log activity: %s", err, exc_info=True)
         return None
+

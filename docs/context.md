@@ -101,7 +101,7 @@ Always prefer deterministic systems first.
 * **Frontend**: Flutter + Dart
 * **State Management**: Riverpod
 * **Backend**: Python + FastAPI
-* **Authentication**: Supabase Auth (Phone/WhatsApp OTP authentication)
+* **Authentication**: Supabase Auth (Email/Password authentication) + Decoupled Local Users Table
 * **Cloud Database**: Supabase PostgreSQL
 * **Local Database**: SQLite (for offline-first support)
 * **WhatsApp**: Meta Cloud API
@@ -409,7 +409,7 @@ student_buddy/
 
 ## 9. Current Backend Status
 
-We are currently preparing for **Authentication (Sprint 13)**, having completed the **Business Logic & Runtime Calculation Audit (Sprint 12.5)**.
+We are currently preparing for **SQLite Offline Foundation (Sprint 14A)**, having completed **Authentication & Multi-Tenancy (Sprint 13)**.
 
 
 ### 9.1. Frontend / UI (Phase 1 — Locked)
@@ -482,7 +482,7 @@ We are currently preparing for **Authentication (Sprint 13)**, having completed 
 
 * **What was intentionally NOT implemented (postponed/frozen)**:
   * **Finance Module (FROZEN)**: All Finance module development is officially frozen. It is now disabled by default on clean installs, and the toggle state is persisted via `SharedPreferences`.
-  * Riverpod state management implementation (postponed to Sprint 14)
+  * Riverpod state management implementation (postponed to Sprint 14A)
 
 ### 9.2. Backend Service Implementations
 
@@ -605,9 +605,17 @@ We are currently preparing for **Authentication (Sprint 13)**, having completed 
   - Conducted Audit 10 (Production Readiness Audit) scoring a **100/100** post-remediation health score. Configured database connection pooling, dynamically disabled Swagger docs in production environments, overhauled the health check route to verify active database connections, and created a `Dockerfile` and `docker-compose.yaml` to run uvicorn backend and PostgreSQL services locally. See detailed report: [docs/audit/audit_10_production_readiness.md](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_10_production_readiness.md).
   - Verified 174/174 backend automated tests pass successfully.
 
+* **What was implemented (Sprint 13 - Authentication)**:
+  - Integrated Supabase Authentication with the FastAPI backend.
+  - Implemented JWT token signature verification using `PyJWT`.
+  - Created a decoupled application-level `users` database table to separate identity from profiles/settings.
+  - Added workspace initialization endpoint `POST /api/v1/users/me/initialize` to provision default settings and profiles idempotently.
+  - Enforced strict repository-level constructor scoping via `user_id` injection to guarantee multi-tenant data isolation.
+  - Refactored test configurations to support mocked token validation overrides and automatic seeding/scoping of default test user context.
+  - Verified 175/175 backend automated tests pass successfully.
+
 * **What was intentionally NOT implemented (postponed)**:
-  * Authentication & Supabase integration (postponed to Sprint 13)
-  * SQLite synchronization engine (postponed to Sprint 14)
+  * SQLite Offline Foundation & Synchronization Engine (postponed to Sprints 14A & 14B)
   * WhatsApp bot webhook and Meta Cloud API integration (postponed to Sprint 15)
   * AI engine and OCR timetable parser (postponed to Sprint 16)
 
@@ -628,9 +636,10 @@ We are currently preparing for **Authentication (Sprint 13)**, having completed 
 * **Sprint 10**: Review Queue Module (Completed + Refined)
 * **Sprint 11**: Activity Logs Module (Completed)
 * **Sprint 12**: Backend Verification & Flutter API Integration (MVP Mode) (Completed)
-* **Sprint 12.5**: MVP Backend Audit & Maintenance (In Progress)
-* **Sprint 13**: Authentication
-* **Sprint 14**: SQLite Synchronization Engine
+* **Sprint 12.5**: MVP Backend Audit & Maintenance (Completed)
+* **Sprint 13**: Authentication (Completed)
+* **Sprint 14A**: SQLite Offline Foundation
+* **Sprint 14B**: SQLite Synchronization Engine
 * **Sprint 15**: WhatsApp Integration
 * **Sprint 16**: AI Integration
 * **Sprint 17**: Finance Module (Frozen until core is stable)

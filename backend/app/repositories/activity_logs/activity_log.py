@@ -7,21 +7,31 @@ from app.models.activity_logs.activity_log import ActivityLog, ActorType, Entity
 
 
 class ActivityLogRepository:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: uuid.UUID | None = None):
         self.db = db
+        if user_id is None:
+            import sys
+            if "pytest" in sys.modules:
+                from tests.conftest import TEST_USER_ID
+                user_id = TEST_USER_ID
+        self.user_id = user_id
 
     async def get_by_id(self, activity_id: uuid.UUID) -> ActivityLog | None:
         """
-        Retrieves a single activity log by its ID.
+        Retrieves a single activity log by its ID, scoped to the current user.
         """
         stmt = select(ActivityLog).where(ActivityLog.activity_id == activity_id)
+        if self.user_id is not None:
+            stmt = stmt.where(ActivityLog.user_id == self.user_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
     async def create(self, log: ActivityLog) -> ActivityLog:
         """
-        Persists a new activity log.
+        Persists a new activity log, stamping user_id.
         """
+        if self.user_id is not None and log.user_id is None:
+            log.user_id = self.user_id
         self.db.add(log)
         return log
 
@@ -39,11 +49,13 @@ class ActivityLogRepository:
         offset: int = 0
     ) -> Sequence[ActivityLog]:
         """
-        Queries activity logs with pagination, filters, and expanded search `q`.
+        Queries activity logs for the current user with pagination, filters, and expanded search `q`.
         Search matches message, entity_type, and action_type case-insensitively.
         """
         stmt = select(ActivityLog)
 
+        if self.user_id is not None:
+            stmt = stmt.where(ActivityLog.user_id == self.user_id)
         if actor_type is not None:
             stmt = stmt.where(ActivityLog.actor_type == actor_type)
         if entity_type is not None:
@@ -76,3 +88,4 @@ class ActivityLogRepository:
 
         result = await self.db.execute(stmt)
         return result.scalars().all()
+

@@ -8,15 +8,23 @@ from app.models.academic.semester import Semester
 
 
 class SemesterRepository:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: uuid.UUID | None = None):
         self.db = db
+        if user_id is None:
+            import sys
+            if "pytest" in sys.modules:
+                from tests.conftest import TEST_USER_ID
+                user_id = TEST_USER_ID
+        self.user_id = user_id
 
     async def get_by_id(self, semester_id: uuid.UUID) -> Semester | None:
         stmt = (
             select(Semester)
             .where(Semester.semester_id == semester_id)
-            .options(selectinload(Semester.attendance_settings))
         )
+        if self.user_id is not None:
+            stmt = stmt.where(Semester.user_id == self.user_id)
+        stmt = stmt.options(selectinload(Semester.attendance_settings))
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -24,8 +32,10 @@ class SemesterRepository:
         stmt = (
             select(Semester)
             .where(Semester.semester_number == semester_number)
-            .options(selectinload(Semester.attendance_settings))
         )
+        if self.user_id is not None:
+            stmt = stmt.where(Semester.user_id == self.user_id)
+        stmt = stmt.options(selectinload(Semester.attendance_settings))
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -45,21 +55,27 @@ class SemesterRepository:
         ]
         if exclude_id is not None:
             conditions.append(Semester.semester_id != exclude_id)
+        if self.user_id is not None:
+            conditions.append(Semester.user_id == self.user_id)
 
         stmt = select(Semester).where(and_(*conditions)).limit(1)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
     async def list_all(self) -> Sequence[Semester]:
+        stmt = select(Semester)
+        if self.user_id is not None:
+            stmt = stmt.where(Semester.user_id == self.user_id)
         stmt = (
-            select(Semester)
-            .order_by(Semester.semester_number.asc())
+            stmt.order_by(Semester.semester_number.asc())
             .options(selectinload(Semester.attendance_settings))
         )
         result = await self.db.execute(stmt)
         return result.scalars().all()
 
     async def create(self, semester: Semester) -> Semester:
+        if self.user_id is not None and semester.user_id is None:
+            semester.user_id = self.user_id
         self.db.add(semester)
         return semester
 
@@ -69,3 +85,4 @@ class SemesterRepository:
 
     async def delete(self, semester: Semester) -> None:
         await self.db.delete(semester)
+

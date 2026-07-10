@@ -7,17 +7,20 @@ from app.schemas.common import ApiResponse
 from app.schemas.review_queue.review_queue import ReviewQueueResolve, ReviewQueueResponse
 from app.repositories.review_queue.review_queue import ReviewQueueRepository
 from app.services.review_queue.review_queue import ReviewQueueService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
 from app.models.review_queue.review_queue import ReviewStatus
 
 router = APIRouter()
 
 
 async def get_review_queue_service(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> ReviewQueueService:
     return ReviewQueueService(
         db=db,
-        review_queue_repo=ReviewQueueRepository(db)
+        review_queue_repo=ReviewQueueRepository(db, current_user.id)
     )
 
 

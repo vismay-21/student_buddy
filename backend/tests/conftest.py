@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from typing import AsyncGenerator, Generator
 import pytest
 import pytest_asyncio
@@ -7,6 +8,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.main import app
 from app.core.database import get_db, engine
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
+
+TEST_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+TEST_USER_EMAIL = "test@example.com"
 
 
 @pytest.fixture(scope="session")
@@ -23,14 +29,24 @@ async def clean_database():
     await engine.dispose()
     async with engine.begin() as conn:
         await conn.execute(
-            text("TRUNCATE TABLE semesters, attendance_settings, subjects, notes_subjects, notes_sections, notes_resources, lecture_templates, lecture_instances, holidays, todos, review_queue, activity_logs RESTART IDENTITY CASCADE;")
+            text("TRUNCATE TABLE users, semesters, attendance_settings, subjects, notes_subjects, notes_sections, notes_resources, lecture_templates, lecture_instances, holidays, todos, review_queue, activity_logs RESTART IDENTITY CASCADE;")
         )
         await conn.execute(
             text(
-                "INSERT INTO app_settings (settings_id, theme_mode, finance_enabled, morning_digest_enabled, night_digest_enabled, attendance_prompt_enabled, created_at, updated_at) "
-                "VALUES (1, 'SYSTEM', false, true, true, true, NOW(), NOW()) "
-                "ON CONFLICT (settings_id) DO NOTHING;"
+                f"INSERT INTO users (id, email, created_at, updated_at) "
+                f"VALUES ('{TEST_USER_ID}', '{TEST_USER_EMAIL}', NOW(), NOW()) "
+                f"ON CONFLICT (id) DO NOTHING;"
             )
+        )
+        await conn.execute(
+            text(
+                f"INSERT INTO app_settings (settings_id, user_id, theme_mode, finance_enabled, morning_digest_enabled, night_digest_enabled, attendance_prompt_enabled, created_at, updated_at) "
+                f"VALUES (1, '{TEST_USER_ID}', 'SYSTEM', false, true, true, true, NOW(), NOW()) "
+                f"ON CONFLICT (settings_id) DO NOTHING;"
+            )
+        )
+        await conn.execute(
+            text("SELECT setval('app_settings_settings_id_seq', COALESCE((SELECT MAX(settings_id) FROM app_settings), 1));")
         )
     await engine.dispose()
 
@@ -73,7 +89,11 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
+    async def _override_get_current_user() -> CurrentUser:
+        return CurrentUser(id=TEST_USER_ID, email=TEST_USER_EMAIL)
+
     app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_current_user] = _override_get_current_user
     try:
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -82,3 +102,4 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
             yield ac
     finally:
         app.dependency_overrides.clear()
+

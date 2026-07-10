@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, date, timezone
-from sqlalchemy import Integer, Date, DateTime, CheckConstraint
+from sqlalchemy import Integer, Date, DateTime, CheckConstraint, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -13,9 +13,14 @@ class Semester(Base):
         default=uuid.uuid4,
         index=True
     )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        default=lambda: __import__("app.core.database", fromlist=["get_default_user_id"]).get_default_user_id()
+    )
     semester_number: Mapped[int] = mapped_column(
         Integer,
-        unique=True,
         nullable=False
     )
     start_date: Mapped[date] = mapped_column(
@@ -41,9 +46,14 @@ class Semester(Base):
     __table_args__ = (
         CheckConstraint("semester_number > 0", name="semester_number_positive"),
         CheckConstraint("start_date < end_date", name="semester_date_order"),
+        UniqueConstraint("user_id", "semester_number", name="uq_semester_per_user"),
     )
 
     # Relationships
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="semesters"
+    )
     attendance_settings: Mapped["AttendanceSettings"] = relationship(
         "AttendanceSettings",
         back_populates="semester",

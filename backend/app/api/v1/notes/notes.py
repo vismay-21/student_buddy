@@ -12,17 +12,22 @@ from app.repositories.notes.notes_section import NotesSectionRepository
 from app.repositories.notes.notes_resource import NotesResourceRepository
 from app.repositories.academic.semester import SemesterRepository
 from app.services.notes.notes import NotesService
+from app.dependencies.auth import get_current_user
+from app.services.auth.authentication_service import CurrentUser
 
 router = APIRouter()
 
 
-async def get_notes_service(db: AsyncSession = Depends(get_db)) -> NotesService:
+async def get_notes_service(
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+) -> NotesService:
     return NotesService(
         db=db,
-        notes_subject_repo=NotesSubjectRepository(db),
+        notes_subject_repo=NotesSubjectRepository(db, current_user.id),
         notes_section_repo=NotesSectionRepository(db),
         notes_resource_repo=NotesResourceRepository(db),
-        semester_repo=SemesterRepository(db)
+        semester_repo=SemesterRepository(db, current_user.id)
     )
 
 
