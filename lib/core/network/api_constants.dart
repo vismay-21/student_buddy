@@ -1,7 +1,7 @@
 class ApiConstants {
   // Use 10.0.2.2 for Android Emulator, localhost/127.0.0.1 for iOS simulator / Web / Desktop.
   // We can dynamically check, but keeping it configurable with a default.
-  static const String baseUrl = 'http://127.0.0.1:8000/api/v1';
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL');
 
   // Sync Protocol Versioning Range
   static const int minSupportedSyncVersion = 1;

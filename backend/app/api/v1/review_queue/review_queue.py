@@ -20,7 +20,8 @@ async def get_review_queue_service(
 ) -> ReviewQueueService:
     return ReviewQueueService(
         db=db,
-        review_queue_repo=ReviewQueueRepository(db, current_user.id)
+        review_queue_repo=ReviewQueueRepository(db, current_user.id),
+        user_id=current_user.id
     )
 
 

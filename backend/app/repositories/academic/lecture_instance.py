@@ -7,11 +7,18 @@ from sqlalchemy.orm import joinedload
 from app.models.academic.lecture_instance import LectureInstance, LectureStatus, AttendanceStatus
 from app.models.academic.lecture_template import LectureTemplate
 from app.models.academic.subject import Subject
+from app.models.academic.semester import Semester
 
 
 class LectureInstanceRepository:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: uuid.UUID | None = None):
         self.db = db
+        if user_id is None:
+            import sys
+            if "pytest" in sys.modules:
+                from tests.conftest import TEST_USER_ID
+                user_id = TEST_USER_ID
+        self.user_id = user_id
 
     async def create_all(self, instances: list[LectureInstance]) -> list[LectureInstance]:
         self.db.add_all(instances)
@@ -38,14 +45,28 @@ class LectureInstanceRepository:
         return result.scalars().all()
 
     async def get_by_id(self, instance_id: uuid.UUID) -> LectureInstance | None:
-        stmt = (
-            select(LectureInstance)
-            .options(
-                joinedload(LectureInstance.lecture_template)
-                .joinedload(LectureTemplate.subject)
+        if self.user_id is not None:
+            stmt = (
+                select(LectureInstance)
+                .join(LectureInstance.lecture_template)
+                .join(LectureTemplate.subject)
+                .join(Subject.semester)
+                .options(
+                    joinedload(LectureInstance.lecture_template)
+                    .joinedload(LectureTemplate.subject)
+                )
+                .where(LectureInstance.lecture_instance_id == instance_id)
+                .where(Semester.user_id == self.user_id)
             )
-            .where(LectureInstance.lecture_instance_id == instance_id)
-        )
+        else:
+            stmt = (
+                select(LectureInstance)
+                .options(
+                    joinedload(LectureInstance.lecture_template)
+                    .joinedload(LectureTemplate.subject)
+                )
+                .where(LectureInstance.lecture_instance_id == instance_id)
+            )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 

@@ -1,5 +1,6 @@
 import logging
-from fastapi import FastAPI
+import sys
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -25,9 +26,10 @@ setup_logging(enable_file_logging=settings.ENABLE_FILE_LOGGING)
 
 logger = logging.getLogger("uvicorn")
 
-# Conditional Swagger/ReDoc URLs for production security
+# Conditional Swagger/ReDoc/OpenAPI URLs for production security
 docs_url = "/docs" if settings.APP_ENV != "production" else None
 redoc_url = "/redoc" if settings.APP_ENV != "production" else None
+openapi_url = "/openapi.json" if settings.APP_ENV != "production" else None
 
 # Instantiate FastAPI application
 app = FastAPI(
@@ -35,12 +37,56 @@ app = FastAPI(
     description="Offline-First Student Productivity Platform Backend",
     version=BACKEND_VERSION,
     docs_url=docs_url,
-    redoc_url=redoc_url
+    redoc_url=redoc_url,
+    openapi_url=openapi_url
 )
+
+# HTTP Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    response.headers["Referrer-Policy"] = "no-referrer-when-downgrade"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
 
 @app.on_event("startup")
 async def startup_event():
     logger.info(f"Sync Protocol Version: {SYNC_PROTOCOL_VERSION}")
+    
+    # Production environment validation
+    if settings.APP_ENV == "production":
+        logger.info("Running in production environment. Validating required secrets...")
+        missing_vars = []
+        
+        # Check DATABASE_URL is not default or empty
+        if not settings.DATABASE_URL or "localhost:5432" in settings.DATABASE_URL:
+            missing_vars.append("DATABASE_URL")
+            
+        # Check JWT_SECRET is not default or empty
+        if not settings.JWT_SECRET or settings.JWT_SECRET == "dev_fallback_jwt_secret_key_not_for_production":
+            missing_vars.append("JWT_SECRET")
+            
+        # Check SUPABASE_URL
+        if not settings.SUPABASE_URL:
+            missing_vars.append("SUPABASE_URL")
+            
+        # Check SUPABASE_KEY
+        if not settings.SUPABASE_KEY:
+            missing_vars.append("SUPABASE_KEY")
+            
+        # Check ALLOWED_ORIGINS
+        if not settings.ALLOWED_ORIGINS:
+            missing_vars.append("ALLOWED_ORIGINS")
+            
+        if missing_vars:
+            logger.error(f"CRITICAL STARTUP ERROR: The following required environment variables are missing or misconfigured for production: {', '.join(missing_vars)}")
+            logger.error("Startup terminated to prevent partially configured deployments.")
+            sys.exit(1)
+            
+        logger.info("All production required environment variables are validated successfully.")
 
 # Register custom and global exception handlers
 register_exception_handlers(app)

@@ -10,7 +10,7 @@ from app.services.review_queue.resolvers.base import BaseResolver
 
 class TodoResolver(BaseResolver):
     async def resolve(self, entity_id: uuid.UUID, resolution_data: Dict[str, Any]) -> None:
-        todo_repo = TodoRepository(self.db)
+        todo_repo = TodoRepository(self.db, self.user_id)
         todo = await todo_repo.get_by_id(entity_id)
         if todo is None:
             raise NotFoundException(f"Referenced Todo with ID {entity_id} not found")
@@ -43,7 +43,7 @@ class TodoResolver(BaseResolver):
         await todo_repo.update(todo)
 
     async def get_summary(self, entity_id: uuid.UUID) -> str:
-        todo_repo = TodoRepository(self.db)
+        todo_repo = TodoRepository(self.db, self.user_id)
         todo = await todo_repo.get_by_id(entity_id)
         if todo is None:
             return "Unknown Todo"

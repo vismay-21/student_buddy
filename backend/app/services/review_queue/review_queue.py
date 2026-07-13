@@ -17,10 +17,12 @@ class ReviewQueueService:
     def __init__(
         self,
         db: AsyncSession,
-        review_queue_repo: ReviewQueueRepository
+        review_queue_repo: ReviewQueueRepository,
+        user_id: uuid.UUID | None = None
     ):
         self.db = db
         self.review_queue_repo = review_queue_repo
+        self.user_id = user_id
 
     async def _populate_summary(self, item: ReviewQueue) -> None:
         """
@@ -28,7 +30,7 @@ class ReviewQueueService:
         """
         resolver_cls = RESOLVERS.get(item.entity_type)
         if resolver_cls:
-            resolver = resolver_cls(self.db)
+            resolver = resolver_cls(self.db, self.user_id)
             item.entity_summary = await resolver.get_summary(item.entity_id)
         else:
             item.entity_summary = "Unknown Entity"
@@ -146,7 +148,7 @@ class ReviewQueueService:
             raise ValidationException(f"Unsupported entity type: {review_in.entity_type}")
 
         # Check if entity exists
-        resolver = resolver_cls(self.db)
+        resolver = resolver_cls(self.db, self.user_id)
         summary = await resolver.get_summary(review_in.entity_id)
         if summary.startswith("Unknown"):
             raise NotFoundException(f"Referenced {review_in.entity_type.value} with ID {review_in.entity_id} not found")
@@ -196,7 +198,7 @@ class ReviewQueueService:
             raise ValidationException(f"Unsupported entity type for resolution: {item.entity_type}")
 
         # Execute resolver
-        resolver = resolver_cls(self.db)
+        resolver = resolver_cls(self.db, self.user_id)
         await resolver.resolve(item.entity_id, resolve_in.resolution_data)
 
         # Mark review as resolved

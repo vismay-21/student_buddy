@@ -1,5 +1,6 @@
 import os
-from typing import Literal
+from typing import Literal, Union
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +29,13 @@ class Settings(BaseSettings):
         "http://localhost:8000",
         "http://localhost:5000",
     ]
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v: Union[str, list[str]]) -> list[str]:
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     # JWT Authentication Configuration (for Sprint 13 compatibility)
     JWT_SECRET: str = "dev_fallback_jwt_secret_key_not_for_production"

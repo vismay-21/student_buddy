@@ -4,8 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class BaseResolver:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: uuid.UUID | None = None):
         self.db = db
+        self.user_id = user_id
 
     async def resolve(self, entity_id: uuid.UUID, resolution_data: Dict[str, Any]) -> None:
         """

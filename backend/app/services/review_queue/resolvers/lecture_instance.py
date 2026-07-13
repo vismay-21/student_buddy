@@ -10,7 +10,7 @@ from app.services.review_queue.resolvers.base import BaseResolver
 
 class LectureInstanceResolver(BaseResolver):
     async def resolve(self, entity_id: uuid.UUID, resolution_data: Dict[str, Any]) -> None:
-        li_repo = LectureInstanceRepository(self.db)
+        li_repo = LectureInstanceRepository(self.db, self.user_id)
         instance = await li_repo.get_by_id(entity_id)
         if instance is None:
             raise NotFoundException(f"Referenced LectureInstance with ID {entity_id} not found")
@@ -47,7 +47,7 @@ class LectureInstanceResolver(BaseResolver):
         await li_repo.update(instance)
 
     async def get_summary(self, entity_id: uuid.UUID) -> str:
-        li_repo = LectureInstanceRepository(self.db)
+        li_repo = LectureInstanceRepository(self.db, self.user_id)
         instance = await li_repo.get_by_id(entity_id)
         if instance is None:
             return "Unknown Lecture"
