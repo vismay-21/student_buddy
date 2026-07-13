@@ -35,9 +35,8 @@ def upgrade() -> None:
     op.add_column('semesters', sa.Column('user_id', sa.Uuid(), nullable=False))
     op.create_foreign_key('fk_semesters_user_id_users', 'semesters', 'users', ['user_id'], ['id'], ondelete='CASCADE')
     
-    # Try dropping various names of unique constraint on semester_number using DROP CONSTRAINT IF EXISTS
-    # to avoid aborting the transaction in PostgreSQL when a constraint doesn't exist.
-    # Otherwise fallback to try-except for SQLite/other databases.
+    # Use DROP CONSTRAINT IF EXISTS on PostgreSQL to avoid aborting the transaction
+    # when the old constraint name may not exist. Fallback to try-except for SQLite.
     if op.get_bind().dialect.name == 'postgresql':
         op.execute("ALTER TABLE semesters DROP CONSTRAINT IF EXISTS uq_semesters_semester_number")
         op.execute("ALTER TABLE semesters DROP CONSTRAINT IF EXISTS semesters_semester_number_key")
@@ -53,26 +52,42 @@ def upgrade() -> None:
             
     op.create_unique_constraint('uq_semester_per_user', 'semesters', ['user_id', 'semester_number'])
 
-    # 3. Add user_id to other tables
+    # 3. Add user_id to all other tables.
+    #
+    # Pattern: add as nullable → delete orphaned seed rows → enforce NOT NULL.
+    # This prevents NotNullViolationError in PostgreSQL when a table already contains
+    # rows from seed data in earlier migrations (e.g. app_settings seeds a default row).
+
     # todos
-    op.add_column('todos', sa.Column('user_id', sa.Uuid(), nullable=False))
+    op.add_column('todos', sa.Column('user_id', sa.Uuid(), nullable=True))
+    op.execute("DELETE FROM todos WHERE user_id IS NULL")
+    op.alter_column('todos', 'user_id', nullable=False)
     op.create_foreign_key('fk_todos_user_id_users', 'todos', 'users', ['user_id'], ['id'], ondelete='CASCADE')
 
-    # app_settings
-    op.add_column('app_settings', sa.Column('user_id', sa.Uuid(), nullable=False))
+    # app_settings — ca2a9e095c10 seeds a singleton row with no user_id;
+    # delete it so the table starts clean for multi-tenant production.
+    op.add_column('app_settings', sa.Column('user_id', sa.Uuid(), nullable=True))
+    op.execute("DELETE FROM app_settings WHERE user_id IS NULL")
+    op.alter_column('app_settings', 'user_id', nullable=False)
     op.create_foreign_key('fk_app_settings_user_id_users', 'app_settings', 'users', ['user_id'], ['id'], ondelete='CASCADE')
     op.create_unique_constraint('uq_app_settings_user_id', 'app_settings', ['user_id'])
 
     # review_queue
-    op.add_column('review_queue', sa.Column('user_id', sa.Uuid(), nullable=False))
+    op.add_column('review_queue', sa.Column('user_id', sa.Uuid(), nullable=True))
+    op.execute("DELETE FROM review_queue WHERE user_id IS NULL")
+    op.alter_column('review_queue', 'user_id', nullable=False)
     op.create_foreign_key('fk_review_queue_user_id_users', 'review_queue', 'users', ['user_id'], ['id'], ondelete='CASCADE')
 
     # activity_logs
-    op.add_column('activity_logs', sa.Column('user_id', sa.Uuid(), nullable=False))
+    op.add_column('activity_logs', sa.Column('user_id', sa.Uuid(), nullable=True))
+    op.execute("DELETE FROM activity_logs WHERE user_id IS NULL")
+    op.alter_column('activity_logs', 'user_id', nullable=False)
     op.create_foreign_key('fk_activity_logs_user_id_users', 'activity_logs', 'users', ['user_id'], ['id'], ondelete='CASCADE')
 
     # notes_subjects
-    op.add_column('notes_subjects', sa.Column('user_id', sa.Uuid(), nullable=False))
+    op.add_column('notes_subjects', sa.Column('user_id', sa.Uuid(), nullable=True))
+    op.execute("DELETE FROM notes_subjects WHERE user_id IS NULL")
+    op.alter_column('notes_subjects', 'user_id', nullable=False)
     op.create_foreign_key('fk_notes_subjects_user_id_users', 'notes_subjects', 'users', ['user_id'], ['id'], ondelete='CASCADE')
 
 
