@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = 1800
 
     # CORS Configuration
-    ALLOWED_ORIGINS: list[str] = [
+    ALLOWED_ORIGINS: Union[list[str], str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
