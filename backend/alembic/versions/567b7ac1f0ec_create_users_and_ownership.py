@@ -35,14 +35,21 @@ def upgrade() -> None:
     op.add_column('semesters', sa.Column('user_id', sa.Uuid(), nullable=False))
     op.create_foreign_key('fk_semesters_user_id_users', 'semesters', 'users', ['user_id'], ['id'], ondelete='CASCADE')
     
-    # Try dropping various names of unique constraint on semester_number to support both SQLite and Postgres
-    try:
-        op.drop_constraint('uq_semesters_semester_number', 'semesters', type_='unique')
-    except Exception:
+    # Try dropping various names of unique constraint on semester_number using DROP CONSTRAINT IF EXISTS
+    # to avoid aborting the transaction in PostgreSQL when a constraint doesn't exist.
+    # Otherwise fallback to try-except for SQLite/other databases.
+    if op.get_bind().dialect.name == 'postgresql':
+        op.execute("ALTER TABLE semesters DROP CONSTRAINT IF EXISTS uq_semesters_semester_number")
+        op.execute("ALTER TABLE semesters DROP CONSTRAINT IF EXISTS semesters_semester_number_key")
+        op.execute("ALTER TABLE semesters DROP CONSTRAINT IF EXISTS semesters_semester_number_uq")
+    else:
         try:
-            op.drop_constraint('semesters_semester_number_key', 'semesters', type_='unique')
+            op.drop_constraint('uq_semesters_semester_number', 'semesters', type_='unique')
         except Exception:
-            pass
+            try:
+                op.drop_constraint('semesters_semester_number_key', 'semesters', type_='unique')
+            except Exception:
+                pass
             
     op.create_unique_constraint('uq_semester_per_user', 'semesters', ['user_id', 'semester_number'])
 
