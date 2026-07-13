@@ -45,6 +45,7 @@ class SubjectService:
 
         # Create subject
         subject = Subject(
+            subject_id=subject_in.subject_id or uuid.uuid4(),
             semester_id=subject_in.semester_id,
             subject_name=subject_in.subject_name,
             faculty_name=subject_in.faculty_name,
@@ -56,6 +57,7 @@ class SubjectService:
 
         # Automatically create corresponding Notes Subject
         notes_subject = NotesSubject(
+            notes_subject_id=subject.subject_id,
             semester_id=subject_in.semester_id,
             notes_subject_name=subject_in.subject_name,
         )

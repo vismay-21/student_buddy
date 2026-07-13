@@ -409,7 +409,7 @@ student_buddy/
 
 ## 9. Current Backend Status
 
-We are currently preparing for **SQLite Offline Foundation (Sprint 14A)**, having completed **Authentication & Multi-Tenancy (Sprint 13)**.
+We have completed the **SQLite Synchronization Engine (Sprint 14B)**, having successfully built the local SQLite offline data foundation (Sprint 14A).
 
 
 ### 9.1. Frontend / UI (Phase 1 — Locked)
@@ -614,8 +614,29 @@ We are currently preparing for **SQLite Offline Foundation (Sprint 14A)**, havin
   - Refactored test configurations to support mocked token validation overrides and automatic seeding/scoping of default test user context.
   - Verified 175/175 backend automated tests pass successfully.
 
+* **What was implemented (Sprint 14A - SQLite Offline Foundation)**:
+  - Designed local SQLite schemas mirroring the authoritative PostgreSQL schemas with FOREIGN KEY constraints.
+  - Developed user-scoped local databases (`student_buddy_${userId}.db`) to ensure perfect local isolation.
+  - Refactored all 11 core data repositories to abstract interfaces with factory constructors returning concrete SQLite implementations.
+  - Replicated business logic locally, including cascade deletes, transaction safety, and automatic activity logging.
+  - Implemented `BootstrapService` for transactional, atomic seeding of local databases from the backend `/users/me/bootstrap` snapshot.
+  - Integrated database checks and seeding into the splash screen (with custom retry and sign-out UI) and login/signup flows.
+  - Hooked connection closing to settings logouts and 401 token expiry handlers.
+  - Added unit testing for UUID generation and verified zero compiler/static analysis warnings.
+
+* **What was implemented (Sprint 14B - SQLite Synchronization Engine)**:
+  - Developed `SyncService` as a centralized sync coordinator with concurrency guarding (Sync Lock).
+  - Designed the queue coalescing algorithm (Rules 1-4) maintaining chronological sorting of operations based on original earliest event ID.
+  - Implemented the Upload pipeline iterating over the coalesced queue and calling REST endpoints sequentially.
+  - Implemented the Download pipeline fetching remote updates via `GET /users/me/bootstrap?since=...`.
+  - Enforced Last Write Wins (LWW) conflict resolution logic using local vs remote `updated_at` checks.
+  - Built lecture instance duplicate reconciliation logic mapped to unique `(lecture_template_id, lecture_date)` keys.
+  - Added automated connectivity monitoring via `connectivity_plus` to auto-trigger synchronization on network reconnect.
+  - Designed and integrated the Synchronization settings card UI displaying real-time sync state, timestamps, and pending count, alongside a manual "Sync Now" button.
+  - Developed an automated unit testing suite for the coalescing and sorting engine and verified all test assertions pass.
+  - Implemented **Sync Protocol Versioning**: Introduced central version constants in the backend (`SYNC_PROTOCOL_VERSION = 1`) and client (`minSupportedSyncVersion = 1`, `maxSupportedSyncVersion = 1`), isolated bootstrap response schema (`backend/app/schemas/users/bootstrap.py`), validated the protocol range in both `BootstrapService` and `SyncService` before SQLite writes, and added professional mismatch warnings in the UI.
+
 * **What was intentionally NOT implemented (postponed)**:
-  * SQLite Offline Foundation & Synchronization Engine (postponed to Sprints 14A & 14B)
   * WhatsApp bot webhook and Meta Cloud API integration (postponed to Sprint 15)
   * AI engine and OCR timetable parser (postponed to Sprint 16)
 
@@ -623,6 +644,16 @@ We are currently preparing for **SQLite Offline Foundation (Sprint 14A)**, havin
 
 ## 10. Future Development Roadmap
 
+The backend architecture is now considered feature-complete for MVP Version 1. Future work will primarily extend the platform rather than redesign it. The implementation order of the remaining project has been finalized as:
+
+### Remaining Phases
+1. **Deployment & Production Validation** (Audit 11 Implementation, Railway deployment, Supabase production database, Flutter production configuration, Production verification, and full Smoke Testing). Only after this is complete and verified will Sprint 15 begin.
+2. **WhatsApp Integration** (Sprint 15)
+3. **AI Integration** (Sprint 16)
+4. **Finance Module** (Sprint 17)
+5. **Final Release & Publishing** (Play Store Release)
+
+### Detailed Sprints & Milestones
 * **Sprint 0**: Backend Foundation (Completed)
 * **Sprint 1**: Semester Module (Completed)
 * **Sprint 2**: Subject Module (Completed)
@@ -638,8 +669,10 @@ We are currently preparing for **SQLite Offline Foundation (Sprint 14A)**, havin
 * **Sprint 12**: Backend Verification & Flutter API Integration (MVP Mode) (Completed)
 * **Sprint 12.5**: MVP Backend Audit & Maintenance (Completed)
 * **Sprint 13**: Authentication (Completed)
-* **Sprint 14A**: SQLite Offline Foundation
-* **Sprint 14B**: SQLite Synchronization Engine
+* **Sprint 14A**: SQLite Offline Foundation (Completed)
+* **Sprint 14B**: SQLite Synchronization Engine (Completed)
+* **Audit 11 — Deployment & Operations**: Audit and Infrastructure Remediation (Active)
+* **Production Deployment**: Deploy PostgreSQL on Supabase, FastAPI on Railway, configure Flutter production variables, and complete comprehensive Smoke Testing.
 * **Sprint 15**: WhatsApp Integration
 * **Sprint 16**: AI Integration
 * **Sprint 17**: Finance Module (Frozen until core is stable)

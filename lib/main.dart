@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/app_state.dart';
 import 'core/network/interceptors.dart';
+import 'core/services/sync_service.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 
@@ -21,6 +22,7 @@ void main() async {
   );
 
   await AppState.instance.init();
+  SyncService.instance.initialize();
   runApp(const StudentBuddyApp());
 }
 

@@ -24,3 +24,6 @@ JWT_ALGORITHM = "HS256"
 # Activity Logging placeholders
 SYSTEM_SETTINGS_UUID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
+# Synchronization Protocol Version
+SYNC_PROTOCOL_VERSION = 1
+

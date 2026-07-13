@@ -76,6 +76,7 @@ class NotesService:
             )
 
         section = NotesSection(
+            section_id=section_in.section_id or uuid.uuid4(),
             notes_subject_id=section_in.notes_subject_id,
             section_name=section_in.section_name
         )
@@ -193,6 +194,7 @@ class NotesService:
             )
 
         resource = NotesResource(
+            resource_id=resource_in.resource_id or uuid.uuid4(),
             section_id=resource_in.section_id,
             resource_name=resource_in.resource_name,
             file_name=resource_in.file_name,

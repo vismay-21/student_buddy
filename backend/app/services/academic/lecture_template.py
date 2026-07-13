@@ -100,6 +100,7 @@ class LectureTemplateService:
 
         # Create lecture template
         template = LectureTemplate(
+            lecture_template_id=template_in.lecture_template_id or uuid.uuid4(),
             subject_id=template_in.subject_id,
             day_of_week=template_in.day_of_week,
             start_time=template_in.start_time,

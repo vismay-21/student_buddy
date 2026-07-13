@@ -1386,3 +1386,105 @@ This log tracks architectural decisions, feature implementations, and refinement
   - `docs/2_STUDENT BUDDY DEVELOPMENT ROADMAP DCOUMENT DRD.md`: Updated Phase 8 structure and Official Development Order.
   - `docs/context.md`: Updated Future Development Roadmap, status descriptions, and Riverpod postponement notes.
   - `docs/history.md`: Recorded current historical entries.
+
+---
+
+## 2026-07-11 (Phase 8: Sprint 14A Implementation — SQLite Offline Foundation)
+
+### Decisions
+1. **User-Scoped Database Isolation**: Scoped local SQLite database files to the logged-in user (`student_buddy_${userId}.db`) to ensure strict local isolation and security across multiple accounts.
+2. **PostgreSQL-SQLite Structural Alignment**: Mirrored the backend SQLAlchemy models directly into SQLite schemas (including FOREIGN KEY constraints and integer-based boolean mappings) to prevent schema drift.
+3. **Repository Pattern Abstraction**: Converted all 11 core data repositories to abstract interfaces with factory constructors returning concrete SQLite implementations.
+4. **Local Business Logic Parity**: Replicated backend business logic directly in the SQLite repositories, including cascade deletion rules for notes hierarchy, automatic ActivityLog generations, and transaction safety.
+5. **Atomic Workspace Seeding**: Built a `BootstrapService` that fetches the backend workspace snapshot and seeds it atomically inside a single SQLite transaction, rollback-ready on any failure.
+6. **Robust Startup and Connection Integration**: Integrated database check and bootstrap seeding on the SplashScreen, LoginScreen, and SignupScreen. Enabled connection closing upon Sign Out or 401 token expiry.
+
+### Implementation Details
+* **Database & Schema Helpers**:
+  - `lib/data/local/database_helper.dart`: Implemented SQLite schemas, user-scoped DB files, PRAGMA foreign keys, and metadata table getters/setters.
+* **Core & Services**:
+  - `lib/core/services/bootstrap_service.dart`: Developed the transactional database seeding service.
+  - `lib/data/api/user_api.dart`: Extended `UserApi` to support the `/users/me/bootstrap` snapshot retrieval.
+* **Repositories**:
+  - Standardized all 11 repository contracts and created concrete SQLite repositories under `lib/data/repositories/sqlite/`.
+* **UI & Navigation Integration**:
+  - `lib/screens/splash/splash_screen.dart`: Added startup bootstrap check and recovery retry UI.
+  - `lib/screens/auth/login_screen.dart` & `lib/screens/auth/signup_screen.dart`: Triggered db initialization and bootstrap seeding.
+  - `lib/screens/settings/settings_screen.dart` & `lib/core/network/interceptors.dart`: Hooked database connection closing to logouts.
+* **Testing & Verification**:
+  - `test/uuid_generator_test.dart`: Added unit testing for UUID generation.
+  - Executed `flutter test` and `flutter analyze` successfully with zero compiler/static analysis errors.
+
+---
+
+## 2026-07-13 (Phase 8: Sprint 14B Implementation — SQLite Synchronization Engine)
+
+### Decisions
+1. **Centralized Sync Coordination**: Developed a singleton `SyncService` keeping the SQLite repositories completely local/offline-first.
+2. **Coalesced Sync Queue**: Implemented a FIFO coalescing queue algorithm (Rules 1-4) minimizing upload payload size and preserving cross-entity chronological order.
+3. **Sequential Execution Order**: Enforced that the sync pipeline always finishes uploading the coalesced operations queue before initiating remote updates download.
+4. **Last Write Wins & Reconciliation**: Added server-side vs client-side `updated_at` checks for conflict resolution and resolved duplicate lecture instances via `(lecture_template_id, lecture_date)` matching.
+5. **Autotrigger Sync & Badges**: Set up automatic synchronization triggers on connectivity shifts using `connectivity_plus` and integrated real-time sync state cards in the application settings.
+6. **Server Idempotency Hardening**: Refactored backend create schemas/services to accept client-provided UUIDs, aligned local Note Subject IDs, and updated client queue processing to handle and discard conflict/deleted errors (`409`, `404`) safely.
+
+### Implementation Details
+* **Core & Services**:
+  - `lib/core/services/sync_service.dart`: Created the orchestrator for upload queuing, coalescing, API uploads, remote downloads, conflict resolution, and HTTP error code idempotency handling.
+* **Repositories**:
+  - Integrated transactional `enqueueOperation` calls in all remaining SQLite repository write/mutation methods.
+  - `lib/data/repositories/sqlite/sqlite_subject_repository.dart`: Aligned note subject creation UUIDs to match subject UUID.
+* **UI & settings**:
+  - `lib/screens/settings/settings_screen.dart`: Integrated the "Offline Synchronization" dashboard displaying real-time state, badges, and manual triggers.
+* **Testing & Verification**:
+  - `test/sync_coalesce_test.dart`: Added test assertions verifying rules and chronological preservation.
+  - `test/sync_lifecycle_test.dart`: Added comprehensive unit testing verifying sequenced execution, crash recovery, and server-side idempotency handling.
+  - Executed `flutter test` successfully passing all unit tests.
+  - Verified static correctness via `flutter analyze`.
+
+---
+
+## 2026-07-13 (Phase 8: Sprint 14B Refinement — Sync Protocol Versioning)
+
+### Decisions
+1. **Centralized Version Control**: Defined `SYNC_PROTOCOL_VERSION = 1` in `backend/app/core/constants.py` and matching bounds in `lib/core/network/api_constants.dart` (`minSupportedSyncVersion = 1`, `maxSupportedSyncVersion = 1`).
+2. **Dedicated Response Schema**: Isolated the bootstrap response structure into `backend/app/schemas/users/bootstrap.py` using `SyncBootstrapResponse` Pydantic model with timezone-aware `generated_at` timestamp.
+3. **Fail-Safe Client-Side Validation**: Enforced protocol version validation in both the `BootstrapService` and `SyncService` pipelines before performing local SQLite writes. Mismatches abort synchronization instantly, preventing data corruption.
+4. **Decoupled Exceptions and UI Handling**: Defined `UnsupportedSyncProtocolException` in `lib/core/exceptions/sync_exceptions.dart`. Handled this error in UI screens (Splash, Login, Signup, Settings) to display a user-friendly update warning.
+5. **Startup Logging**: Programmed backend FastAPI application to output the active synchronization version on startup.
+
+### Implementation Details
+* **Backend**:
+  - `backend/app/core/constants.py`: Added `SYNC_PROTOCOL_VERSION`.
+  - `backend/app/schemas/users/bootstrap.py`: Added dedicated `SyncBootstrapResponse` schema.
+  - `backend/app/api/v1/users/users.py`: Refactored `/me/bootstrap` to return timezone-aware `generated_at` and `sync_version`.
+  - `backend/app/main.py`: Added startup event logging.
+* **Frontend**:
+  - `lib/core/network/api_constants.dart`: Added `minSupportedSyncVersion` and `maxSupportedSyncVersion`.
+  - `lib/core/exceptions/sync_exceptions.dart`: Created `UnsupportedSyncProtocolException`.
+  - `lib/data/api/user_api.dart`: Validated `sync_version` inside `getBootstrapData()`.
+  - `lib/core/services/sync_service.dart`: Validated version in `_downloadRemoteChanges()`, caught exception in `sync()`, and disabled retries.
+  - `lib/screens/splash/splash_screen.dart`, `lib/screens/auth/login_screen.dart`, `lib/screens/auth/signup_screen.dart`: Handled version exception to show a professional mismatch warning.
+* **Testing & Verification**:
+  - `backend/tests/settings/test_bootstrap.py`: Added tests to verify version metadata in HTTP response.
+  - `test/sync_lifecycle_test.dart`: Added test suite covering matching version success, version mismatch halting, and database protection.
+
+---
+
+## 2026-07-13 (Audit 11: Deployment & Operations Review & Roadmap Finalization)
+
+### Decisions
+1. **Audit 11 Scoring**: Issued an Initial Health Score of 85/100, finding minor dynamic port/URL configs, missing security headers, missing proxy headers, exposed `/openapi.json` files, and unscoped repositories in review queue resolvers. Projected Health Score is 100/100 upon remediation.
+2. **Finalized Project Execution Order**: Reordered the remaining sprints to prioritize Deployment and Production Validation as an isolated milestone between SQLite Synchronization Engine (Sprint 14B) and WhatsApp Integration (Sprint 15).
+3. **Backend Feature-Complete Status**: Froze the core backend REST architecture as feature-complete for MVP Version 1. Future phases (WhatsApp, AI, etc.) will extend the current base rather than redesigning it.
+4. **Division of Remaining Tasks**: Partitioned the remaining roadmap into:
+   - Deployment & Production Validation (including Audit 11 Remediation, Railway & Supabase Deploy, production variables/configurations in Flutter, and comprehensive smoke testing).
+   - WhatsApp Integration (Sprint 15)
+   - AI Integration (Sprint 16)
+   - Finance Module (Sprint 17)
+   - Final Release & Publishing (Play Store)
+
+### Implementation Details
+* **Documentation**:
+  - Created [`docs/audit/audit_11_deployment_operations.md`](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_11_deployment_operations.md).
+  - Created [`docs/audit/implementation_plan_audit_11_deployment_operations.md`](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/implementation_plan_audit_11_deployment_operations.md) specifying required changes for dynamic ports/endpoints, security headers, reverse-proxy configurations, fail-fast validations, and a 18-step manual post-deployment smoke test suite.
+  - Updated roadmaps in `docs/context.md`, `docs/4_backend_implementation_sprints.md`, and `docs/2_STUDENT BUDDY DEVELOPMENT ROADMAP DCOUMENT DRD.md`.

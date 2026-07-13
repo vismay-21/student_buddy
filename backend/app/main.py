@@ -1,8 +1,9 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.constants import API_V1_PREFIX, BACKEND_VERSION
+from app.core.constants import API_V1_PREFIX, BACKEND_VERSION, SYNC_PROTOCOL_VERSION
 from app.core.logging import setup_logging
 from app.core.exceptions import register_exception_handlers
 from app.api.v1.health import router as health_router
@@ -22,6 +23,8 @@ from app.api.v1.users.users import router as users_router
 # Setup structured logging
 setup_logging(enable_file_logging=settings.ENABLE_FILE_LOGGING)
 
+logger = logging.getLogger("uvicorn")
+
 # Conditional Swagger/ReDoc URLs for production security
 docs_url = "/docs" if settings.APP_ENV != "production" else None
 redoc_url = "/redoc" if settings.APP_ENV != "production" else None
@@ -34,6 +37,10 @@ app = FastAPI(
     docs_url=docs_url,
     redoc_url=redoc_url
 )
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info(f"Sync Protocol Version: {SYNC_PROTOCOL_VERSION}")
 
 # Register custom and global exception handlers
 register_exception_handlers(app)

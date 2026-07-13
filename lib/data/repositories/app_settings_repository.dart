@@ -1,22 +1,9 @@
-import '../api/app_settings_api.dart';
 import '../dto/settings/app_settings_dto.dart';
+import 'sqlite/sqlite_app_settings_repository.dart';
 
-class AppSettingsRepository {
-  final AppSettingsApi _api = AppSettingsApi();
+abstract class AppSettingsRepository {
+  factory AppSettingsRepository() => SqliteAppSettingsRepository();
 
-  Future<AppSettingsDto> getSettings() async {
-    final response = await _api.getSettings();
-    if (!response.success || response.data == null) {
-      throw Exception(response.message);
-    }
-    return response.data!;
-  }
-
-  Future<AppSettingsDto> updateSettings(AppSettingsUpdateRequest request) async {
-    final response = await _api.updateSettings(request);
-    if (!response.success || response.data == null) {
-      throw Exception(response.message);
-    }
-    return response.data!;
-  }
+  Future<AppSettingsDto> getSettings();
+  Future<AppSettingsDto> updateSettings(AppSettingsUpdateRequest request);
 }

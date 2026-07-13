@@ -4,8 +4,11 @@ import '../../core/theme/app_theme.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../core/services/bootstrap_service.dart';
+import '../../data/local/database_helper.dart';
 import '../../data/api/user_api.dart';
 import '../../data/repositories/semester_repository.dart';
+import '../../core/exceptions/sync_exceptions.dart';
 import '../navigation_shell.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -55,8 +58,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
 
       // Session is immediately available (email confirmation disabled).
-      // Initialize backend workspace and navigate to dashboard.
-      await UserApi().initializeUser(token: response.session?.accessToken);
+      // Initialize user-scoped SQLite DB and backend workspace, then bootstrap.
+      final userId = response.user?.id;
+      if (userId != null) {
+        await DatabaseHelper.instance.initDatabase(userId);
+
+        final isBootstrapped = await DatabaseHelper.instance.isBootstrapped();
+        if (!isBootstrapped) {
+          await UserApi().initializeUser(token: response.session?.accessToken);
+          await BootstrapService.instance.bootstrapUser(userId);
+        }
+      }
 
       try {
         final list = await SemesterRepository().getSemesters();
@@ -85,6 +97,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           (route) => false,
         );
       }
+    } on UnsupportedSyncProtocolException catch (e) {
+      if (mounted) AppSnackbar.error(context, 'This version of Student Buddy is no longer compatible with the server. Please update the application.');
     } on AuthException catch (e) {
       if (mounted) AppSnackbar.error(context, e.message);
     } catch (e) {

@@ -77,6 +77,7 @@ class HolidayService:
             async with self.db.begin_nested():
                 # Create Holiday
                 holiday = Holiday(
+                    holiday_id=holiday_in.holiday_id or uuid.uuid4(),
                     semester_id=semester_id,
                     holiday_date=holiday_in.holiday_date,
                     holiday_name=holiday_in.holiday_name,

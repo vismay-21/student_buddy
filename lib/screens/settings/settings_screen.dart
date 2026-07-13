@@ -8,6 +8,8 @@ import '../../data/dto/settings/app_settings_dto.dart';
 import '../../data/repositories/app_settings_repository.dart';
 import '../../data/dto/activity_log/activity_log_dto.dart';
 import '../../data/repositories/activity_log_repository.dart';
+import '../../data/local/database_helper.dart';
+import 'package:student_buddy/core/services/sync_service.dart';
 import 'semester_selection_screen.dart';
 import '../auth/login_screen.dart';
 
@@ -119,6 +121,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSectionHeader('DIGESTS & NOTIFICATIONS'),
             const SizedBox(height: 10),
             _buildNotificationsCard(),
+            const SizedBox(height: 24),
+
+            // Synchronization
+            _buildSectionHeader('OFFLINE SYNCHRONIZATION'),
+            const SizedBox(height: 10),
+            _buildSyncCard(),
             const SizedBox(height: 24),
 
             // Activity Timeline
@@ -490,6 +498,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
           if (confirmed == true && mounted) {
             await AuthService.instance.signOut();
+            await DatabaseHelper.instance.closeDatabase();
             if (mounted) {
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -499,6 +508,147 @@ class _SettingsScreenState extends State<SettingsScreen> {
           }
         },
       ),
+    );
+  }
+
+  Widget _buildSyncCard() {
+    return ValueListenableBuilder<SyncState>(
+      valueListenable: SyncService.instance.stateNotifier,
+      builder: (context, syncState, _) {
+        Color statusColor;
+        IconData statusIcon;
+        String statusText;
+
+        switch (syncState.status) {
+          case SyncStatus.idle:
+            statusColor = Colors.grey;
+            statusIcon = Icons.sync_disabled_rounded;
+            statusText = 'Idle';
+            break;
+          case SyncStatus.syncing:
+            statusColor = Colors.blue;
+            statusIcon = Icons.sync_rounded;
+            statusText = 'Syncing...';
+            break;
+          case SyncStatus.success:
+            statusColor = Colors.green;
+            statusIcon = Icons.cloud_done_rounded;
+            statusText = 'Synced';
+            break;
+          case SyncStatus.error:
+            statusColor = Colors.red;
+            statusIcon = Icons.cloud_off_rounded;
+            statusText = 'Sync Error';
+            break;
+        }
+
+        final lastSyncStr = syncState.lastSyncTime != null
+            ? DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(syncState.lastSyncTime!).toLocal())
+            : 'Never';
+
+        final isSyncing = syncState.status == SyncStatus.syncing;
+
+        return Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.shade800),
+          ),
+          color: Colors.grey.shade900,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(statusIcon, color: statusColor, size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            statusText,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          if (syncState.errorMessage != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: Text(
+                                syncState.errorMessage!,
+                                style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: isSyncing
+                          ? null
+                          : () {
+                              SyncService.instance.sync();
+                            },
+                      icon: isSyncing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.sync_rounded, size: 16),
+                      label: Text(isSyncing ? 'Syncing' : 'Sync Now'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, color: Colors.grey),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Last Successful Sync',
+                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
+                    Text(
+                      lastSyncStr,
+                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Pending Operations',
+                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: syncState.pendingCount > 0 ? Colors.amber.shade900 : Colors.grey.shade800,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${syncState.pendingCount}',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

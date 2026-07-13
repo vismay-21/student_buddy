@@ -391,7 +391,24 @@ Automatic and manual synchronization engine connecting SQLite with the FastAPI b
 
 ---
 
-# Phase 9 - WhatsApp Integration
+# Phase 9 - Deployment & Production Validation (MVP Version 1 Release)
+
+**Estimated Duration:** 2 Days
+
+### Goal
+Implement Audit 11 remediation plan, deploy backend resources to Railway and Supabase PostgreSQL, and configure the Flutter build variables. Complete comprehensive production validation before progressing to any WhatsApp or AI integrations.
+
+The backend core REST architecture is feature-complete for MVP Version 1. Future phases will extend, rather than redesign, the existing database schemas and API patterns.
+
+### Deliverables
+- **Audit 11 Implementation:** Remediate dynamic port bindings, ASGI worker manager dependencies, HTTPS proxy headers, secure Pydantic configuration validation, custom security headers, and resolver multi-tenant scope propagation.
+- **Production Infrastructure:** Setup Supabase PostgreSQL database and Railway FastAPI container service.
+- **Flutter Build Pipeline:** Inject environment variables (API_BASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY) as required, fail-fast compile-time variables.
+- **Post-Deployment Smoke Tests:** Verify database connectivity, migrations, user isolation, auth, and offline synchronization pipelines.
+
+---
+
+# Phase 10 - WhatsApp Integration
 
 **Estimated Duration:** 4-5 Days
 
@@ -408,7 +425,7 @@ Connect Meta Cloud API.
 
 ---
 
-# Phase 10 - Notification Engine
+# Phase 11 - Notification Engine
 
 **Estimated Duration:** 2-3 Days
 
@@ -426,7 +443,7 @@ Automated scheduled morning/night digests, class reminders.
 
 ---
 
-# Phase 11 - AI & OCR Integration
+# Phase 12 - AI & OCR Integration
 
 **Estimated Duration:** 5-7 Days
 
@@ -442,7 +459,7 @@ Implement intelligent automation.
 
 ---
 
-# Phase 12 - Finance Module
+# Phase 13 - Finance Module
 
 Finance Module implementation begins only after the core application is stable.
 
@@ -469,12 +486,13 @@ Keep these in Future Scope:
 2. FastAPI Setup, Database Design & CRUD (Completed through Sprint 11)
 3. Backend Verification & Flutter API Integration (MVP Mode - Completed)
 4. Authentication & Multi-Tenancy (Phase 7 / Sprint 13) (Completed)
-5. SQLite Offline Foundation (Phase 8A / Sprint 14A)
-6. Synchronization Engine (Phase 8B / Sprint 14B)
-7. WhatsApp Integration (Phase 9 / Sprint 15)
-8. Notification Engine (Phase 10)
-9. AI & OCR Integration (Phase 11 / Sprint 16)
-10. Finance Module (Phase 12 / Sprint 17)
+5. SQLite Offline Foundation (Phase 8A / Sprint 14A) (Completed)
+6. Synchronization Engine (Phase 8B / Sprint 14B) (Completed)
+7. Deployment & Production Validation (Phase 9 / Audit 11 Remediation & Deploy)
+8. WhatsApp Integration (Phase 10 / Sprint 15)
+9. Notification Engine (Phase 11)
+10. AI & OCR Integration (Phase 12 / Sprint 16)
+11. Finance Module (Phase 13 / Sprint 17)
 
 ---
 

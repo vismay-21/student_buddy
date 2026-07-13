@@ -3,6 +3,10 @@ class ApiConstants {
   // We can dynamically check, but keeping it configurable with a default.
   static const String baseUrl = 'http://127.0.0.1:8000/api/v1';
 
+  // Sync Protocol Versioning Range
+  static const int minSupportedSyncVersion = 1;
+  static const int maxSupportedSyncVersion = 1;
+
   // Academic Endpoints
   static const String semesters = '/academic/semesters';
   static const String subjects = '/academic/subjects';

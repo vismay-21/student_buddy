@@ -38,6 +38,7 @@ class TodoBase(BaseModel):
 
 
 class TodoCreate(TodoBase):
+    todo_id: uuid.UUID | None = None
     created_by: TodoCreatedBy = Field(
         default=TodoCreatedBy.USER,
         description="Source of the task creation."

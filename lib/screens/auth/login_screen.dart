@@ -4,8 +4,11 @@ import '../../core/theme/app_theme.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../core/services/bootstrap_service.dart';
+import '../../data/local/database_helper.dart';
 import '../../data/api/user_api.dart';
 import '../../data/repositories/semester_repository.dart';
+import '../../core/exceptions/sync_exceptions.dart';
 import '../navigation_shell.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
@@ -41,8 +44,20 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      // Initialize backend workspace (idempotent).
-      await UserApi().initializeUser(token: response.session?.accessToken);
+      final userId = response.user?.id;
+      if (userId != null) {
+        // Initialize user-scoped SQLite DB
+        await DatabaseHelper.instance.initDatabase(userId);
+
+        final isBootstrapped = await DatabaseHelper.instance.isBootstrapped();
+        if (!isBootstrapped) {
+          // Initialize backend workspace (idempotent).
+          await UserApi().initializeUser(token: response.session?.accessToken);
+          
+          // Seed local database from backend
+          await BootstrapService.instance.bootstrapUser(userId);
+        }
+      }
 
       // Bootstrap active semester into app state.
       try {
@@ -71,6 +86,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
+    } on UnsupportedSyncProtocolException catch (e) {
+      if (mounted) AppSnackbar.error(context, 'This version of Student Buddy is no longer compatible with the server. Please update the application.');
     } on AuthException catch (e) {
       if (mounted) AppSnackbar.error(context, e.message);
     } catch (e) {

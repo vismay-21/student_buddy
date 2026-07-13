@@ -13,6 +13,8 @@ class SemesterBase(BaseModel):
 
 
 class SemesterCreate(SemesterBase):
+    semester_id: uuid.UUID | None = None
+
     @model_validator(mode="after")
     def validate_dates(self) -> Self:
         if self.start_date >= self.end_date:

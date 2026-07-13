@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_state.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/bootstrap_service.dart';
+import '../../data/local/database_helper.dart';
 import '../../data/api/user_api.dart';
 import '../../data/repositories/semester_repository.dart';
+import '../../core/exceptions/sync_exceptions.dart';
 import '../auth/login_screen.dart';
 import '../navigation_shell.dart';
 
@@ -19,6 +22,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
+  String? _errorMessage;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -44,35 +49,71 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _bootstrap() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     final startTime = DateTime.now();
 
     // Check if the user already has an active Supabase session.
     final hasSession = AuthService.instance.isSignedIn;
+    final userId = AuthService.instance.currentUser?.id;
     Widget destination;
 
-    if (hasSession) {
-      // Session exists — initialize backend workspace (idempotent) and load semesters.
+    if (hasSession && userId != null) {
+      bool bootstrapSucceeded = false;
       try {
-        await UserApi().initializeUser();
-      } catch (_) {
-        // Best-effort — don't block startup if backend is temporarily unavailable.
+        // Initialize SQLite Database
+        await DatabaseHelper.instance.initDatabase(userId);
+        
+        // Check if database is already bootstrapped locally
+        final isBootstrapped = await DatabaseHelper.instance.isBootstrapped();
+        if (!isBootstrapped) {
+          // Perform idempotent user initialization on backend
+          try {
+            await UserApi().initializeUser();
+          } catch (_) {
+            // Best-effort user initialization, bootstrap will proceed
+          }
+          
+          // Seed local database from backend
+          await BootstrapService.instance.bootstrapUser(userId);
+        }
+        bootstrapSucceeded = true;
+      } on UnsupportedSyncProtocolException catch (e) {
+        debugPrint('Bootstrap failed due to protocol version mismatch: $e');
+        setState(() {
+          _errorMessage = 'This version of Student Buddy is no longer compatible with the server. Please update the application.';
+          _isLoading = false;
+        });
+        return;
+      } catch (e) {
+        debugPrint('Bootstrap failed during splash screen: $e');
+        setState(() {
+          _errorMessage = 'Failed to load offline data. Please check your internet connection and try again.';
+          _isLoading = false;
+        });
+        return;
       }
 
-      try {
-        final list = await SemesterRepository().getSemesters();
-        if (list.isNotEmpty) {
-          final savedId = AppState.instance.savedActiveSemesterId;
-          final found = list.firstWhere(
-            (s) => s.semesterId == savedId,
-            orElse: () => list.first,
-          );
-          AppState.instance.setActiveSemester(found);
-        } else {
+      if (bootstrapSucceeded) {
+        try {
+          final list = await SemesterRepository().getSemesters();
+          if (list.isNotEmpty) {
+            final savedId = AppState.instance.savedActiveSemesterId;
+            final found = list.firstWhere(
+              (s) => s.semesterId == savedId,
+              orElse: () => list.first,
+            );
+            AppState.instance.setActiveSemester(found);
+          } else {
+            AppState.instance.setActiveSemester(null);
+          }
+        } catch (e) {
+          debugPrint('Failed to load semesters after bootstrap: $e');
           AppState.instance.setActiveSemester(null);
         }
-      } catch (e) {
-        debugPrint('Failed to bootstrap semesters: $e');
-        AppState.instance.setActiveSemester(null);
       }
       destination = const NavigationShell();
     } else {
@@ -96,6 +137,29 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           transitionDuration: const Duration(milliseconds: 500),
         ),
       );
+    }
+  }
+
+  Future<void> _handleSignOut() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      await AuthService.instance.signOut();
+      await DatabaseHelper.instance.closeDatabase();
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to sign out from splash error screen: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to sign out. Please close the app and reopen it.';
+        });
+      }
     }
   }
 
@@ -190,15 +254,58 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
               const SizedBox(height: 48),
               
-              // Loading indicator
-              const SizedBox(
-                width: 30,
-                height: 30,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+              // Loading or Error UI
+              if (_isLoading)
+                const SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                  ),
+                )
+              else if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    children: [
+                      Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _bootstrap,
+                            icon: const Icon(Icons.refresh),
+                            label: const String.fromEnvironment('test') != ''
+                                ? const Text('Retry')
+                                : const Text('Retry'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          OutlinedButton.icon(
+                            onPressed: _handleSignOut,
+                            icon: const Icon(Icons.logout),
+                            label: const Text('Sign Out'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              side: const BorderSide(color: Colors.white30),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

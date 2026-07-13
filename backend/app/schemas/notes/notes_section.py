@@ -8,6 +8,7 @@ class NotesSectionBase(BaseModel):
 
 
 class NotesSectionCreate(NotesSectionBase):
+    section_id: uuid.UUID | None = None
     notes_subject_id: uuid.UUID = Field(..., description="UUID of the parent notes subject")
 
 

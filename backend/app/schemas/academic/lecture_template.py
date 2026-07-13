@@ -27,6 +27,7 @@ class LectureTemplateBase(BaseModel):
 
 
 class LectureTemplateCreate(LectureTemplateBase):
+    lecture_template_id: uuid.UUID | None = None
     subject_id: uuid.UUID = Field(
         ...,
         description="UUID of the subject this template belongs to"

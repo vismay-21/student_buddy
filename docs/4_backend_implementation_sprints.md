@@ -304,7 +304,7 @@ No APIs.
 - Scoped repository constructors for data isolation
 - Multi-tenant test suite using mocked authentication overrides
 
-# Sprint 14A — Offline Foundation
+# Sprint 14A — Offline Foundation (Completed)
 
 ## Goal
 Transform Student Buddy into a fully functional offline-first application while preserving the existing authenticated architecture. 
@@ -390,6 +390,22 @@ Synchronize the local SQLite database with the PostgreSQL database on the backen
 - **UI Indicators**: Provide manual sync actions and status icons to show connection/sync state.
 
 *Note: Sprint 14B assumes that the Sprint 14A Offline Foundation is already fully implemented.*
+
+---
+
+# Deployment & Operations (Production Readiness Milestone)
+
+## Goal
+Remediate the infrastructure gaps identified in Audit 11 and deploy the feature-complete backend to production (FastAPI on Railway and PostgreSQL on Supabase). Secure the client-server connection and conduct a full end-to-end operational verification before proceeding to WhatsApp or AI integrations.
+
+The backend core REST architecture is now frozen as feature-complete for MVP Version 1. Future work will extend the platform rather than redesigning it.
+
+## Deliverables & Tasks
+- **Audit 11 Remediation:** Resolve port binding, security headers, reverse-proxy forwarding, fail-fast variable validations, and OpenAPI schema protections.
+- **Supabase PostgreSQL Provisioning:** Setup the production Supabase database.
+- **FastAPI Railway Deployment:** Configure, build, and deploy backend service with automated migrations.
+- **Flutter Production Build:** Point API constants and Supabase credentials to production without hardcoded fallbacks using compile-time variables (`--dart-define`).
+- **Smoke Testing:** Execute the 18-step Post-Deployment Smoke Test suite to verify user isolation, authentication, SQLite creation, and synchronization pipelines.
 
 ---
 

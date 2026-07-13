@@ -1,27 +1,12 @@
-import '../api/semester_api.dart';
 import '../dto/semester/semester_dto.dart';
+import 'sqlite/sqlite_semester_repository.dart';
 
-class SemesterRepository {
-  final SemesterApi _semesterApi = SemesterApi();
+abstract class SemesterRepository {
+  factory SemesterRepository() => SqliteSemesterRepository();
 
-  Future<List<SemesterDto>> getSemesters() {
-    return _semesterApi.getSemesters();
-  }
-
-  Future<SemesterDto> createSemester(SemesterCreateRequest request) {
-    return _semesterApi.createSemester(request);
-  }
-
-  Future<SemesterDto> getSemesterById(String semesterId) {
-    return _semesterApi.getSemesterById(semesterId);
-  }
-
-  Future<void> deleteSemester(String semesterId) {
-    return _semesterApi.deleteSemester(semesterId);
-  }
-
-  Future<SemesterDto> updateSemester(String semesterId, SemesterUpdateRequest request) {
-    return _semesterApi.updateSemester(semesterId, request);
-  }
+  Future<List<SemesterDto>> getSemesters();
+  Future<SemesterDto> createSemester(SemesterCreateRequest request);
+  Future<SemesterDto> getSemesterById(String semesterId);
+  Future<void> deleteSemester(String semesterId);
+  Future<SemesterDto> updateSemester(String semesterId, SemesterUpdateRequest request);
 }
-

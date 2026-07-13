@@ -15,6 +15,7 @@ class HolidayBase(BaseModel):
 
 
 class HolidayCreate(HolidayBase):
+    holiday_id: uuid.UUID | None = None
     semester_id: uuid.UUID = Field(..., description="ID of the semester this holiday belongs to.")
 
 

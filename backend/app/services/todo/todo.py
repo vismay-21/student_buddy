@@ -55,6 +55,7 @@ class TodoService:
         handles completed_at appropriately.
         """
         todo = Todo(
+            todo_id=todo_in.todo_id or uuid.uuid4(),
             title=todo_in.title,
             priority=todo_in.priority,
             due_datetime=todo_in.due_datetime,

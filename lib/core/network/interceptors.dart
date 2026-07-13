@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../../data/local/database_helper.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -50,10 +51,12 @@ class AppInterceptors extends Interceptor {
     // Handle 401: sign the user out and navigate to login.
     if (err.response?.statusCode == 401) {
       AuthService.instance.signOut().then((_) {
-        final nav = navigatorKey?.currentState;
-        if (nav != null) {
-          nav.pushNamedAndRemoveUntil('/login', (route) => false);
-        }
+        DatabaseHelper.instance.closeDatabase().then((_) {
+          final nav = navigatorKey?.currentState;
+          if (nav != null) {
+            nav.pushNamedAndRemoveUntil('/login', (route) => false);
+          }
+        });
       });
     }
 

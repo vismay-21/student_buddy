@@ -42,6 +42,7 @@ class NotesResourceBase(BaseModel):
 
 
 class NotesResourceCreate(NotesResourceBase):
+    resource_id: uuid.UUID | None = None
     section_id: uuid.UUID = Field(..., description="UUID of the parent notes section")
 
 

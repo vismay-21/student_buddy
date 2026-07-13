@@ -40,6 +40,7 @@ class SemesterService:
 
         # Create Semester
         semester = Semester(
+            semester_id=semester_in.semester_id or uuid.uuid4(),
             semester_number=semester_in.semester_number,
             start_date=semester_in.start_date,
             end_date=semester_in.end_date

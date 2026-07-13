@@ -39,6 +39,7 @@ class SubjectBase(BaseModel):
 
 
 class SubjectCreate(SubjectBase):
+    subject_id: uuid.UUID | None = None
     semester_id: uuid.UUID = Field(
         ...,
         description="UUID of the semester this subject belongs to."
