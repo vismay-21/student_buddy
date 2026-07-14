@@ -22,14 +22,14 @@ class AppSettings(Base):
     settings_id: Mapped[int] = mapped_column(
         SmallInteger,
         primary_key=True,
+        autoincrement=True,
         nullable=False
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         unique=True,
         nullable=False,
-        index=True,
-        default=lambda: __import__("app.core.database", fromlist=["get_default_user_id"]).get_default_user_id()
+        index=True
     )
     active_semester_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("semesters.semester_id", ondelete="RESTRICT"),
