@@ -92,7 +92,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             pageBuilder: (_, __, ___) => const NavigationShell(),
             transitionsBuilder: (_, animation, __, child) =>
                 FadeTransition(opacity: animation, child: child),
-            transitionDuration: const Duration(milliseconds: 400),
+            transitionDuration: const Duration(milliseconds: 700),
           ),
           (route) => false,
         );

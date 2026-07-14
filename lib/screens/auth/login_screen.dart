@@ -82,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
             pageBuilder: (_, __, ___) => const NavigationShell(),
             transitionsBuilder: (_, animation, __, child) =>
                 FadeTransition(opacity: animation, child: child),
-            transitionDuration: const Duration(milliseconds: 400),
+            transitionDuration: const Duration(milliseconds: 700),
           ),
         );
       }
