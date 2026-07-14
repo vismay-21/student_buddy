@@ -41,6 +41,19 @@ class BootstrapService {
       // 1. Insert App Settings
       final settings = data['app_settings'];
       if (settings != null) {
+        // Store active_semester_id in local_metadata if present
+        final activeSemId = settings['active_semester_id'];
+        if (activeSemId != null) {
+          await txn.insert(
+            'local_metadata',
+            {
+              'key': 'active_semester_id',
+              'value': activeSemId.toString(),
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+
         await txn.insert('app_settings', {
           'settings_id': settings['settings_id'],
           'user_id': userId,

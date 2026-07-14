@@ -602,6 +602,27 @@ class SyncService {
     final id = remoteData[pkColumn];
     if (id == null) return;
 
+    if (table == 'app_settings') {
+      // Handle active_semester_id by storing it in local_metadata
+      final activeSemId = remoteData['active_semester_id'];
+      if (activeSemId != null) {
+        await txn.insert(
+          'local_metadata',
+          {
+            'key': 'active_semester_id',
+            'value': activeSemId.toString(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      } else {
+        await txn.delete(
+          'local_metadata',
+          where: 'key = ?',
+          whereArgs: ['active_semester_id'],
+        );
+      }
+    }
+
     final existing = await txn.query(table, where: '$pkColumn = ?', whereArgs: [id]);
     final normalizedRemote = _normalizeForSqlite(table, remoteData);
 
@@ -632,6 +653,7 @@ class SyncService {
     normalized.remove('subject');
 
     if (table == 'app_settings') {
+      normalized.remove('active_semester_id');
       if (normalized['finance_enabled'] is bool) {
         normalized['finance_enabled'] = normalized['finance_enabled'] ? 1 : 0;
       }
