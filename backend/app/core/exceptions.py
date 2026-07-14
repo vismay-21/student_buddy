@@ -67,7 +67,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
         # Check environment to determine if detail should be returned
         from app.core.config import settings
-        show_details = settings.APP_ENV == "development"
+        show_details = True  # Temporarily enabled for production debugging
         
         return JSONResponse(
             status_code=500,
