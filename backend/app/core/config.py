@@ -37,6 +37,13 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
+    @field_validator("SUPABASE_URL", "SUPABASE_KEY", "DATABASE_URL", "JWT_SECRET", mode="before")
+    @classmethod
+    def clean_env_strings(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip().replace("\n", "").replace("\r", "")
+        return v
+
     # JWT Authentication Configuration (for Sprint 13 compatibility)
     JWT_SECRET: str = "dev_fallback_jwt_secret_key_not_for_production"
     JWT_ALGORITHM: str = "HS256"

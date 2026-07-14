@@ -204,57 +204,62 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 10),
-
-                        // Forgot password
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const ForgotPasswordScreen(),
-                              ),
-                            ),
-                            child: Text(
-                              'Forgot Password?',
-                              style: TextStyle(color: AppTheme.primary),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Login button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleLogin,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Sign In',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 28),
+                         const SizedBox(height: 2),
+ 
+                         // Forgot password
+                         Align(
+                           alignment: Alignment.centerRight,
+                           child: TextButton(
+                             onPressed: () => Navigator.of(context).push(
+                               MaterialPageRoute(
+                                 builder: (_) => const ForgotPasswordScreen(),
+                               ),
+                             ),
+                             style: TextButton.styleFrom(
+                               padding: EdgeInsets.zero,
+                               minimumSize: const Size(0, 0),
+                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                             ),
+                             child: Text(
+                               'Forgot Password?',
+                               style: TextStyle(color: AppTheme.primary),
+                             ),
+                           ),
+                         ),
+                         const SizedBox(height: 16),
+ 
+                         // Login button
+                         SizedBox(
+                           width: double.infinity,
+                           height: 52,
+                           child: ElevatedButton(
+                             onPressed: _isLoading ? null : _handleLogin,
+                             style: ElevatedButton.styleFrom(
+                               backgroundColor: AppTheme.primary,
+                               shape: RoundedRectangleBorder(
+                                 borderRadius: BorderRadius.circular(14),
+                               ),
+                             ),
+                             child: _isLoading
+                                 ? const SizedBox(
+                                     width: 22,
+                                     height: 22,
+                                     child: CircularProgressIndicator(
+                                       strokeWidth: 2.5,
+                                       color: Colors.white,
+                                     ),
+                                   )
+                                 : const Text(
+                                     'Sign In',
+                                     style: TextStyle(
+                                       fontSize: 16,
+                                       fontWeight: FontWeight.bold,
+                                       color: Colors.white,
+                                     ),
+                                   ),
+                           ),
+                         ),
+                         const SizedBox(height: 16),
 
                         // Sign up link
                         Row(
