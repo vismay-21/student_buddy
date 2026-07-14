@@ -84,6 +84,16 @@ class SyncService {
   }
 
   Future<void> _updateState({SyncStatus? status, String? errorMessage}) async {
+    if (!_authService.isSignedIn || _dbHelper.currentUserId == null) {
+      stateNotifier.value = stateNotifier.value.copyWith(
+        status: status ?? SyncStatus.idle,
+        lastSyncTime: null,
+        pendingCount: 0,
+        errorMessage: errorMessage,
+      );
+      return;
+    }
+
     final count = await _getPendingCount();
     final lastSync = await _dbHelper.getLastSuccessfulSync();
     stateNotifier.value = stateNotifier.value.copyWith(
