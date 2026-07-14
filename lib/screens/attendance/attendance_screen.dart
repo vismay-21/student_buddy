@@ -64,7 +64,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (_subjectsList.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       // 1. Load settings
       final settings = await _settingsRepo.getSettings(activeSem.semesterId);

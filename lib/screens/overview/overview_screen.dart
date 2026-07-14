@@ -68,7 +68,9 @@ class _OverviewScreenState extends State<OverviewScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (_todayInstances.isEmpty && _subjectMetricsMap.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final instances = await _lectureRepo.getTodayLectures(

@@ -34,7 +34,9 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _loadTodos() async {
-    setState(() => _isLoading = true);
+    if (_todoItems.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final items = await _todoRepository.getTodos();
       setState(() {

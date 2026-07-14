@@ -113,7 +113,10 @@ class _NavigationShellState extends State<NavigationShell> {
               const SizedBox(width: 16),
             ],
           ),
-          body: pages[_selectedIndex],
+          body: IndexedStack(
+            index: _selectedIndex,
+            children: pages,
+          ),
           bottomNavigationBar: BottomNavigationBar(
             currentIndex: _selectedIndex,
             onTap: (index) {
