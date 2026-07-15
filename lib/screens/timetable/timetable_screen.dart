@@ -263,6 +263,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 60.0),
         child: FloatingActionButton(
+          heroTag: 'timetable_fab',
           backgroundColor: AppTheme.primary,
           foregroundColor: Colors.white,
           onPressed: () async {

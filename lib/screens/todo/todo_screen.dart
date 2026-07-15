@@ -128,6 +128,7 @@ class _TodoScreenState extends ConsumerState<TodoScreen> with SingleTickerProvid
             ],
           ),
           floatingActionButton: FloatingActionButton(
+            heroTag: 'todo_fab',
             onPressed: _navigateToAddTodo,
             backgroundColor: AppTheme.primary,
             child: const Icon(Icons.add, color: Colors.white),

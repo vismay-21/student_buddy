@@ -270,6 +270,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'notes_fab',
         backgroundColor: AppTheme.primary,
         onPressed: () => _navigateToAddResource(),
         tooltip: 'Add Resource',
