@@ -198,14 +198,22 @@ async def bootstrap_user(
         )
     )
     if since:
-        has_updated_section = exists().where(
-            NotesSection.notes_subject_id == NotesSubject.notes_subject_id,
-            NotesSection.updated_at > since
+        has_updated_section = exists(
+            select(1)
+            .select_from(NotesSection)
+            .where(
+                NotesSection.notes_subject_id == NotesSubject.notes_subject_id,
+                NotesSection.updated_at > since
+            )
         )
-        has_updated_resource = exists().join(NotesSection).where(
-            NotesSection.notes_subject_id == NotesSubject.notes_subject_id,
-            NotesResource.section_id == NotesSection.section_id,
-            NotesResource.updated_at > since
+        has_updated_resource = exists(
+            select(1)
+            .select_from(NotesResource)
+            .join(NotesSection, NotesResource.section_id == NotesSection.section_id)
+            .where(
+                NotesSection.notes_subject_id == NotesSubject.notes_subject_id,
+                NotesResource.updated_at > since
+            )
         )
         notes_stmt = notes_stmt.where(
             (NotesSubject.updated_at > since) |
@@ -215,10 +223,11 @@ async def bootstrap_user(
     notes_subjects = (await db.scalars(notes_stmt)).all()
     notes_subjects_data = [NotesSubjectDetailResponse.model_validate(ns) for ns in notes_subjects]
 
-    # 10. Fetch Review Queue
     review_stmt = select(ReviewQueue).where(ReviewQueue.user_id == current_user.id)
     if since:
-        review_stmt = review_stmt.where(ReviewQueue.updated_at > since)
+        review_stmt = review_stmt.where(
+            (ReviewQueue.created_at > since) | (ReviewQueue.resolved_at > since)
+        )
     review_queue_items = (await db.scalars(review_stmt)).all()
     review_service = ReviewQueueService(db, ReviewQueueRepository(db, current_user.id))
     await review_service._bulk_populate_summaries(review_queue_items)

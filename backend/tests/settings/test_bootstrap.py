@@ -243,3 +243,35 @@ async def test_bootstrap_endpoint(client: AsyncClient, db_session: AsyncSession)
     assert len(payload["activity_logs"]) == 1
     assert payload["activity_logs"][0]["activity_id"] == str(activity_id)
     assert payload["activity_logs"][0]["entity_summary"] == "Submit OS Project"
+
+
+async def test_bootstrap_since_parameter(client: AsyncClient, db_session: AsyncSession) -> None:
+    semester_id = uuid.uuid4()
+    semester = Semester(
+        semester_id=semester_id,
+        user_id=TEST_USER_ID,
+        semester_number=1,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 6, 1),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(semester)
+
+    notes_subject_id = uuid.uuid4()
+    notes_subject = NotesSubject(
+        notes_subject_id=notes_subject_id,
+        user_id=TEST_USER_ID,
+        semester_id=semester_id,
+        notes_subject_name="OS Notes",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(notes_subject)
+    await db_session.flush()
+
+    since_str = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    response = await client.get(f"/api/v1/users/me/bootstrap?since={since_str}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True

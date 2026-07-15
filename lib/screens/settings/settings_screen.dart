@@ -324,7 +324,7 @@ class SettingsScreen extends ConsumerWidget {
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final item = logs[index];
-                final timeStr = DateFormat('d MMM yyyy, h:mm a').format(item.createdAt);
+                final timeStr = DateFormat('d MMM yyyy, h:mm a').format(item.createdAt.toLocal());
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

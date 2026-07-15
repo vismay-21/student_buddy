@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'common_providers.dart';
 import 'auth_provider.dart';
+import 'sync_provider.dart';
 import '../models/subject_template.dart';
 import '../../data/dto/settings/app_settings_dto.dart';
 import '../../data/repositories/app_settings_repository.dart';
@@ -321,6 +322,10 @@ final activityLogsProvider = FutureProvider<List<ActivityLogDto>>((ref) async {
   if (bootstrapState != BootstrapState.success) {
     return Completer<List<ActivityLogDto>>().future;
   }
+  
+  // Watch syncStateProvider to rebuild when remote logs are synced down
+  ref.watch(syncStateProvider);
+
   final repo = ActivityLogRepository();
   return repo.getActivityLogs(limit: 5);
 });

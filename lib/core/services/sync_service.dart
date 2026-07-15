@@ -545,6 +545,14 @@ class SyncService {
           await _mergeEntity(txn, 'review_queue', 'review_id', req);
         }
       }
+
+      // 12. Activity Logs
+      final activityLogs = bootstrap['activity_logs'] as List?;
+      if (activityLogs != null) {
+        for (final log in activityLogs) {
+          await _mergeEntity(txn, 'activity_logs', 'activity_id', log);
+        }
+      }
     });
   }
 
@@ -630,10 +638,23 @@ class SyncService {
       await txn.insert(table, normalizedRemote);
     } else {
       final localItem = existing.first;
-      final localUpdatedAt = DateTime.parse(localItem['updated_at'] as String);
-      final remoteUpdatedAt = DateTime.parse(remoteData['updated_at'] as String);
+      final localUpdatedAtStr = localItem['updated_at'] ?? localItem['created_at'];
+      final remoteUpdatedAtStr = remoteData['updated_at'] ?? remoteData['created_at'];
 
-      if (remoteUpdatedAt.isAfter(localUpdatedAt) || remoteUpdatedAt.isAtSameMomentAs(localUpdatedAt)) {
+      if (localUpdatedAtStr != null && remoteUpdatedAtStr != null) {
+        final localUpdatedAt = DateTime.parse(localUpdatedAtStr as String);
+        final remoteUpdatedAt = DateTime.parse(remoteUpdatedAtStr as String);
+
+        if (remoteUpdatedAt.isAfter(localUpdatedAt) || remoteUpdatedAt.isAtSameMomentAs(localUpdatedAt)) {
+          await txn.update(
+            table,
+            normalizedRemote,
+            where: '$pkColumn = ?',
+            whereArgs: [id],
+          );
+        }
+      } else {
+        // Fallback: overwrite if no timestamps to compare
         await txn.update(
           table,
           normalizedRemote,
@@ -765,6 +786,17 @@ class SyncService {
         'resolved_by',
         'created_at',
         'resolved_at',
+      },
+      'activity_logs': {
+        'activity_id',
+        'user_id',
+        'actor_type',
+        'entity_type',
+        'entity_id',
+        'action_type',
+        'activity_message',
+        'correlation_id',
+        'created_at',
       },
     };
 

@@ -109,6 +109,7 @@ class TodoService:
 
         # Manage status transitions and completed_at
         was_completed = False
+        was_uncompleted = False
         if todo_in.status is not None:
             if todo_in.status == TodoStatus.COMPLETED:
                 if todo.status != TodoStatus.COMPLETED:
@@ -117,6 +118,7 @@ class TodoService:
             elif todo_in.status == TodoStatus.PENDING:
                 if todo.status != TodoStatus.PENDING:
                     todo.completed_at = None
+                    was_uncompleted = True
             todo.status = todo_in.status
 
         await self.todo_repo.update(todo)
@@ -125,7 +127,12 @@ class TodoService:
         from app.services.activity_logs import log_activity
         from app.models.activity_logs.activity_log import ActorType, EntityType, ActionType
         action_type = ActionType.COMPLETED if was_completed else ActionType.UPDATED
-        msg = f"Completed todo task: '{todo.title}'." if was_completed else f"Updated todo task details: '{todo.title}'."
+        if was_completed:
+            msg = f"Completed todo task: '{todo.title}'."
+        elif was_uncompleted:
+            msg = f"Marked todo task as pending: '{todo.title}'."
+        else:
+            msg = f"Updated todo task details: '{todo.title}'."
         await log_activity(
             db=self.db,
             actor_type=ActorType.USER,
