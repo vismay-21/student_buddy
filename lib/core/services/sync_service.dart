@@ -652,6 +652,11 @@ class SyncService {
     normalized.remove('lecture_template');
     normalized.remove('subject');
 
+    if (table == 'lecture_instances') {
+      normalized.remove('marked_by');
+      normalized.remove('marked_at');
+    }
+
     if (table == 'app_settings') {
       normalized.remove('active_semester_id');
       if (normalized['finance_enabled'] is bool) {
