@@ -727,6 +727,33 @@ class SyncService {
         'created_at',
         'updated_at',
       },
+      'notes_subjects': {
+        'notes_subject_id',
+        'user_id',
+        'semester_id',
+        'notes_subject_name',
+        'created_at',
+        'updated_at',
+      },
+      'notes_sections': {
+        'section_id',
+        'notes_subject_id',
+        'section_name',
+        'created_at',
+        'updated_at',
+      },
+      'notes_resources': {
+        'resource_id',
+        'section_id',
+        'resource_name',
+        'file_name',
+        'mime_type',
+        'file_size_bytes',
+        'storage_path',
+        'uploaded_via',
+        'created_at',
+        'updated_at',
+      },
       'review_queue': {
         'review_id',
         'user_id',
@@ -747,8 +774,8 @@ class SyncService {
       final allowedKeys = tableSchemas[table]!;
       normalized.removeWhere((key, _) => !allowedKeys.contains(key));
       
-      // If table requires user_id but remote data lacks it, populate it
-      if (allowedKeys.contains('user_id') && !normalized.containsKey('user_id') && currentUserId != null) {
+      // If table requires user_id but remote data lacks it or it is null, populate it
+      if (allowedKeys.contains('user_id') && (normalized['user_id'] == null) && currentUserId != null) {
         normalized['user_id'] = currentUserId;
       }
     }
