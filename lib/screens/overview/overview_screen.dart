@@ -454,10 +454,6 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                     }
 
                     try {
-                      final currentAction = inst.attendanceStatus == 'present'
-                          ? 'attended'
-                          : (inst.attendanceStatus == 'absent' ? 'missed' : 'clear');
-                      
                       await ref.read(attendanceActionsProvider).updateAttendance(
                         inst.lectureInstanceId,
                         LectureInstanceUpdateRequest(
@@ -465,7 +461,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                           lectureStatus: newLectureStatus,
                         ),
                         subjectId: inst.lectureTemplate.subjectId,
-                        oldStatus: currentAction,
+                        oldStatus: inst.attendanceStatus,
+                        dateStr: DateFormat('yyyy-MM-dd').format(inst.lectureDate),
                       );
                     } catch (e) {
                       if (mounted) {
@@ -632,8 +629,30 @@ class _OverviewLectureCard extends ConsumerWidget {
     final statsAsync = ref.watch(subjectAttendanceStatsProvider(inst.lectureTemplate.subjectId));
     final settingsAsync = ref.watch(attendanceSettingsProvider);
 
-    return statsAsync.when(
-      loading: () => Container(
+    if (statsAsync.hasValue) {
+      final stats = statsAsync.value!;
+      final settings = settingsAsync.value;
+      final mappedMode = settings?.criteriaMode == 'subject' ? 'subject_wise' : settings?.criteriaMode;
+      int target = settings?.overallAttendanceGoal ?? 80;
+      if (mappedMode == 'custom') {
+        target = inst.lectureTemplate.subject.attendanceGoal;
+      }
+      final bool isAboveTarget = stats.attendancePercentage >= target;
+
+      return LectureCard(
+        lecture: lecture,
+        showAttendance: true,
+        currentAction: currentAction,
+        attendancePercent: stats.attendancePercentage,
+        targetPercent: target,
+        attended: stats.presentLectures,
+        total: stats.totalLectures,
+        statusMessage: stats.statusMessage,
+        isAboveTarget: isAboveTarget,
+        onActionChanged: onActionChanged,
+      );
+    } else if (statsAsync.isLoading) {
+      return Container(
         height: 100,
         alignment: Alignment.center,
         child: const SizedBox(
@@ -641,30 +660,9 @@ class _OverviewLectureCard extends ConsumerWidget {
           height: 24,
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
-      ),
-      error: (err, stack) => Text('Error loading stats: $err'),
-      data: (stats) {
-        final settings = settingsAsync.value;
-        final mappedMode = settings?.criteriaMode == 'subject' ? 'subject_wise' : settings?.criteriaMode;
-        int target = settings?.overallAttendanceGoal ?? 80;
-        if (mappedMode == 'custom') {
-          target = inst.lectureTemplate.subject.attendanceGoal;
-        }
-        final bool isAboveTarget = stats.attendancePercentage >= target;
-
-        return LectureCard(
-          lecture: lecture,
-          showAttendance: true,
-          currentAction: currentAction,
-          attendancePercent: stats.attendancePercentage,
-          targetPercent: target,
-          attended: stats.presentLectures,
-          total: stats.totalLectures,
-          statusMessage: stats.statusMessage,
-          isAboveTarget: isAboveTarget,
-          onActionChanged: onActionChanged,
-        );
-      },
-    );
+      );
+    } else {
+      return Text('Error loading stats: ${statsAsync.error}');
+    }
   }
 }

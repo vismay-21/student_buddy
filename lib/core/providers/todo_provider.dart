@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/dto/todo/todo_dto.dart';
 import 'common_providers.dart';
+import 'auth_provider.dart';
 
 // ==========================================
 // 1. Todos List Provider (Read-Only)
@@ -8,6 +10,17 @@ import 'common_providers.dart';
 class TodosNotifier extends AsyncNotifier<List<TodoDto>> {
   @override
   Future<List<TodoDto>> build() async {
+    final bootstrapAsync = ref.watch(bootstrapStatusProvider);
+    if (bootstrapAsync.isLoading) {
+      return Completer<List<TodoDto>>().future;
+    }
+    if (bootstrapAsync.hasError) {
+      throw bootstrapAsync.error!;
+    }
+    final bootstrapState = bootstrapAsync.value;
+    if (bootstrapState != BootstrapState.success) {
+      return Completer<List<TodoDto>>().future;
+    }
     final service = ref.watch(todoServiceProvider);
     return service.getTodos();
   }

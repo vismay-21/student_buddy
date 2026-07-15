@@ -60,213 +60,216 @@ class DayHistoryScreen extends ConsumerWidget {
         ),
         centerTitle: true,
       ),
-      body: instancesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
-        data: (instances) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Selected Day Header Card
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cardBackground,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
+      body: instancesAsync.hasValue
+          ? Builder(
+              builder: (context) {
+                final instances = instancesAsync.value!;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Selected Day Header Card
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppTheme.primary.withOpacity(0.12),
-                          shape: BoxShape.circle,
+                          color: cardBackground,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderColor),
                         ),
-                        child: const Icon(
-                          Icons.calendar_today_rounded,
-                          color: AppTheme.primary,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(
-                              titleStr,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary.withOpacity(0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.calendar_today_rounded,
+                                color: AppTheme.primary,
+                                size: 20,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${instances.length} scheduled lectures for this day',
-                              style: const TextStyle(
-                                color: AppTheme.textMuted,
-                                fontSize: 12,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    titleStr,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${instances.length} scheduled lectures for this day',
+                                    style: const TextStyle(
+                                      color: AppTheme.textMuted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-
-              if (hasHolidayToday)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1D4ED8).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF1D4ED8).withOpacity(0.3), width: 1.5),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          color: Color(0xFF1D4ED8),
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+
+                    if (hasHolidayToday)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1D4ED8).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFF1D4ED8).withOpacity(0.3), width: 1.5),
+                          ),
+                          child: Row(
                             children: [
-                              const Text(
-                                'University Holiday',
-                                style: TextStyle(
-                                  color: Color(0xFF1D4ED8),
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 13,
-                                  letterSpacing: 0.5,
-                                ),
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Color(0xFF1D4ED8),
+                                size: 24,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                holidayToday.holidayName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: AppTheme.textPrimary,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'University Holiday',
+                                      style: TextStyle(
+                                        color: Color(0xFF1D4ED8),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      holidayToday.holidayName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Whole day action panel
-              if (instances.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                  child: Card(
-                    color: cardBackground,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: borderColor),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                              child: _buildWholeDayButton(
-                                  context, ref, activeSem.semesterId, dateStr, hasHolidayToday, 'clear', 'Clear',
-                                  AppTheme.textMuted, Icons.remove_circle_outline)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                              child: _buildWholeDayButton(
-                                  context, ref, activeSem.semesterId, dateStr, hasHolidayToday, 'off', 'Day Off',
-                                  AppTheme.warning, Icons.pause_circle_outline)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                              child: _buildWholeDayButton(
-                                  context, ref, activeSem.semesterId, dateStr, hasHolidayToday, 'missed', 'Missed',
-                                  AppTheme.danger, Icons.highlight_off)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                              child: _buildWholeDayButton(
-                                  context, ref, activeSem.semesterId, dateStr, hasHolidayToday, 'attended', 'Attended',
-                                  AppTheme.accent, Icons.check_circle_rounded)),
-                        ],
                       ),
-                    ),
-                  ),
-                ),
 
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                child: Text(
-                  'LECTURES LIST',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textMuted,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-
-              Expanded(
-                child: instances.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.weekend_rounded,
-                              size: 48,
-                              color: AppTheme.textMuted.withOpacity(0.3),
+                    // Whole day action panel
+                    if (instances.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                        child: Card(
+                          color: cardBackground,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(color: borderColor),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                    child: _buildWholeDayButton(
+                                        context, ref, activeSem.semesterId, dateStr, hasHolidayToday, 'clear', 'Clear',
+                                        AppTheme.textMuted, Icons.remove_circle_outline)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                    child: _buildWholeDayButton(
+                                        context, ref, activeSem.semesterId, dateStr, hasHolidayToday, 'off', 'Day Off',
+                                        AppTheme.warning, Icons.pause_circle_outline)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                    child: _buildWholeDayButton(
+                                        context, ref, activeSem.semesterId, dateStr, hasHolidayToday, 'missed', 'Missed',
+                                        AppTheme.danger, Icons.highlight_off)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                    child: _buildWholeDayButton(
+                                        context, ref, activeSem.semesterId, dateStr, hasHolidayToday, 'attended', 'Attended',
+                                        AppTheme.accent, Icons.check_circle_rounded)),
+                              ],
                             ),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'No classes scheduled for this day.',
-                              style: TextStyle(
-                                color: AppTheme.textMuted,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: instances.length,
-                        itemBuilder: (context, index) {
-                          final inst = instances[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: LectureCardWrapper(
-                              inst: inst,
-                              hasHoliday: hasHolidayToday,
-                              overallGoal: settings?.overallAttendanceGoal ?? 75,
-                              criteriaMode: settings?.criteriaMode ?? 'overall',
-                              onActionChanged: (action) => _onActionTapped(context, ref, inst, action),
-                            ),
-                          );
-                        },
                       ),
-              ),
-            ],
-          );
-        },
-      ),
+
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                      child: Text(
+                        'LECTURES LIST',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textMuted,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ),
+
+                    Expanded(
+                      child: instances.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.weekend_rounded,
+                                    size: 48,
+                                    color: AppTheme.textMuted.withOpacity(0.3),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'No classes scheduled for this day.',
+                                    style: TextStyle(
+                                      color: AppTheme.textMuted,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: instances.length,
+                              itemBuilder: (context, index) {
+                                final inst = instances[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16.0),
+                                  child: LectureCardWrapper(
+                                    inst: inst,
+                                    hasHoliday: hasHolidayToday,
+                                    overallGoal: settings?.overallAttendanceGoal ?? 75,
+                                    criteriaMode: settings?.criteriaMode ?? 'overall',
+                                    onActionChanged: (action) => _onActionTapped(context, ref, inst, action),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            )
+          : instancesAsync.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Center(child: Text('Error: ${instancesAsync.error}')),
     );
   }
 
@@ -295,6 +298,9 @@ class DayHistoryScreen extends ConsumerWidget {
               attendanceStatus: newAttendanceStatus,
               lectureStatus: newLectureStatus,
             ),
+            subjectId: inst.lectureTemplate.subjectId,
+            oldStatus: inst.attendanceStatus,
+            dateStr: DateFormat('yyyy-MM-dd').format(inst.lectureDate),
           );
       AppSnackbar.success(context, 'Attendance updated.');
     } catch (e) {

@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'common_providers.dart';
+import 'auth_provider.dart';
 import '../models/subject_template.dart';
 import '../../data/dto/settings/app_settings_dto.dart';
 import '../../data/repositories/app_settings_repository.dart';
@@ -13,6 +15,17 @@ import '../../data/repositories/activity_log_repository.dart';
 class AppSettingsNotifier extends AsyncNotifier<AppSettingsDto> {
   @override
   Future<AppSettingsDto> build() async {
+    final bootstrapAsync = ref.watch(bootstrapStatusProvider);
+    if (bootstrapAsync.isLoading) {
+      return Completer<AppSettingsDto>().future;
+    }
+    if (bootstrapAsync.hasError) {
+      throw bootstrapAsync.error!;
+    }
+    final bootstrapState = bootstrapAsync.value;
+    if (bootstrapState != BootstrapState.success) {
+      return Completer<AppSettingsDto>().future;
+    }
     final repo = AppSettingsRepository();
     final settings = await repo.getSettings();
     return settings;
@@ -296,10 +309,18 @@ class AppPreferencesNotifier extends Notifier<AppPreferencesState> {
 final appPreferencesProvider =
     NotifierProvider<AppPreferencesNotifier, AppPreferencesState>(AppPreferencesNotifier.new);
 
-// ==========================================
-// 6. Activity Logs Provider
-// ==========================================
 final activityLogsProvider = FutureProvider<List<ActivityLogDto>>((ref) async {
+  final bootstrapAsync = ref.watch(bootstrapStatusProvider);
+  if (bootstrapAsync.isLoading) {
+    return Completer<List<ActivityLogDto>>().future;
+  }
+  if (bootstrapAsync.hasError) {
+    throw bootstrapAsync.error!;
+  }
+  final bootstrapState = bootstrapAsync.value;
+  if (bootstrapState != BootstrapState.success) {
+    return Completer<List<ActivityLogDto>>().future;
+  }
   final repo = ActivityLogRepository();
   return repo.getActivityLogs(limit: 5);
 });

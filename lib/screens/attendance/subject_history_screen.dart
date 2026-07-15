@@ -62,6 +62,9 @@ class SubjectHistoryScreen extends ConsumerWidget {
               attendanceStatus: newAttendanceStatus,
               lectureStatus: newLectureStatus,
             ),
+            subjectId: subjectId,
+            oldStatus: inst.attendanceStatus,
+            dateStr: DateFormat('yyyy-MM-dd').format(inst.lectureDate),
           );
       onLectureActionChanged(inst.lectureDate, _mapToMock(inst), action);
     } catch (e) {
@@ -153,143 +156,131 @@ class SubjectHistoryScreen extends ConsumerWidget {
         ),
         centerTitle: true,
       ),
-      body: instancesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error loading history: $err')),
-        data: (instancesList) {
-          final sortedInstances = [...instancesList];
-          sortedInstances.sort((a, b) => b.lectureDate.compareTo(a.lectureDate));
+      body: (instancesAsync.hasValue && statsAsync.hasValue)
+          ? Builder(
+              builder: (context) {
+                final instancesList = instancesAsync.value!;
+                final stats = statsAsync.value!;
 
-          return statsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Center(child: Text('Error loading stats: $err')),
-            data: (stats) {
-              final double attendancePercent = stats.attendancePercentage;
-              final bool isAboveTarget = attendancePercent >= criteriaPercentage;
+                final sortedInstances = [...instancesList];
+                sortedInstances.sort((a, b) => b.lectureDate.compareTo(a.lectureDate));
 
-              return Column(
-                children: [
-                  // Header summary card
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Card(
-                      color: cardBackground,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: borderColor),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          children: [
-                            // Circular Progress Ring
-                            SizedBox(
-                              width: 52,
-                              height: 52,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  CustomPaint(
-                                    size: const Size(52, 52),
-                                    painter: _RingPainter(
-                                      progress: attendancePercent / 100,
-                                      ringColor: isAboveTarget ? AppTheme.accent : AppTheme.danger,
-                                      backgroundColor:
-                                          (isAboveTarget ? AppTheme.accent : AppTheme.danger).withOpacity(0.15),
-                                    ),
-                                  ),
-                                  FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(4.0),
-                                      child: AttendanceRingLabel(
-                                        current: attendancePercent,
-                                        target: criteriaPercentage.toDouble(),
-                                        fontSize: 13,
+                final double attendancePercent = stats.attendancePercentage;
+                final bool isAboveTarget = attendancePercent >= criteriaPercentage;
+
+                return Column(
+                  children: [
+                    // Header summary card
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Card(
+                        color: cardBackground,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: borderColor),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            children: [
+                              // Circular Progress Ring
+                              SizedBox(
+                                width: 52,
+                                height: 52,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    CustomPaint(
+                                      size: const Size(52, 52),
+                                      painter: _RingPainter(
+                                        progress: attendancePercent / 100,
+                                        ringColor: isAboveTarget ? AppTheme.accent : AppTheme.danger,
+                                        backgroundColor:
+                                            (isAboveTarget ? AppTheme.accent : AppTheme.danger).withOpacity(0.15),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Criteria Goal: $criteriaPercentage%',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Attended: ${stats.presentLectures}/${stats.presentLectures + stats.absentLectures} • Total Lectures: ${stats.totalLectures}',
-                                    style: const TextStyle(
-                                      color: AppTheme.textMuted,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.person_outline_rounded,
-                                        size: 12,
-                                        color: isDark ? AppTheme.textMuted : AppTheme.lightTextSecondary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        facultyName,
-                                        style: TextStyle(
-                                          color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
-                                          fontSize: 12,
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(4.0),
+                                        child: AttendanceRingLabel(
+                                          current: attendancePercent,
+                                          target: criteriaPercentage.toDouble(),
+                                          fontSize: 13,
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
-                                      Icon(
-                                        Icons.meeting_room_outlined,
-                                        size: 12,
-                                        color: isDark ? AppTheme.textMuted : AppTheme.lightTextSecondary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        roomName,
-                                        style: TextStyle(
-                                          color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    stats.statusMessage,
-                                    style: TextStyle(
-                                      color: isAboveTarget ? AppTheme.accent : AppTheme.danger,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Criteria Goal: $criteriaPercentage%',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Attended: ${stats.presentLectures}/${stats.presentLectures + stats.absentLectures} • Total Lectures: ${stats.totalLectures}',
+                                      style: const TextStyle(
+                                        color: AppTheme.textMuted,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.person_outline_rounded,
+                                          size: 12,
+                                          color: isDark ? AppTheme.textMuted : AppTheme.lightTextSecondary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          facultyName,
+                                          style: TextStyle(
+                                            color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Icon(
+                                          Icons.meeting_room_outlined,
+                                          size: 12,
+                                          color: isDark ? AppTheme.textMuted : AppTheme.lightTextSecondary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          roomName,
+                                          style: TextStyle(
+                                            color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'CLASS RECORD HISTORY',
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'HISTORY LOGS',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -297,162 +288,148 @@ class SubjectHistoryScreen extends ConsumerWidget {
                             letterSpacing: 1.5,
                           ),
                         ),
-                        Text(
-                          '${sortedInstances.length} Lectures',
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
 
-                  // Scrollable list of history instances
-                  Expanded(
-                    child: sortedInstances.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No classes scheduled for this subject',
-                              style: TextStyle(color: AppTheme.textMuted),
+                    // Logs list
+                    Expanded(
+                      child: sortedInstances.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No attendance logs for this subject.',
+                                style: TextStyle(color: AppTheme.textMuted),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              itemCount: sortedInstances.length,
+                              itemBuilder: (context, index) {
+                                final inst = sortedInstances[index];
+                                final bool isHoliday = inst.lectureStatus == 'holiday';
+                                final action = inst.attendanceStatus == 'present'
+                                    ? 'attended'
+                                    : (inst.attendanceStatus == 'absent'
+                                        ? 'missed'
+                                        : (isHoliday ? 'off' : 'clear'));
+
+                                final String dateString = DateFormat('EEEE, d MMM yyyy').format(inst.lectureDate);
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: cardBackground,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: borderColor, width: 1),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      // Colored indicator based on action
+                                      Container(
+                                        width: 4,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: isHoliday
+                                              ? AppTheme.warning
+                                              : (action == 'attended'
+                                                  ? AppTheme.accent
+                                                  : (action == 'missed' ? AppTheme.danger : AppTheme.textMuted)),
+                                          borderRadius: BorderRadius.circular(2),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    dateString,
+                                                    style: TextStyle(
+                                                      color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13.5,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    '${inst.lectureTemplate.startTime.substring(0, 5)} - ${inst.lectureTemplate.endTime.substring(0, 5)}',
+                                                    style: const TextStyle(
+                                                      color: AppTheme.textMuted,
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+
+                                            // Right side: 4 action buttons
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                _buildActionButton(
+                                                  context,
+                                                  action,
+                                                  'clear',
+                                                  Icons.remove_circle_outline,
+                                                  isDark ? AppTheme.textMuted : Colors.black54,
+                                                  !isHoliday ? (newAct) => _onActionTapped(context, ref, inst, newAct) : null,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                _buildActionButton(
+                                                  context,
+                                                  action,
+                                                  'off',
+                                                  Icons.pause_circle_outline,
+                                                  AppTheme.warning,
+                                                  !isHoliday ? (newAct) => _onActionTapped(context, ref, inst, newAct) : null,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                _buildActionButton(
+                                                  context,
+                                                  action,
+                                                  'missed',
+                                                  Icons.highlight_off,
+                                                  AppTheme.danger,
+                                                  !isHoliday ? (newAct) => _onActionTapped(context, ref, inst, newAct) : null,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                _buildActionButton(
+                                                  context,
+                                                  action,
+                                                  'attended',
+                                                  Icons.check_circle_rounded,
+                                                  AppTheme.accent,
+                                                  !isHoliday ? (newAct) => _onActionTapped(context, ref, inst, newAct) : null,
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            itemCount: sortedInstances.length,
-                            itemBuilder: (context, index) {
-                              final inst = sortedInstances[index];
-                              final DateTime date = inst.lectureDate;
-                              final LectureMock lecture = _mapToMock(inst);
-                              final String action = inst.attendanceStatus == 'present'
-                                  ? 'attended'
-                                  : (inst.attendanceStatus == 'absent'
-                                      ? 'missed'
-                                      : (inst.lectureStatus == 'holiday' ? 'off' : 'clear'));
-                              final bool isHoliday = inst.lectureStatus == 'holiday';
-
-                              final String dateStr = DateFormat('EEEE, d MMMM yyyy').format(date);
-
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 4.0, bottom: 6.0),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            dateStr,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppTheme.textMuted,
-                                            ),
-                                          ),
-                                          if (isHoliday)
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.warning.withOpacity(0.12),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: const Text(
-                                                'HOLIDAY',
-                                                style: TextStyle(
-                                                  color: AppTheme.warning,
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                                      decoration: BoxDecoration(
-                                        color: cardBackground,
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: borderColor, width: 1),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          // Left side: Timing
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.access_time_rounded,
-                                                size: 15,
-                                                color: isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                '${lecture.startTime} - ${lecture.endTime}',
-                                                style: TextStyle(
-                                                  color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          // Right side: 4 action buttons
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              _buildActionButton(
-                                                context,
-                                                action,
-                                                'clear',
-                                                Icons.remove_circle_outline,
-                                                isDark ? AppTheme.textMuted : Colors.black54,
-                                                !isHoliday ? (newAct) => _onActionTapped(context, ref, inst, newAct) : null,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              _buildActionButton(
-                                                context,
-                                                action,
-                                                'off',
-                                                Icons.pause_circle_outline,
-                                                AppTheme.warning,
-                                                !isHoliday ? (newAct) => _onActionTapped(context, ref, inst, newAct) : null,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              _buildActionButton(
-                                                context,
-                                                action,
-                                                'missed',
-                                                Icons.highlight_off,
-                                                AppTheme.danger,
-                                                !isHoliday ? (newAct) => _onActionTapped(context, ref, inst, newAct) : null,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              _buildActionButton(
-                                                context,
-                                                action,
-                                                'attended',
-                                                Icons.check_circle_rounded,
-                                                AppTheme.accent,
-                                                !isHoliday ? (newAct) => _onActionTapped(context, ref, inst, newAct) : null,
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
+                    ),
+                  ],
+                );
+              },
+            )
+          : (instancesAsync.isLoading || statsAsync.isLoading)
+              ? const Center(child: CircularProgressIndicator())
+              : Center(
+                  child: Text(
+                    'Error: ${instancesAsync.error ?? statsAsync.error}',
                   ),
-                ],
-              );
-            },
-          );
-        },
-      ),
+                ),
     );
   }
 }

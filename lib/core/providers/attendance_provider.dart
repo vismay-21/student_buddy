@@ -5,6 +5,7 @@ import '../../data/dto/attendance/attendance_settings_dto.dart';
 import 'common_providers.dart';
 import 'semester_provider.dart';
 import 'timetable_provider.dart';
+import 'subject_provider.dart';
 
 // ==========================================
 // 1. Semester Attendance Statistics Provider
@@ -90,13 +91,90 @@ final attendanceStatsProvider =
 // ==========================================
 // 2. Subject Attendance Statistics Family Provider
 // ==========================================
-final subjectAttendanceStatsProvider = FutureProvider.family<AttendanceStatsDto, String>((ref, subjectId) async {
-  // Listen to today lectures to reload stats on change
-  ref.watch(todayLecturesProvider);
-  
-  final service = ref.watch(attendanceServiceProvider);
-  return service.getSubjectStats(subjectId);
-});
+class SubjectAttendanceStatsNotifier extends FamilyAsyncNotifier<AttendanceStatsDto, String> {
+  @override
+  Future<AttendanceStatsDto> build(String arg) async {
+    // Watch todayLecturesProvider and semesterInstancesProvider to auto-rebuild if needed
+    ref.watch(todayLecturesProvider);
+    ref.watch(semesterInstancesProvider);
+
+    final service = ref.watch(attendanceServiceProvider);
+    return service.getSubjectStats(arg);
+  }
+
+  Future<void> refresh() async {
+    state = await AsyncValue.guard(() async {
+      final service = ref.read(attendanceServiceProvider);
+      return service.getSubjectStats(arg);
+    });
+  }
+
+  void updateStatsOptimistically(String? oldStatus, String? newStatus, double targetGoal) {
+    if (state.value == null) return;
+    final currentStats = state.value!;
+
+    final int presentDelta = (newStatus == 'present' ? 1 : 0) - (oldStatus == 'present' ? 1 : 0);
+    final int absentDelta = (newStatus == 'absent' ? 1 : 0) - (oldStatus == 'absent' ? 1 : 0);
+
+    final newTotal = currentStats.totalLectures + (oldStatus == null ? 1 : 0) - (newStatus == null ? 1 : 0);
+    final newPresent = currentStats.presentLectures + presentDelta;
+    final newAbsent = currentStats.absentLectures + absentDelta;
+
+    final double newPercent = newTotal == 0 ? 0.0 : (newPresent / newTotal) * 100;
+    
+    // Status message logic
+    String newStatusMsg = '';
+    if (newTotal == 0) {
+      newStatusMsg = 'No lectures';
+    } else {
+      if (newPercent >= targetGoal) {
+        // Calculate safe skips
+        int skips = 0;
+        while (true) {
+          final tempTotal = newTotal + skips + 1;
+          final tempPercent = (newPresent / tempTotal) * 100;
+          if (tempPercent >= targetGoal) {
+            skips++;
+          } else {
+            break;
+          }
+        }
+        newStatusMsg = skips > 0 ? 'You can skip the next $skips classes.' : 'You cannot skip any classes.';
+      } else {
+        // Calculate classes to attend
+        int required = 0;
+        while (true) {
+          final tempTotal = newTotal + required;
+          final tempPresent = newPresent + required;
+          final tempPercent = (tempPresent / tempTotal) * 100;
+          if (tempPercent >= targetGoal) {
+            break;
+          }
+          required++;
+        }
+        newStatusMsg = 'Attend next $required classes to reach target.';
+      }
+    }
+
+    state = AsyncValue.data(
+      AttendanceStatsDto(
+        attendancePercentage: newPercent,
+        presentLectures: newPresent,
+        absentLectures: newAbsent,
+        totalLectures: newTotal,
+        remainingLectures: currentStats.remainingLectures,
+        safeSkipCount: currentStats.safeSkipCount,
+        statusMessage: newStatusMsg,
+        criteriaMode: currentStats.criteriaMode,
+      ),
+    );
+  }
+}
+
+final subjectAttendanceStatsProvider =
+    AsyncNotifierProviderFamily<SubjectAttendanceStatsNotifier, AttendanceStatsDto, String>(
+  SubjectAttendanceStatsNotifier.new,
+);
 
 // ==========================================
 // 3. Holidays Provider
@@ -134,13 +212,15 @@ class AttendanceActions {
     LectureInstanceUpdateRequest request, {
     String? subjectId,
     String? oldStatus,
+    String? dateStr,
   }) async {
     final service = _ref.read(attendanceServiceProvider);
+    final newStatus = request.attendanceStatus ?? 'unmarked';
 
     // 1. Optimistic Update
     _ref.read(todayLecturesProvider.notifier).updateLecturesOptimistically(
           instanceId,
-          request.attendanceStatus ?? 'unmarked',
+          newStatus,
         );
 
     _ref.read(attendanceStatsProvider.notifier).updateStatsOptimistically(
@@ -148,8 +228,39 @@ class AttendanceActions {
           request.attendanceStatus,
         );
 
+    // Get settings overall goal or custom subject goal to update subject stats
+    double targetGoal = 75.0;
+    final settings = _ref.read(attendanceSettingsProvider).value;
+    if (settings != null) {
+      targetGoal = settings.overallAttendanceGoal.toDouble();
+    }
+
     if (subjectId != null) {
-      _ref.invalidate(subjectAttendanceStatsProvider(subjectId));
+      final subjects = _ref.read(subjectsProvider).value;
+      if (subjects != null && subjects.isNotEmpty) {
+        final sub = subjects.firstWhere(
+          (s) => s.subjectId == subjectId,
+          orElse: () => subjects.first,
+        );
+        targetGoal = sub.attendanceGoal.toDouble();
+      }
+
+      _ref.read(subjectAttendanceStatsProvider(subjectId).notifier).updateStatsOptimistically(
+            oldStatus,
+            request.attendanceStatus,
+            targetGoal,
+          );
+      _ref.read(subjectInstancesProvider(subjectId).notifier).updateLecturesOptimistically(
+            instanceId,
+            newStatus,
+          );
+    }
+
+    if (dateStr != null) {
+      _ref.read(dateLecturesProvider(dateStr).notifier).updateLecturesOptimistically(
+            instanceId,
+            newStatus,
+          );
     }
 
     try {
@@ -158,10 +269,12 @@ class AttendanceActions {
       _ref.read(todayLecturesProvider.notifier).refresh();
       _ref.read(attendanceStatsProvider.notifier).refresh();
       _ref.read(semesterInstancesProvider.notifier).refresh();
-      _ref.invalidate(subjectInstancesProvider);
-      _ref.invalidate(dateLecturesProvider);
       if (subjectId != null) {
-        _ref.invalidate(subjectAttendanceStatsProvider(subjectId));
+        _ref.read(subjectAttendanceStatsProvider(subjectId).notifier).refresh();
+        _ref.read(subjectInstancesProvider(subjectId).notifier).refresh();
+      }
+      if (dateStr != null) {
+        _ref.read(dateLecturesProvider(dateStr).notifier).refresh();
       }
       
       // Trigger sync
@@ -171,10 +284,12 @@ class AttendanceActions {
       _ref.read(todayLecturesProvider.notifier).refresh();
       _ref.read(attendanceStatsProvider.notifier).refresh();
       _ref.read(semesterInstancesProvider.notifier).refresh();
-      _ref.invalidate(subjectInstancesProvider);
-      _ref.invalidate(dateLecturesProvider);
       if (subjectId != null) {
-        _ref.invalidate(subjectAttendanceStatsProvider(subjectId));
+        _ref.read(subjectAttendanceStatsProvider(subjectId).notifier).refresh();
+        _ref.read(subjectInstancesProvider(subjectId).notifier).refresh();
+      }
+      if (dateStr != null) {
+        _ref.read(dateLecturesProvider(dateStr).notifier).refresh();
       }
       rethrow;
     }
@@ -186,8 +301,17 @@ class AttendanceActions {
     _ref.read(todayLecturesProvider.notifier).refresh();
     _ref.read(attendanceStatsProvider.notifier).refresh();
     _ref.read(semesterInstancesProvider.notifier).refresh();
-    _ref.invalidate(subjectInstancesProvider);
-    _ref.invalidate(dateLecturesProvider);
+    
+    _ref.read(dateLecturesProvider(request.lectureDate).notifier).refresh();
+    
+    final activeSem = _ref.read(activeSemesterProvider);
+    if (activeSem != null) {
+      final subjects = _ref.read(subjectsProvider).value ?? [];
+      for (var sub in subjects) {
+        _ref.read(subjectAttendanceStatsProvider(sub.subjectId).notifier).refresh();
+        _ref.read(subjectInstancesProvider(sub.subjectId).notifier).refresh();
+      }
+    }
     
     // Trigger sync
     _ref.read(syncServiceProvider).sync();
@@ -241,13 +365,30 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsDto> {
     final activeSem = ref.read(activeSemesterProvider);
     if (activeSem == null) throw StateError('No active semester');
     final service = ref.read(attendanceServiceProvider);
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    
+    // Save previous state for potential rollback
+    final previousState = state;
+
+    // Optimistically update local state if we have data
+    if (state.hasValue) {
+      final current = state.value!;
+      final updated = current.copyWith(
+        criteriaMode: request.criteriaMode ?? current.criteriaMode,
+        overallAttendanceGoal: request.overallAttendanceGoal ?? current.overallAttendanceGoal,
+      );
+      state = AsyncValue.data(updated);
+    }
+
+    try {
       final res = await service.updateSettings(activeSem.semesterId, request);
+      state = AsyncValue.data(res);
       // Trigger sync
       ref.read(syncServiceProvider).sync();
-      return res;
-    });
+    } catch (e) {
+      // Rollback on error
+      state = previousState;
+      rethrow;
+    }
   }
 }
 
@@ -281,19 +422,77 @@ final semesterInstancesProvider =
 // ==========================================
 // 7. Subject Instances Provider (Family)
 // ==========================================
-final subjectInstancesProvider = FutureProvider.family<List<LectureInstanceDto>, String>((ref, subjectId) async {
-  final activeSem = ref.watch(activeSemesterProvider);
-  if (activeSem == null) return [];
-  final service = ref.watch(attendanceServiceProvider);
-  return service.getInstances(semesterId: activeSem.semesterId, subjectId: subjectId);
-});
+class SubjectInstancesNotifier extends FamilyAsyncNotifier<List<LectureInstanceDto>, String> {
+  @override
+  Future<List<LectureInstanceDto>> build(String arg) async {
+    final activeSem = ref.watch(activeSemesterProvider);
+    if (activeSem == null) return [];
+    final service = ref.watch(attendanceServiceProvider);
+    return service.getInstances(semesterId: activeSem.semesterId, subjectId: arg);
+  }
+
+  Future<void> refresh() async {
+    state = await AsyncValue.guard(() async {
+      final activeSem = ref.read(activeSemesterProvider);
+      if (activeSem == null) return <LectureInstanceDto>[];
+      final service = ref.read(attendanceServiceProvider);
+      return service.getInstances(semesterId: activeSem.semesterId, subjectId: arg);
+    });
+  }
+
+  void updateLecturesOptimistically(String instanceId, String newStatus) {
+    if (state.value == null) return;
+    state = AsyncValue.data(
+      state.value!.map((l) {
+        if (l.lectureInstanceId == instanceId) {
+          return l.copyWith(attendanceStatus: newStatus);
+        }
+        return l;
+      }).toList(),
+    );
+  }
+}
+
+final subjectInstancesProvider =
+    AsyncNotifierProviderFamily<SubjectInstancesNotifier, List<LectureInstanceDto>, String>(
+  SubjectInstancesNotifier.new,
+);
 
 // ==========================================
 // 8. Date Lectures Provider (Family)
 // ==========================================
-final dateLecturesProvider = FutureProvider.family<List<LectureInstanceDto>, String>((ref, dateStr) async {
-  final activeSem = ref.watch(activeSemesterProvider);
-  if (activeSem == null) return [];
-  final service = ref.watch(attendanceServiceProvider);
-  return service.getTodayLectures(date: dateStr, semesterId: activeSem.semesterId);
-});
+class DateLecturesNotifier extends FamilyAsyncNotifier<List<LectureInstanceDto>, String> {
+  @override
+  Future<List<LectureInstanceDto>> build(String arg) async {
+    final activeSem = ref.watch(activeSemesterProvider);
+    if (activeSem == null) return [];
+    final service = ref.watch(attendanceServiceProvider);
+    return service.getTodayLectures(date: arg, semesterId: activeSem.semesterId);
+  }
+
+  Future<void> refresh() async {
+    state = await AsyncValue.guard(() async {
+      final activeSem = ref.read(activeSemesterProvider);
+      if (activeSem == null) return <LectureInstanceDto>[];
+      final service = ref.read(attendanceServiceProvider);
+      return service.getTodayLectures(date: arg, semesterId: activeSem.semesterId);
+    });
+  }
+
+  void updateLecturesOptimistically(String instanceId, String newStatus) {
+    if (state.value == null) return;
+    state = AsyncValue.data(
+      state.value!.map((l) {
+        if (l.lectureInstanceId == instanceId) {
+          return l.copyWith(attendanceStatus: newStatus);
+        }
+        return l;
+      }).toList(),
+    );
+  }
+}
+
+final dateLecturesProvider =
+    AsyncNotifierProviderFamily<DateLecturesNotifier, List<LectureInstanceDto>, String>(
+  DateLecturesNotifier.new,
+);

@@ -84,72 +84,73 @@ class SubjectCardWidget extends ConsumerWidget {
     final statsAsync = ref.watch(subjectAttendanceStatsProvider(subject.subjectId));
     final templatesAsync = ref.watch(timetableTemplatesProvider(subject.subjectId));
 
-    return statsAsync.when(
-      loading: () => const SizedBox(
+    if (statsAsync.hasValue) {
+      final stats = statsAsync.value!;
+      final room = (templatesAsync.value != null &&
+              templatesAsync.value!.isNotEmpty &&
+              templatesAsync.value!.first.room != null)
+          ? templatesAsync.value!.first.room!
+          : 'Room TBD';
+
+      int target = overallGoal;
+      if (criteriaMode == 'custom') {
+        target = subject.attendanceGoal;
+      }
+
+      final bool isAboveTarget = stats.attendancePercentage >= target;
+
+      final subMap = {
+        'id': subject.subjectId,
+        'name': subject.subjectName,
+        'percent': stats.attendancePercentage,
+        'target': target,
+        'attended': stats.presentLectures,
+        'absent': stats.absentLectures,
+        'total': stats.totalLectures,
+        'statusMessage': stats.statusMessage,
+        'isAboveTarget': isAboveTarget,
+        'color': subject.themeColor,
+        'faculty': subject.facultyName ?? 'Faculty TBD',
+        'room': room,
+      };
+
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        color: Colors.transparent,
+        elevation: 0,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SubjectHistoryScreen(
+                  subjectId: subject.subjectId,
+                  subjectName: subject.subjectName,
+                  criteriaPercentage: target,
+                  facultyName: subject.facultyName ?? 'Faculty TBD',
+                  roomName: room,
+                  onLectureActionChanged: (date, lecture, action) {
+                    // Handled reactively
+                  },
+                ),
+              ),
+            );
+          },
+          child: _buildSubjectCard(context, subMap),
+        ),
+      );
+    } else if (statsAsync.isLoading) {
+      return const SizedBox(
         height: 100,
         child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (err, _) => const SizedBox(
+      );
+    } else {
+      return const SizedBox(
         height: 100,
         child: Center(child: Text('Failed to load stats', style: TextStyle(color: AppTheme.textMuted))),
-      ),
-      data: (stats) {
-        final room = (templatesAsync.value != null &&
-                templatesAsync.value!.isNotEmpty &&
-                templatesAsync.value!.first.room != null)
-            ? templatesAsync.value!.first.room!
-            : 'Room TBD';
-
-        int target = overallGoal;
-        if (criteriaMode == 'custom') {
-          target = subject.attendanceGoal;
-        }
-
-        final bool isAboveTarget = stats.attendancePercentage >= target;
-
-        final subMap = {
-          'id': subject.subjectId,
-          'name': subject.subjectName,
-          'percent': stats.attendancePercentage,
-          'target': target,
-          'attended': stats.presentLectures,
-          'absent': stats.absentLectures,
-          'total': stats.totalLectures,
-          'statusMessage': stats.statusMessage,
-          'isAboveTarget': isAboveTarget,
-          'color': subject.themeColor,
-          'faculty': subject.facultyName ?? 'Faculty TBD',
-          'room': room,
-        };
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          color: Colors.transparent,
-          elevation: 0,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SubjectHistoryScreen(
-                    subjectId: subject.subjectId,
-                    subjectName: subject.subjectName,
-                    criteriaPercentage: target,
-                    facultyName: subject.facultyName ?? 'Faculty TBD',
-                    roomName: room,
-                    onLectureActionChanged: (date, lecture, action) {
-                      // Handled reactively
-                    },
-                  ),
-                ),
-              );
-            },
-            child: _buildSubjectCard(context, subMap),
-          ),
-        );
-      },
-    );
+      );
+    }
   }
 
   Widget _buildSubjectCard(BuildContext context, Map<String, dynamic> sub) {

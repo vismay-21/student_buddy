@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/dto/semester/semester_dto.dart';
 import 'common_providers.dart';
+import 'auth_provider.dart';
 
 // ==========================================
 // 1. Semesters List Provider
@@ -8,6 +10,17 @@ import 'common_providers.dart';
 class SemestersNotifier extends AsyncNotifier<List<SemesterDto>> {
   @override
   Future<List<SemesterDto>> build() async {
+    final bootstrapAsync = ref.watch(bootstrapStatusProvider);
+    if (bootstrapAsync.isLoading) {
+      return Completer<List<SemesterDto>>().future;
+    }
+    if (bootstrapAsync.hasError) {
+      throw bootstrapAsync.error!;
+    }
+    final bootstrapState = bootstrapAsync.value;
+    if (bootstrapState != BootstrapState.success) {
+      return Completer<List<SemesterDto>>().future;
+    }
     final service = ref.watch(semesterServiceProvider);
     return service.getSemesters();
   }

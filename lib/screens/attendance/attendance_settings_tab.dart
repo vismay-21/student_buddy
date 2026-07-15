@@ -31,369 +31,360 @@ class AttendanceSettingsTab extends ConsumerWidget {
     final holidaysAsync = ref.watch(holidaysProvider);
     final subjectsAsync = ref.watch(subjectsProvider);
 
+    final bool hasData = settingsAsync.hasValue && holidaysAsync.hasValue && subjectsAsync.hasValue;
+
     return Scaffold(
-      body: settingsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error loading settings: $err')),
-        data: (settings) {
-          final criteriaMode = settings.criteriaMode == 'subject' ? 'subject_wise' : settings.criteriaMode;
-          final targetPercentage = settings.overallAttendanceGoal;
+      body: hasData
+          ? Builder(
+              builder: (context) {
+                final settings = settingsAsync.value!;
+                final holidays = holidaysAsync.value!;
+                final subjects = subjectsAsync.value!;
 
-          return holidaysAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Center(child: Text('Error loading holidays: $err')),
-            data: (holidays) {
-              return subjectsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, _) => Center(child: Text('Error loading subjects: $err')),
-                data: (subjects) {
-                  final subjectCustomTargets = {
-                    for (var s in subjects) s.subjectName: s.attendanceGoal
-                  };
+                final criteriaMode = settings.criteriaMode == 'subject' ? 'subject_wise' : settings.criteriaMode;
+                final targetPercentage = settings.overallAttendanceGoal;
 
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Target Goal Section
-                        _buildSectionHeader('ATTENDANCE CRITERIA CONFIGURATION'),
-                        const SizedBox(height: 10),
-                        Card(
-                          color: cardBackground,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(color: borderColor),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Criteria Mode',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
-                                ),
-                                const SizedBox(height: 10),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? AppTheme.surface.withOpacity(0.5)
-                                        : AppTheme.lightSurface.withOpacity(0.5),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: borderColor),
-                                  ),
-                                  padding: const EdgeInsets.all(4),
-                                  child: Row(
-                                    children: [
-                                      // Overall Average Segment
-                                      Expanded(
-                                        child: GestureDetector(
-                                          onTap: () => _updateCriteriaMode(ref, 'overall', subjects),
-                                          child: AnimatedContainer(
-                                            duration: const Duration(milliseconds: 200),
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: criteriaMode == 'overall' ? AppTheme.primary : Colors.transparent,
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              'Overall',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: criteriaMode == 'overall'
-                                                    ? Colors.white
-                                                    : (isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      // Subject-Wise Segment
-                                      Expanded(
-                                        child: GestureDetector(
-                                          onTap: () => _updateCriteriaMode(ref, 'subject_wise', subjects),
-                                          child: AnimatedContainer(
-                                            duration: const Duration(milliseconds: 200),
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: criteriaMode == 'subject_wise' ? AppTheme.primary : Colors.transparent,
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              'Subject-Wise',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: criteriaMode == 'subject_wise'
-                                                    ? Colors.white
-                                                    : (isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      // Custom Segment
-                                      Expanded(
-                                        child: GestureDetector(
-                                          onTap: () => _updateCriteriaMode(ref, 'custom', subjects),
-                                          child: AnimatedContainer(
-                                            duration: const Duration(milliseconds: 200),
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: criteriaMode == 'custom' ? AppTheme.primary : Colors.transparent,
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              'Custom',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: criteriaMode == 'custom'
-                                                    ? Colors.white
-                                                    : (isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                final subjectCustomTargets = {
+                  for (var s in subjects) s.subjectName: s.attendanceGoal
+                };
 
-                                if (criteriaMode == 'custom') ...[
-                                  const SizedBox(height: 16),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      ),
-                                      icon: const Icon(Icons.settings_suggest_rounded, size: 18, color: AppTheme.primary),
-                                      label: const Text('Configure Subject Criteria',
-                                          style: TextStyle(
-                                              fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.bold)),
-                                      onPressed: () =>
-                                          _showCustomCriteriaDialog(context, ref, subjectCustomTargets, subjects),
-                                    ),
-                                  ),
-                                ],
-
-                                const SizedBox(height: 20),
-                                IgnorePointer(
-                                  ignoring: criteriaMode == 'custom',
-                                  child: Opacity(
-                                    opacity: criteriaMode == 'custom' ? 0.38 : 1.0,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text(
-                                              'Criteria Percentage',
-                                              style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppTheme.textMuted),
-                                            ),
-                                            Text(
-                                              '$targetPercentage%',
-                                              style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppTheme.primary),
-                                            ),
-                                          ],
-                                        ),
-                                        Slider(
-                                          value: targetPercentage.toDouble(),
-                                          min: 50,
-                                          max: 100,
-                                          divisions: 10,
-                                          label: '$targetPercentage%',
-                                          onChanged: (val) {
-                                            _updateTargetPercentage(ref, val.toInt());
-                                          },
-                                        ),
-                                        if (criteriaMode == 'custom')
-                                          const Padding(
-                                            padding: EdgeInsets.only(top: 2, bottom: 4),
-                                            child: Text(
-                                              'Not used in Custom mode — configure individual targets below.',
-                                              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Target Goal Section
+                      _buildSectionHeader('ATTENDANCE CRITERIA CONFIGURATION'),
+                      const SizedBox(height: 10),
+                      Card(
+                        color: cardBackground,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: borderColor),
                         ),
-                        const SizedBox(height: 24),
-
-                        // Semester Duration
-                        _buildSectionHeader('SEMESTER DURATION'),
-                        const SizedBox(height: 10),
-                        Card(
-                          color: cardBackground,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(color: borderColor),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _buildDateItem(
-                                    context,
-                                    'Start Date',
-                                    activeSem.startDate,
-                                    (date) => _updateSemesterStartDate(context, ref, activeSem.semesterId, date),
-                                  ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Criteria Mode',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                              ),
+                              const SizedBox(height: 10),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? AppTheme.surface.withOpacity(0.5)
+                                      : AppTheme.lightSurface.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: borderColor),
                                 ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  width: 1,
-                                  height: 36,
-                                  color: borderColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _buildDateItem(
-                                    context,
-                                    'End Date',
-                                    activeSem.endDate,
-                                    (date) => _updateSemesterEndDate(context, ref, activeSem.semesterId, date),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // University Holidays
-                        _buildSectionHeader('UNIVERSITY HOLIDAYS'),
-                        const SizedBox(height: 10),
-                        Card(
-                          color: cardBackground,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(color: borderColor),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                                padding: const EdgeInsets.all(4),
+                                child: Row(
                                   children: [
+                                    // Overall Average Segment
                                     Expanded(
-                                      child: ElevatedButton.icon(
-                                        style: ElevatedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                      child: GestureDetector(
+                                        onTap: () => _updateCriteriaMode(ref, 'overall', subjects),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: criteriaMode == 'overall' ? AppTheme.primary : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            'Overall',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: criteriaMode == 'overall'
+                                                  ? Colors.white
+                                                  : (isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary),
+                                            ),
+                                          ),
                                         ),
-                                        icon: const Icon(Icons.add_rounded, size: 18),
-                                        label: const Text('Add Holiday', style: TextStyle(fontSize: 13)),
-                                        onPressed: () => _showAddHolidayDialog(context, ref, activeSem.semesterId),
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
+                                    // Subject-Wise Segment
                                     Expanded(
-                                      child: OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      child: GestureDetector(
+                                        onTap: () => _updateCriteriaMode(ref, 'subject_wise', subjects),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: criteriaMode == 'subject_wise' ? AppTheme.primary : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            'Subject-Wise',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: criteriaMode == 'subject_wise'
+                                                  ? Colors.white
+                                                  : (isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary),
+                                            ),
+                                          ),
                                         ),
-                                        icon: const Icon(Icons.camera_alt_rounded, size: 18),
-                                        label: const Text('Import OCR',
-                                            style: TextStyle(fontSize: 13, color: AppTheme.primary)),
-                                        onPressed: () => _showOcrPlaceholderDialog(context),
+                                      ),
+                                    ),
+                                    // Custom Segment
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () => _updateCriteriaMode(ref, 'custom', subjects),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: criteriaMode == 'custom' ? AppTheme.primary : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            'Custom',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: criteriaMode == 'custom'
+                                                  ? Colors.white
+                                                  : (isDark ? AppTheme.textSecondary : AppTheme.lightTextSecondary),
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
+                              ),
+
+                              if (criteriaMode == 'custom') ...[
                                 const SizedBox(height: 16),
-                                Divider(color: borderColor),
-                                const SizedBox(height: 10),
-                                if (holidays.isEmpty)
-                                  const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 16.0),
-                                      child: Text(
-                                        'No holidays added yet',
-                                        style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                                      ),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
-                                  )
-                                else
-                                  ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: holidays.length,
-                                    itemBuilder: (context, index) {
-                                      final hol = holidays[index];
-                                      final dateStr = DateFormat('EEE, d MMM yyyy').format(hol.holidayDate);
-                                      return ListTile(
-                                        contentPadding: EdgeInsets.zero,
-                                        title: Text(
-                                          hol.holidayName,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary,
-                                          ),
-                                        ),
-                                        subtitle: Text(
-                                          dateStr,
-                                          style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                                        ),
-                                        leading: Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.warning.withOpacity(0.12),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child:
-                                              const Icon(Icons.beach_access_rounded, color: AppTheme.warning, size: 18),
-                                        ),
-                                        trailing: IconButton(
-                                          icon: const Icon(Icons.delete_outline_rounded,
-                                              color: AppTheme.danger, size: 20),
-                                          onPressed: () {
-                                            ref
-                                                .read(attendanceActionsProvider)
-                                                .deleteHoliday(hol.holidayId);
-                                          },
-                                        ),
-                                      );
-                                    },
+                                    icon: const Icon(Icons.settings_suggest_rounded, size: 18, color: AppTheme.primary),
+                                    label: const Text('Configure Subject Criteria',
+                                        style: TextStyle(
+                                            fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.bold)),
+                                    onPressed: () =>
+                                        _showCustomCriteriaDialog(context, ref, subjectCustomTargets, subjects),
                                   ),
+                                ),
                               ],
-                            ),
+
+                              const SizedBox(height: 20),
+                              IgnorePointer(
+                                ignoring: criteriaMode == 'custom',
+                                child: Opacity(
+                                  opacity: criteriaMode == 'custom' ? 0.38 : 1.0,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'Criteria Percentage',
+                                            style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.textMuted),
+                                          ),
+                                          Text(
+                                            '$targetPercentage%',
+                                            style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.primary),
+                                          ),
+                                        ],
+                                      ),
+                                      Slider(
+                                        value: targetPercentage.toDouble(),
+                                        min: 50,
+                                        max: 100,
+                                        divisions: 10,
+                                        label: '$targetPercentage%',
+                                        onChanged: (val) {
+                                          _updateTargetPercentage(ref, val.toInt());
+                                        },
+                                      ),
+                                      if (criteriaMode == 'custom')
+                                        const Padding(
+                                          padding: EdgeInsets.only(top: 2, bottom: 4),
+                                          child: Text(
+                                            'Not used in Custom mode — configure individual targets below.',
+                                            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Semester Duration
+                      _buildSectionHeader('SEMESTER DURATION'),
+                      const SizedBox(height: 10),
+                      Card(
+                        color: cardBackground,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: borderColor),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _buildDateItem(
+                                  context,
+                                  'Start Date',
+                                  activeSem.startDate,
+                                  (date) => _updateSemesterStartDate(context, ref, activeSem.semesterId, date),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 1,
+                                height: 36,
+                                color: borderColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _buildDateItem(
+                                  context,
+                                  'End Date',
+                                  activeSem.endDate,
+                                  (date) => _updateSemesterEndDate(context, ref, activeSem.semesterId, date),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // University Holidays
+                      _buildSectionHeader('UNIVERSITY HOLIDAYS'),
+                      const SizedBox(height: 10),
+                      Card(
+                        color: cardBackground,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: borderColor),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Holidays (${holidays.length})',
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          'Holidays exclude all lectures on those dates from attendance calculations.',
+                                          style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.add_circle_outline_rounded, color: AppTheme.primary, size: 24),
+                                    onPressed: () => _showAddHolidayDialog(context, ref, activeSem.semesterId),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              if (holidays.isEmpty)
+                                const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 20),
+                                    child: Text(
+                                      'No holidays added yet.',
+                                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                )
+                              else
+                                ListView.separated(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: holidays.length,
+                                  separatorBuilder: (context, index) => Divider(color: borderColor),
+                                  itemBuilder: (context, index) {
+                                    final holiday = holidays[index];
+                                    return ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(
+                                        holiday.holidayName,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                      ),
+                                      subtitle: Text(
+                                        DateFormat('EEEE, d MMMM yyyy').format(holiday.holidayDate),
+                                        style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
+                                      ),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
+                                        onPressed: () => ref.read(attendanceActionsProvider).deleteHoliday(holiday.holidayId),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                icon: const Icon(Icons.document_scanner_outlined, size: 18, color: AppTheme.primary),
+                                label: const Text('Import Academic Calendar Holiday List (OCR)',
+                                    style: TextStyle(
+                                        fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.bold)),
+                                onPressed: () => _showOcrPlaceholderDialog(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                );
+              },
+            )
+          : (settingsAsync.isLoading || holidaysAsync.isLoading || subjectsAsync.isLoading)
+              ? const Center(child: CircularProgressIndicator())
+              : Center(
+                  child: Text(
+                    'Error loading settings: ${settingsAsync.error ?? holidaysAsync.error ?? subjectsAsync.error}',
+                  ),
+                ),
     );
   }
 

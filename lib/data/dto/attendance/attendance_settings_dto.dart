@@ -20,6 +20,16 @@ class AttendanceSettingsDto {
       'overall_attendance_goal': overallAttendanceGoal,
     };
   }
+
+  AttendanceSettingsDto copyWith({
+    String? criteriaMode,
+    int? overallAttendanceGoal,
+  }) {
+    return AttendanceSettingsDto(
+      criteriaMode: criteriaMode ?? this.criteriaMode,
+      overallAttendanceGoal: overallAttendanceGoal ?? this.overallAttendanceGoal,
+    );
+  }
 }
 
 class AttendanceSettingsUpdateRequest {

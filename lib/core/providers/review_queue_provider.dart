@@ -1,11 +1,24 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/dto/review_queue/review_queue_dto.dart';
 import 'common_providers.dart';
+import 'auth_provider.dart';
 
 // ==========================================
 // 1. Pending Review Queue Provider (Read Provider)
 // ==========================================
 final pendingReviewQueueProvider = FutureProvider<List<ReviewQueueDto>>((ref) async {
+  final bootstrapAsync = ref.watch(bootstrapStatusProvider);
+  if (bootstrapAsync.isLoading) {
+    return Completer<List<ReviewQueueDto>>().future;
+  }
+  if (bootstrapAsync.hasError) {
+    throw bootstrapAsync.error!;
+  }
+  final bootstrapState = bootstrapAsync.value;
+  if (bootstrapState != BootstrapState.success) {
+    return Completer<List<ReviewQueueDto>>().future;
+  }
   final service = ref.watch(reviewQueueServiceProvider);
   return service.getReviewQueue(status: 'pending');
 });
