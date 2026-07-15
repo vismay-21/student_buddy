@@ -374,6 +374,17 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> removePendingOperations(List<String> uuids) async {
+    if (uuids.isEmpty) return;
+    final db = database;
+    final placeholders = List.filled(uuids.length, '?').join(',');
+    await db.delete(
+      'pending_sync_operations',
+      where: 'operation_uuid IN ($placeholders)',
+      whereArgs: uuids,
+    );
+  }
+
   Future<void> incrementRetryCount(String operationUuid) async {
     final db = database;
     await db.rawUpdate(

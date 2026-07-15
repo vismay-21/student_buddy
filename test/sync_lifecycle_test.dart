@@ -9,8 +9,18 @@ import 'package:student_buddy/data/local/database_helper.dart';
 class FakeDatabase extends Fake implements Database {
   final List<String> executedStatements = [];
   final List<Map<String, dynamic>> queryResult;
+  List<Map<String, dynamic>> Function(String sql, List<Object?>? arguments)? rawQueryCallback;
 
-  FakeDatabase({this.queryResult = const []});
+  FakeDatabase({this.queryResult = const [], this.rawQueryCallback});
+
+  @override
+  Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<Object?>? arguments]) async {
+    executedStatements.add('rawQuery:$sql args:$arguments');
+    if (rawQueryCallback != null) {
+      return rawQueryCallback!(sql, arguments);
+    }
+    return queryResult;
+  }
 
   @override
   Future<T> transaction<T>(Future<T> Function(Transaction txn) action, {bool? exclusive}) async {
@@ -91,6 +101,11 @@ class FakeDatabaseHelper extends Fake implements DatabaseHelper {
   @override
   Future<void> removePendingOperation(String uuid) async {
     pendingOperations.removeWhere((op) => op['operation_uuid'] == uuid);
+  }
+
+  @override
+  Future<void> removePendingOperations(List<String> uuids) async {
+    pendingOperations.removeWhere((op) => uuids.contains(op['operation_uuid']));
   }
 
   @override
@@ -245,6 +260,12 @@ void main() {
     setUp(() {
       fakeDb = FakeDatabase();
       fakeDbHelper = FakeDatabaseHelper(fakeDb);
+      fakeDb.rawQueryCallback = (sql, args) {
+        if (sql.contains('COUNT(*)')) {
+          return [{'count': fakeDbHelper.pendingOperations.length}];
+        }
+        return [];
+      };
       fakeDio = FakeDio(responses: {
         '/users/me/bootstrap': {
           'success': true,
@@ -468,6 +489,93 @@ void main() {
       // Verify database remains untouched (last_successful_sync is not written)
       final lastSync = await fakeDbHelper.getLastSuccessfulSync();
       expect(lastSync, isNull);
+    });
+
+    test('7. Queue Cleanliness: Coalesced multiple updates removes all contributing source operation UUIDs', () async {
+      // Setup three pending updates for the same todo
+      fakeDbHelper.pendingOperations.addAll([
+        {
+          'id': 1,
+          'operation_uuid': 'uuid-update-1',
+          'entity_type': 'todo',
+          'entity_id': 'todo-1',
+          'operation_type': 'update',
+          'payload': '{"title": "Title A"}',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'retry_count': 0,
+        },
+        {
+          'id': 2,
+          'operation_uuid': 'uuid-update-2',
+          'entity_type': 'todo',
+          'entity_id': 'todo-1',
+          'operation_type': 'update',
+          'payload': '{"is_completed": true}',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'retry_count': 0,
+        },
+      ]);
+
+      await syncService.sync();
+
+      // Check that the queue is fully cleared (both uuid-update-1 and uuid-update-2 are deleted)
+      expect(fakeDbHelper.pendingOperations.isEmpty, isTrue);
+    });
+
+    test('8. Queue Cleanliness: Immediate discard of CREATE + DELETE removes them from queue without hitting API', () async {
+      // Setup pending CREATE and DELETE for the same todo
+      fakeDbHelper.pendingOperations.addAll([
+        {
+          'id': 1,
+          'operation_uuid': 'uuid-create',
+          'entity_type': 'todo',
+          'entity_id': 'todo-1',
+          'operation_type': 'create',
+          'payload': '{"title": "Temporary Todo"}',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'retry_count': 0,
+        },
+        {
+          'id': 2,
+          'operation_uuid': 'uuid-delete',
+          'entity_type': 'todo',
+          'entity_id': 'todo-1',
+          'operation_type': 'delete',
+          'payload': null,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'retry_count': 0,
+        },
+      ]);
+
+      await syncService.sync();
+
+      // Verify no API requests were made to /todos (only GET for bootstrap runs)
+      expect(fakeDio.requests.any((r) => r.contains('POST:/todos') || r.contains('DELETE:/todos')), isFalse);
+
+      // Verify the queue is completely cleared
+      expect(fakeDbHelper.pendingOperations.isEmpty, isTrue);
+    });
+
+    test('9. Sync status is set to error if operations are skipped/pending due to backoff', () async {
+      // Setup a pending operation with retry_count > 0 so that it is skipped (cooldown backoff)
+      final nowStr = DateTime.now().toUtc().toIso8601String();
+      fakeDbHelper.pendingOperations.add({
+        'id': 1,
+        'operation_uuid': 'uuid-retry',
+        'entity_type': 'todo',
+        'entity_id': 'todo-1',
+        'operation_type': 'update',
+        'payload': '{"title": "Retry Todo"}',
+        'created_at': nowStr,
+        'retry_count': 2,
+      });
+
+      await syncService.sync();
+
+      // Check that syncState is set to error because of the skipped pending operation
+      expect(syncService.stateNotifier.value.status, equals(SyncStatus.error));
+      expect(syncService.stateNotifier.value.errorMessage, contains('Some operations are pending retry due to previous failures.'));
+      expect(syncService.stateNotifier.value.pendingCount, equals(1));
     });
   });
 }

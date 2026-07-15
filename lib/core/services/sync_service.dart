@@ -85,7 +85,7 @@ class SyncService {
 
   Future<void> _updateState({SyncStatus? status, String? errorMessage}) async {
     if (!_authService.isSignedIn || _dbHelper.currentUserId == null) {
-      stateNotifier.value = stateNotifier.value.copyWith(
+      stateNotifier.value = SyncState(
         status: status ?? SyncStatus.idle,
         lastSyncTime: null,
         pendingCount: 0,
@@ -96,11 +96,20 @@ class SyncService {
 
     final count = await _getPendingCount();
     final lastSync = await _dbHelper.getLastSuccessfulSync();
-    stateNotifier.value = stateNotifier.value.copyWith(
-      status: status ?? stateNotifier.value.status,
+
+    final newStatus = status ?? stateNotifier.value.status;
+    String? newErrorMessage;
+    if (newStatus == SyncStatus.syncing || newStatus == SyncStatus.success) {
+      newErrorMessage = null;
+    } else {
+      newErrorMessage = errorMessage ?? (newStatus == SyncStatus.error ? stateNotifier.value.errorMessage : null);
+    }
+
+    stateNotifier.value = SyncState(
+      status: newStatus,
       lastSyncTime: lastSync,
       pendingCount: count,
-      errorMessage: errorMessage,
+      errorMessage: newErrorMessage,
     );
   }
 
@@ -128,6 +137,7 @@ class SyncService {
       final ops = groups[key]!;
       final hasCreate = ops.any((o) => o['operation_type'] == 'create');
       final isDeleted = ops.last['operation_type'] == 'delete';
+      final List<String> sourceUuids = ops.map((o) => o['operation_uuid'] as String).toList();
 
       if (hasCreate) {
         if (isDeleted) {
@@ -147,13 +157,16 @@ class SyncService {
           }
           final updatedOp = Map<String, dynamic>.from(firstCreate);
           updatedOp['payload'] = jsonEncode(mergedPayload);
+          updatedOp['source_uuids'] = sourceUuids;
           coalesced.add(updatedOp);
         }
       } else {
         if (isDeleted) {
           // Keep only the DELETE operation
           final lastDelete = ops.lastWhere((o) => o['operation_type'] == 'delete');
-          coalesced.add(lastDelete);
+          final updatedOp = Map<String, dynamic>.from(lastDelete);
+          updatedOp['source_uuids'] = sourceUuids;
+          coalesced.add(updatedOp);
         } else {
           // Keep as UPDATE, with merged/latest payload
           final firstUpdate = ops.firstWhere((o) => o['operation_type'] == 'update');
@@ -168,6 +181,7 @@ class SyncService {
           }
           final updatedOp = Map<String, dynamic>.from(firstUpdate);
           updatedOp['payload'] = jsonEncode(mergedPayload);
+          updatedOp['source_uuids'] = sourceUuids;
           coalesced.add(updatedOp);
         }
       }
@@ -203,7 +217,15 @@ class SyncService {
       await _downloadRemoteChanges();
 
       await _dbHelper.setLastSuccessfulSync(DateTime.now().toUtc().toIso8601String());
-      await _updateState(status: SyncStatus.success);
+      final pendingCount = await _getPendingCount();
+      if (pendingCount > 0) {
+        await _updateState(
+          status: SyncStatus.error,
+          errorMessage: 'Some operations are pending retry due to previous failures.',
+        );
+      } else {
+        await _updateState(status: SyncStatus.success);
+      }
       debugPrint('[SyncService] Sync completed successfully.');
     } on UnsupportedSyncProtocolException catch (e) {
       debugPrint('[SyncService] Sync aborted due to protocol mismatch: $e');
@@ -233,7 +255,36 @@ class SyncService {
     final rawOps = await _dbHelper.getPendingOperations();
     if (rawOps.isEmpty) return true;
 
-    final coalesced = coalesceQueue(rawOps);
+    // First: identify and discard any entities that have both a CREATE and a DELETE operation in the queue.
+    final Map<String, List<Map<String, dynamic>>> groups = {};
+    for (final op in rawOps) {
+      final key = '${op['entity_type']}:${op['entity_id']}';
+      groups.putIfAbsent(key, () => []).add(op);
+    }
+
+    final List<String> discardedUuids = [];
+    final List<Map<String, dynamic>> nonDiscardedOps = [];
+
+    for (final key in groups.keys) {
+      final ops = groups[key]!;
+      final hasCreate = ops.any((o) => o['operation_type'] == 'create');
+      final isDeleted = ops.last['operation_type'] == 'delete';
+
+      if (hasCreate && isDeleted) {
+        discardedUuids.addAll(ops.map((o) => o['operation_uuid'] as String));
+      } else {
+        nonDiscardedOps.addAll(ops);
+      }
+    }
+
+    if (discardedUuids.isNotEmpty) {
+      debugPrint('[SyncService] Discarding ${discardedUuids.length} operations from queue because they were created and then deleted offline.');
+      await _dbHelper.removePendingOperations(discardedUuids);
+    }
+
+    if (nonDiscardedOps.isEmpty) return true;
+
+    final coalesced = coalesceQueue(nonDiscardedOps);
 
     for (final op in coalesced) {
       final String uuid = op['operation_uuid'];
@@ -241,6 +292,7 @@ class SyncService {
       final String entityId = op['entity_id'];
       final String operationType = op['operation_type'];
       final int retryCount = op['retry_count'] ?? 0;
+      final List<String> sourceUuids = List<String>.from(op['source_uuids'] ?? [uuid]);
 
       // Exponential backoff logic based on retry count
       if (retryCount > 0) {
@@ -259,8 +311,8 @@ class SyncService {
 
       try {
         await _sendApiRequest(entityType, entityId, operationType, payload);
-        // Remove from db queue upon success
-        await _dbHelper.removePendingOperation(uuid);
+        // Remove all coalesced source operations from db queue upon success
+        await _dbHelper.removePendingOperations(sourceUuids);
       } catch (e) {
         debugPrint('[SyncService] Failed to upload operation $uuid: $e');
         
@@ -269,12 +321,15 @@ class SyncService {
           if (statusCode == 409 || 
               (statusCode == 404 && (operationType == 'delete' || operationType == 'update'))) {
             debugPrint('[SyncService] Idempotent ignore: Server returned $statusCode for operation $operationType of $entityType ($entityId). Discarding operation from queue.');
-            await _dbHelper.removePendingOperation(uuid);
+            await _dbHelper.removePendingOperations(sourceUuids);
             continue;
           }
         }
 
-        await _dbHelper.incrementRetryCount(uuid);
+        // Increment retry count for all source operations in the group
+        for (final u in sourceUuids) {
+          await _dbHelper.incrementRetryCount(u);
+        }
         
         // If it's a network error (no connection), abort the rest of the queue to keep order
         if (_isNetworkError(e)) {

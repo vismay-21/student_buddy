@@ -140,6 +140,9 @@ class SqliteSemesterRepository implements SemesterRepository {
       updates['end_date'] = request.endDate!.toIso8601String().substring(0, 10);
     }
 
+    final datesChanged = (request.startDate != null && request.startDate!.toIso8601String().substring(0, 10) != sem.startDate.toIso8601String().substring(0, 10)) ||
+        (request.endDate != null && request.endDate!.toIso8601String().substring(0, 10) != sem.endDate.toIso8601String().substring(0, 10));
+
     await db.transaction((txn) async {
       await txn.update(
         'semesters',
@@ -155,6 +158,81 @@ class SqliteSemesterRepository implements SemesterRepository {
       );
       if (updatedMaps.isNotEmpty) {
         await _dbHelper.enqueueOperation(txn, 'semester', semesterId, 'update', updatedMaps.first);
+      }
+
+      if (datesChanged) {
+        final newStart = request.startDate ?? sem.startDate;
+        final newEnd = request.endDate ?? sem.endDate;
+        final newStartStr = newStart.toIso8601String().substring(0, 10);
+        final newEndStr = newEnd.toIso8601String().substring(0, 10);
+
+        // 1. Delete holidays outside the new range
+        await txn.delete(
+          'holidays',
+          where: 'semester_id = ? AND (holiday_date < ? OR holiday_date > ?)',
+          whereArgs: [semesterId, newStartStr, newEndStr],
+        );
+
+        // 2. Delete lecture instances outside the new range
+        await txn.rawDelete('''
+          DELETE FROM lecture_instances
+          WHERE lecture_template_id IN (
+            SELECT lt.lecture_template_id
+            FROM lecture_templates lt
+            JOIN subjects s ON lt.subject_id = s.subject_id
+            WHERE s.semester_id = ?
+          ) AND (lecture_date < ? OR lecture_date > ?)
+        ''', [semesterId, newStartStr, newEndStr]);
+
+        // 3. Fetch all templates for this semester
+        final List<Map<String, dynamic>> templates = await txn.rawQuery('''
+          SELECT lt.* FROM lecture_templates lt
+          JOIN subjects s ON lt.subject_id = s.subject_id
+          WHERE s.semester_id = ?
+        ''', [semesterId]);
+
+        // 4. Fetch remaining holidays
+        final List<Map<String, dynamic>> holidays = await txn.query(
+          'holidays',
+          where: 'semester_id = ?',
+          whereArgs: [semesterId],
+        );
+        final holidayDatesStr = holidays.map((h) => h['holiday_date'] as String).toSet();
+
+        // 5. Generate missing instances for each template
+        for (final temp in templates) {
+          final templateId = temp['lecture_template_id'] as String;
+          final dayOfWeek = temp['day_of_week'] as int;
+
+          // Fetch existing dates for this template in the new range
+          final List<Map<String, dynamic>> existingInstances = await txn.query(
+            'lecture_instances',
+            columns: ['lecture_date'],
+            where: 'lecture_template_id = ?',
+            whereArgs: [templateId],
+          );
+          final existingDates = existingInstances.map((e) => e['lecture_date'] as String).toSet();
+
+          var current = newStart;
+          while (current.compareTo(newEnd) <= 0) {
+            if (current.weekday == dayOfWeek) {
+              final dateStr = current.toIso8601String().substring(0, 10);
+              if (!existingDates.contains(dateStr)) {
+                final isHoliday = holidayDatesStr.contains(dateStr);
+                await txn.insert('lecture_instances', {
+                  'lecture_instance_id': generateUuid(),
+                  'lecture_template_id': templateId,
+                  'lecture_date': dateStr,
+                  'lecture_status': isHoliday ? 'holiday' : 'scheduled',
+                  'attendance_status': 'unmarked',
+                  'created_at': nowStr,
+                  'updated_at': nowStr,
+                });
+              }
+            }
+            current = current.add(const Duration(days: 1));
+          }
+        }
       }
 
       // Log activity
