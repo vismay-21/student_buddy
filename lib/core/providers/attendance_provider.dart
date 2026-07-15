@@ -26,9 +26,6 @@ class AttendanceStatsNotifier extends AsyncNotifier<AttendanceStatsDto> {
       );
     }
 
-    // Refresh when today's lectures list updates
-    ref.watch(todayLecturesProvider);
-
     final service = ref.watch(attendanceServiceProvider);
     return service.getSemesterStats(activeSem.semesterId);
   }
@@ -59,16 +56,51 @@ class AttendanceStatsNotifier extends AsyncNotifier<AttendanceStatsDto> {
     int presentDelta = 0;
     int absentDelta = 0;
 
-    if (oldStatus == 'attended') presentDelta--;
-    if (oldStatus == 'absent') absentDelta--;
+    if (oldStatus == 'present' || oldStatus == 'attended') presentDelta--;
+    if (oldStatus == 'absent' || oldStatus == 'missed') absentDelta--;
 
-    if (newStatus == 'attended') presentDelta++;
-    if (newStatus == 'absent') absentDelta++;
+    if (newStatus == 'present' || newStatus == 'attended') presentDelta++;
+    if (newStatus == 'absent' || newStatus == 'missed') absentDelta++;
 
-    final newTotal = currentStats.totalLectures + (oldStatus == null ? 1 : 0) - (newStatus == null ? 1 : 0);
     final newPresent = currentStats.presentLectures + presentDelta;
     final newAbsent = currentStats.absentLectures + absentDelta;
-    final newPercent = newTotal > 0 ? (newPresent / newTotal) * 100 : 0.0;
+    final int marked = newPresent + newAbsent;
+    final newTotal = currentStats.totalLectures;
+
+    final double newPercent = marked == 0 ? 100.0 : double.parse(((newPresent / marked) * 100.0).toStringAsFixed(2));
+
+    int goal = 75;
+    final settings = ref.read(attendanceSettingsProvider).value;
+    if (settings != null) {
+      goal = settings.overallAttendanceGoal;
+    }
+
+    int skip = 0;
+    if (marked > 0) {
+      final double valK = (100 * newPresent - goal * marked) / goal;
+      final int k = valK.floor();
+      skip = k > 0 ? k : 0;
+    }
+
+    String msg = "can't skip next lecture";
+    if (marked > 0) {
+      final double valK = (100 * newPresent - goal * marked) / goal;
+      final int k = valK.floor();
+      if (k > 0) {
+        msg = "can skip $k lectures";
+      } else if (k == 0) {
+        msg = "can't skip next lecture";
+      } else {
+        final int divisor = 100 - goal;
+        if (divisor <= 0) {
+          msg = newAbsent > 0 ? "need to attend next lecture" : "can't skip next lecture";
+        } else {
+          final double valM = (goal * marked - 100 * newPresent) / divisor;
+          final int m = valM.ceil();
+          msg = "need to attend next $m lectures";
+        }
+      }
+    }
 
     state = AsyncValue.data(
       AttendanceStatsDto(
@@ -77,8 +109,8 @@ class AttendanceStatsNotifier extends AsyncNotifier<AttendanceStatsDto> {
         absentLectures: newAbsent,
         attendancePercentage: newPercent,
         remainingLectures: currentStats.remainingLectures,
-        safeSkipCount: currentStats.safeSkipCount,
-        statusMessage: currentStats.statusMessage,
+        safeSkipCount: skip,
+        statusMessage: msg,
         criteriaMode: currentStats.criteriaMode,
       ),
     );
@@ -94,10 +126,6 @@ final attendanceStatsProvider =
 class SubjectAttendanceStatsNotifier extends FamilyAsyncNotifier<AttendanceStatsDto, String> {
   @override
   Future<AttendanceStatsDto> build(String arg) async {
-    // Watch todayLecturesProvider and semesterInstancesProvider to auto-rebuild if needed
-    ref.watch(todayLecturesProvider);
-    ref.watch(semesterInstancesProvider);
-
     final service = ref.watch(attendanceServiceProvider);
     return service.getSubjectStats(arg);
   }
@@ -113,46 +141,47 @@ class SubjectAttendanceStatsNotifier extends FamilyAsyncNotifier<AttendanceStats
     if (state.value == null) return;
     final currentStats = state.value!;
 
-    final int presentDelta = (newStatus == 'present' ? 1 : 0) - (oldStatus == 'present' ? 1 : 0);
-    final int absentDelta = (newStatus == 'absent' ? 1 : 0) - (oldStatus == 'absent' ? 1 : 0);
+    int presentDelta = 0;
+    int absentDelta = 0;
 
-    final newTotal = currentStats.totalLectures + (oldStatus == null ? 1 : 0) - (newStatus == null ? 1 : 0);
+    if (oldStatus == 'present' || oldStatus == 'attended') presentDelta--;
+    if (oldStatus == 'absent' || oldStatus == 'missed') absentDelta--;
+
+    if (newStatus == 'present' || newStatus == 'attended') presentDelta++;
+    if (newStatus == 'absent' || newStatus == 'missed') absentDelta++;
+
     final newPresent = currentStats.presentLectures + presentDelta;
     final newAbsent = currentStats.absentLectures + absentDelta;
+    final int marked = newPresent + newAbsent;
+    final newTotal = currentStats.totalLectures;
 
-    final double newPercent = newTotal == 0 ? 0.0 : (newPresent / newTotal) * 100;
-    
-    // Status message logic
-    String newStatusMsg = '';
-    if (newTotal == 0) {
-      newStatusMsg = 'No lectures';
-    } else {
-      if (newPercent >= targetGoal) {
-        // Calculate safe skips
-        int skips = 0;
-        while (true) {
-          final tempTotal = newTotal + skips + 1;
-          final tempPercent = (newPresent / tempTotal) * 100;
-          if (tempPercent >= targetGoal) {
-            skips++;
-          } else {
-            break;
-          }
-        }
-        newStatusMsg = skips > 0 ? 'You can skip the next $skips classes.' : 'You cannot skip any classes.';
+    final double newPercent = marked == 0 ? 100.0 : double.parse(((newPresent / marked) * 100.0).toStringAsFixed(2));
+    final int goal = targetGoal.toInt();
+
+    int skip = 0;
+    if (marked > 0) {
+      final double valK = (100 * newPresent - goal * marked) / goal;
+      final int k = valK.floor();
+      skip = k > 0 ? k : 0;
+    }
+
+    String msg = "can't skip next lecture";
+    if (marked > 0) {
+      final double valK = (100 * newPresent - goal * marked) / goal;
+      final int k = valK.floor();
+      if (k > 0) {
+        msg = "can skip $k lectures";
+      } else if (k == 0) {
+        msg = "can't skip next lecture";
       } else {
-        // Calculate classes to attend
-        int required = 0;
-        while (true) {
-          final tempTotal = newTotal + required;
-          final tempPresent = newPresent + required;
-          final tempPercent = (tempPresent / tempTotal) * 100;
-          if (tempPercent >= targetGoal) {
-            break;
-          }
-          required++;
+        final int divisor = 100 - goal;
+        if (divisor <= 0) {
+          msg = newAbsent > 0 ? "need to attend next lecture" : "can't skip next lecture";
+        } else {
+          final double valM = (goal * marked - 100 * newPresent) / divisor;
+          final int m = valM.ceil();
+          msg = "need to attend next $m lectures";
         }
-        newStatusMsg = 'Attend next $required classes to reach target.';
       }
     }
 
@@ -163,8 +192,8 @@ class SubjectAttendanceStatsNotifier extends FamilyAsyncNotifier<AttendanceStats
         absentLectures: newAbsent,
         totalLectures: newTotal,
         remainingLectures: currentStats.remainingLectures,
-        safeSkipCount: currentStats.safeSkipCount,
-        statusMessage: newStatusMsg,
+        safeSkipCount: skip,
+        statusMessage: msg,
         criteriaMode: currentStats.criteriaMode,
       ),
     );

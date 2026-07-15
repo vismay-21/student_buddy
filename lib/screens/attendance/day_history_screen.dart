@@ -421,16 +421,8 @@ class LectureCardWrapper extends ConsumerWidget {
     final sub = inst.lectureTemplate.subject;
     final statsAsync = ref.watch(subjectAttendanceStatsProvider(sub.subjectId));
 
-    return statsAsync.when(
-      loading: () => const SizedBox(
-        height: 120,
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (err, _) => const SizedBox(
-        height: 120,
-        child: Center(child: Text('Failed to load stats', style: TextStyle(color: AppTheme.textMuted))),
-      ),
-      data: (stats) {
+    if (statsAsync.hasValue) {
+      final stats = statsAsync.value!;
         int target = overallGoal;
         if (criteriaMode == 'custom') {
           target = sub.attendanceGoal;
@@ -473,7 +465,16 @@ class LectureCardWrapper extends ConsumerWidget {
           isAboveTarget: isAboveTarget,
           onActionChanged: hasHoliday ? null : onActionChanged,
         );
-      },
-    );
+    } else if (statsAsync.isLoading) {
+      return const SizedBox(
+        height: 120,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    } else {
+      return const SizedBox(
+        height: 120,
+        child: Center(child: Text('Failed to load stats', style: TextStyle(color: AppTheme.textMuted))),
+      );
+    }
   }
 }

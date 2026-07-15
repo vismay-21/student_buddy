@@ -323,51 +323,56 @@ class AttendanceSettingsTab extends ConsumerWidget {
                               if (holidays.isEmpty)
                                 const Center(
                                   child: Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 20),
+                                    padding: EdgeInsets.symmetric(vertical: 16.0),
                                     child: Text(
-                                      'No holidays added yet.',
-                                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                                      'No holidays added yet',
+                                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
                                     ),
                                   ),
                                 )
                               else
-                                ListView.separated(
+                                ListView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   itemCount: holidays.length,
-                                  separatorBuilder: (context, index) => Divider(color: borderColor),
                                   itemBuilder: (context, index) {
-                                    final holiday = holidays[index];
+                                    final hol = holidays[index];
+                                    final dateStr = DateFormat('EEE, d MMM yyyy').format(hol.holidayDate);
                                     return ListTile(
                                       contentPadding: EdgeInsets.zero,
                                       title: Text(
-                                        holiday.holidayName,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                        hol.holidayName,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark ? AppTheme.textPrimary : AppTheme.lightTextPrimary,
+                                        ),
                                       ),
                                       subtitle: Text(
-                                        DateFormat('EEEE, d MMMM yyyy').format(holiday.holidayDate),
-                                        style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
+                                        dateStr,
+                                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                      ),
+                                      leading: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.warning.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child:
+                                            const Icon(Icons.beach_access_rounded, color: AppTheme.warning, size: 18),
                                       ),
                                       trailing: IconButton(
-                                        icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.danger, size: 20),
-                                        onPressed: () => ref.read(attendanceActionsProvider).deleteHoliday(holiday.holidayId),
+                                        icon: const Icon(Icons.delete_outline_rounded,
+                                            color: AppTheme.danger, size: 20),
+                                        onPressed: () {
+                                          ref
+                                              .read(attendanceActionsProvider)
+                                              .deleteHoliday(hol.holidayId);
+                                        },
                                       ),
                                     );
                                   },
                                 ),
-                              const SizedBox(height: 12),
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: AppTheme.primary.withOpacity(0.5)),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                icon: const Icon(Icons.document_scanner_outlined, size: 18, color: AppTheme.primary),
-                                label: const Text('Import Academic Calendar Holiday List (OCR)',
-                                    style: TextStyle(
-                                        fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.bold)),
-                                onPressed: () => _showOcrPlaceholderDialog(context),
-                              ),
                             ],
                           ),
                         ),
@@ -681,23 +686,4 @@ class AttendanceSettingsTab extends ConsumerWidget {
         );
       },
     );
-  }
-
-  void _showOcrPlaceholderDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppTheme.surface : AppTheme.lightSurface,
-        title: const Text('Import OCR', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text(
-            'This feature will allow importing academic calendar holiday lists from PDF/Image formats directly.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Understood', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
-          ),
-        ],
-      ),
-    );
-  }
-}
+  }}
