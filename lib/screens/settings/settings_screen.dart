@@ -498,8 +498,6 @@ class SettingsScreen extends ConsumerWidget {
         ? DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(syncState.lastSyncTime!).toLocal())
         : 'Never';
 
-    final isSyncing = syncState.status == SyncStatus.syncing;
-
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -513,7 +511,17 @@ class SettingsScreen extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(statusIcon, color: statusColor, size: 24),
+                if (syncState.status == SyncStatus.syncing)
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                    ),
+                  )
+                else
+                  Icon(statusIcon, color: statusColor, size: 24),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -532,31 +540,6 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                         ),
                     ],
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: isSyncing
-                      ? null
-                      : () {
-                          ref.read(syncStateProvider.notifier).triggerSync();
-                        },
-                  icon: isSyncing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.sync_rounded, size: 16),
-                  label: Text(isSyncing ? 'Syncing' : 'Sync Now'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
                   ),
                 ),
               ],

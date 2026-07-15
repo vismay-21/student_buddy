@@ -646,36 +646,128 @@ class SyncService {
 
   Map<String, dynamic> _normalizeForSqlite(String table, Map<String, dynamic> remoteData) {
     final Map<String, dynamic> normalized = Map<String, dynamic>.from(remoteData);
-    // Remove nested children elements to avoid sqlite column mismatch
-    normalized.remove('sections');
-    normalized.remove('resources');
-    normalized.remove('lecture_template');
-    normalized.remove('subject');
 
-    if (table == 'lecture_instances') {
-      normalized.remove('marked_by');
-      normalized.remove('marked_at');
+    // Schema whitelist for each table to prevent column mismatch exceptions
+    const Map<String, Set<String>> tableSchemas = {
+      'semesters': {
+        'semester_id',
+        'user_id',
+        'semester_number',
+        'start_date',
+        'end_date',
+        'created_at',
+        'updated_at',
+      },
+      'subjects': {
+        'subject_id',
+        'semester_id',
+        'subject_name',
+        'faculty_name',
+        'theme_color',
+        'attendance_goal',
+        'created_at',
+        'updated_at',
+      },
+      'lecture_templates': {
+        'lecture_template_id',
+        'subject_id',
+        'day_of_week',
+        'start_time',
+        'end_time',
+        'room',
+        'created_at',
+        'updated_at',
+      },
+      'lecture_instances': {
+        'lecture_instance_id',
+        'lecture_template_id',
+        'lecture_date',
+        'lecture_status',
+        'attendance_status',
+        'created_at',
+        'updated_at',
+      },
+      'holidays': {
+        'holiday_id',
+        'semester_id',
+        'holiday_date',
+        'holiday_name',
+        'created_at',
+        'updated_at',
+      },
+      'attendance_settings': {
+        'attendance_settings_id',
+        'semester_id',
+        'criteria_mode',
+        'overall_attendance_goal',
+        'created_at',
+        'updated_at',
+      },
+      'todos': {
+        'todo_id',
+        'user_id',
+        'title',
+        'priority',
+        'status',
+        'created_by',
+        'due_datetime',
+        'completed_at',
+        'created_at',
+        'updated_at',
+      },
+      'app_settings': {
+        'settings_id',
+        'user_id',
+        'theme_mode',
+        'finance_enabled',
+        'morning_digest_enabled',
+        'night_digest_enabled',
+        'attendance_prompt_enabled',
+        'notes_download_directory',
+        'created_at',
+        'updated_at',
+      },
+      'review_queue': {
+        'review_id',
+        'user_id',
+        'review_type',
+        'entity_type',
+        'entity_id',
+        'review_message',
+        'review_status',
+        'resolved_by',
+        'created_at',
+        'resolved_at',
+      },
+    };
+
+    final currentUserId = _dbHelper.currentUserId;
+
+    if (tableSchemas.containsKey(table)) {
+      final allowedKeys = tableSchemas[table]!;
+      normalized.removeWhere((key, _) => !allowedKeys.contains(key));
+      
+      // If table requires user_id but remote data lacks it, populate it
+      if (allowedKeys.contains('user_id') && !normalized.containsKey('user_id') && currentUserId != null) {
+        normalized['user_id'] = currentUserId;
+      }
     }
 
     if (table == 'app_settings') {
-      normalized.remove('active_semester_id');
       if (normalized['finance_enabled'] is bool) {
-        normalized['finance_enabled'] = normalized['finance_enabled'] ? 1 : 0;
+        normalized['finance_enabled'] = (normalized['finance_enabled'] as bool) ? 1 : 0;
       }
       if (normalized['morning_digest_enabled'] is bool) {
-        normalized['morning_digest_enabled'] = normalized['morning_digest_enabled'] ? 1 : 0;
+        normalized['morning_digest_enabled'] = (normalized['morning_digest_enabled'] as bool) ? 1 : 0;
       }
       if (normalized['night_digest_enabled'] is bool) {
-        normalized['night_digest_enabled'] = normalized['night_digest_enabled'] ? 1 : 0;
+        normalized['night_digest_enabled'] = (normalized['night_digest_enabled'] as bool) ? 1 : 0;
       }
       if (normalized['attendance_prompt_enabled'] is bool) {
-        normalized['attendance_prompt_enabled'] = normalized['attendance_prompt_enabled'] ? 1 : 0;
-      }
-    } else if (table == 'todos') {
-      if (normalized['is_completed'] is bool) {
-        normalized['is_completed'] = normalized['is_completed'] ? 1 : 0;
+        normalized['attendance_prompt_enabled'] = (normalized['attendance_prompt_enabled'] as bool) ? 1 : 0;
       }
     }
+
     return normalized;
   }
 
