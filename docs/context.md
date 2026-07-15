@@ -482,7 +482,7 @@ We have completed the **SQLite Synchronization Engine (Sprint 14B)**, having suc
 
 * **What was intentionally NOT implemented (postponed/frozen)**:
   * **Finance Module (FROZEN)**: All Finance module development is officially frozen. It is now disabled by default on clean installs, and the toggle state is persisted via `SharedPreferences`.
-  * Riverpod state management implementation (postponed to Sprint 14A)
+  * **Riverpod CQRS Migration (Sprint 14C — Completed)**: All persistent modules (Todo, Timetable, Attendance, Finance, Notes, Review Queue, Settings, Semester Selection, and the root `StudentBuddyApp`) have been fully migrated to the Riverpod CQRS architecture. The legacy `AppState` singleton is no longer referenced anywhere in the active codebase. Every UI screen now follows the reactive `Flutter UI → ReadProvider → ActionProvider → Service → Repository` pattern.
 
 ### 9.2. Backend Service Implementations
 
@@ -671,6 +671,7 @@ The backend architecture is now considered feature-complete for MVP Version 1. F
 * **Sprint 13**: Authentication (Completed)
 * **Sprint 14A**: SQLite Offline Foundation (Completed)
 * **Sprint 14B**: SQLite Synchronization Engine (Completed)
+* **Sprint 14C**: State Management Modernization (Riverpod Integration) (Completed)
 * **Audit 11 — Deployment & Operations**: Audit and Infrastructure Remediation (Active)
 * **Production Deployment**: Deploy PostgreSQL on Supabase, FastAPI on Railway, configure Flutter production variables, and complete comprehensive Smoke Testing.
 * **Sprint 15**: WhatsApp Integration
@@ -693,10 +694,19 @@ The backend architecture is now considered feature-complete for MVP Version 1. F
 ## 12. State Management Strategy & Guidelines
 
 * **Core Decision**: Riverpod is the final, official state management solution for Student Buddy.
-* **Phase 1 Boundaries**: Riverpod is intentionally postponed in Phase 1 to maintain focus on standard Flutter UI skeletal layouts.
-* **State Isolation**: State must be kept local to individual screens (e.g. within stateful wrapper pages) to avoid nested global `ValueNotifier` trees.
-* **ValueNotifier Restrictions**: Standard `ValueNotifier` can only be used for simple, isolated UI events. All core calculations, models, and operations must not depend on `ValueNotifier` chains.
-* **Riverpod Migration Preparation**: State logic (such as attendance calculations, holiday maps) should be organized into notifier-like structures inside the screen states, facilitating clean extraction to `StateNotifier` or `Notifier` classes in Phase 2+.
+* **Separation of Concerns (CQRS)**: All state management is split between Read-Only state providers (e.g. `AsyncNotifierProvider`, `FutureProvider`) and Action/Command providers (handling mutations, local database enqueueing, and triggering backend synchronization).
+* **Migration Status (Sprint 14C — Complete)**: All persistent modules have been fully migrated to clean Riverpod structures:
+  - **Todo**: `todosProvider` (Read) + `todoActionsProvider` (Action)
+  - **Timetable**: `allLectureTemplatesProvider` / `todayLecturesProvider` (Read) + `timetableActionsProvider` (Action)
+  - **Attendance**: `attendanceSettingsProvider` / `dateLecturesProvider` / `holidaysProvider` (Read) + `attendanceActionsProvider` (Action)
+  - **Notes**: `notesHierarchyProvider` / `notesSubjectsProvider` / `notesSectionsProvider` (Read) + `notesActionsProvider` (Action)
+  - **Review Queue**: `pendingReviewQueueProvider` (Read) + `reviewQueueActionsProvider` (Action)
+  - **Settings & Semester**: `appSettingsProvider` / `themeProvider` / `semestersProvider` / `activeSemesterProvider` (Read) + `semesterActionsProvider` (Action)
+  - **Finance**: `financeSettingsProvider` (Read)
+  - **Sync**: `syncStateProvider` (Read)
+* **AppState Status**: The legacy `AppState` singleton (`lib/core/utils/app_state.dart`) is no longer referenced by any active code. It is dead code and safe to delete.
+* **ValueNotifier Restrictions**: Standard `ValueNotifier` is fully eliminated from the UI layer. All state queries and operations watch Riverpod providers to enable reactive, reload-free UI flows.
+* **Provider Files**: All providers reside in `lib/core/providers/` following the naming convention `{module}_provider.dart`.
 
 ---
 

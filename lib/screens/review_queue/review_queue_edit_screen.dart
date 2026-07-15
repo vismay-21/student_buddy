@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../data/dto/review_queue/review_queue_dto.dart';
-import '../../data/repositories/review_queue_repository.dart';
+import '../../core/providers/review_queue_provider.dart';
 
-class ReviewQueueEditScreen extends StatefulWidget {
+class ReviewQueueEditScreen extends ConsumerStatefulWidget {
   final ReviewQueueDto item;
   const ReviewQueueEditScreen({super.key, required this.item});
 
   @override
-  State<ReviewQueueEditScreen> createState() => _ReviewQueueEditScreenState();
+  ConsumerState<ReviewQueueEditScreen> createState() => _ReviewQueueEditScreenState();
 }
 
-class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
+class _ReviewQueueEditScreenState extends ConsumerState<ReviewQueueEditScreen> {
   final _formKey = GlobalKey<FormState>();
-  final ReviewQueueRepository _repository = ReviewQueueRepository();
   bool _isLoading = false;
 
   // Finance Form State
@@ -80,13 +80,13 @@ class _ReviewQueueEditScreenState extends State<ReviewQueueEditScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _repository.resolveReviewQueueItem(
-        widget.item.reviewId,
-        ReviewQueueResolveRequest(
-          resolutionData: resolutionData,
-          resolvedBy: 'user',
-        ),
-      );
+      await ref.read(reviewQueueActionsProvider).resolveItem(
+            widget.item.reviewId,
+            ReviewQueueResolveRequest(
+              resolutionData: resolutionData,
+              resolvedBy: 'user',
+            ),
+          );
       if (mounted) {
         AppSnackbar.success(context, 'Review item resolved!');
         Navigator.pop(context, true);

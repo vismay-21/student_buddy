@@ -391,6 +391,25 @@ Automatic and manual synchronization engine connecting SQLite with the FastAPI b
 
 ---
 
+# Phase 8C - State Management Modernization (Riverpod Integration)
+
+**Estimated Duration:** 1 Day
+
+### Goal
+
+Modernize Flutter state management using Riverpod's `AsyncNotifier` and `FutureProvider`, decoupling read and write operations via dedicated `Actions` providers to eliminate redundant reloads, loading spinners, and rebuilds.
+
+### Scope & Deliverables
+* **Riverpod Migration**: Refactor Todo and Timetable screens to `ConsumerStatefulWidget` or `ConsumerWidget`.
+* **CQRS Read/Write Separation**: Decouple state exposure (read-only providers) from mutations (action/command providers).
+* **Keyboard UX & Layout Refinement**: Redesign login and signup forms to prevent layout components or CTA buttons from hiding behind the virtual keyboard.
+
+### Deliverable
+
+A reactive, fluid, and robust Flutter UI where UI updates reflect immediately across screens without manual state reloads, and forms scroll smoothly above virtual keyboards.
+
+---
+
 # Phase 9 - Deployment & Production Validation (MVP Version 1 Release)
 
 **Estimated Duration:** 2 Days
@@ -488,11 +507,12 @@ Keep these in Future Scope:
 4. Authentication & Multi-Tenancy (Phase 7 / Sprint 13) (Completed)
 5. SQLite Offline Foundation (Phase 8A / Sprint 14A) (Completed)
 6. Synchronization Engine (Phase 8B / Sprint 14B) (Completed)
-7. Deployment & Production Validation (Phase 9 / Audit 11 Remediation & Deploy)
-8. WhatsApp Integration (Phase 10 / Sprint 15)
-9. Notification Engine (Phase 11)
-10. AI & OCR Integration (Phase 12 / Sprint 16)
-11. Finance Module (Phase 13 / Sprint 17)
+7. State Management Modernization (Phase 8C / Sprint 14C) (Completed)
+8. Deployment & Production Validation (Phase 9 / Audit 11 Remediation & Deploy)
+9. WhatsApp Integration (Phase 10 / Sprint 15)
+10. Notification Engine (Phase 11)
+11. AI & OCR Integration (Phase 12 / Sprint 16)
+12. Finance Module (Phase 13 / Sprint 17)
 
 ---
 

@@ -48,6 +48,30 @@ class TodoDto {
       'updated_at': updatedAt.toIso8601String(),
     };
   }
+
+  TodoDto copyWith({
+    String? todoId,
+    String? title,
+    String? priority,
+    String? status,
+    String? createdBy,
+    DateTime? dueDatetime,
+    DateTime? completedAt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return TodoDto(
+      todoId: todoId ?? this.todoId,
+      title: title ?? this.title,
+      priority: priority ?? this.priority,
+      status: status ?? this.status,
+      createdBy: createdBy ?? this.createdBy,
+      dueDatetime: dueDatetime ?? this.dueDatetime,
+      completedAt: completedAt ?? this.completedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }
 
 class TodoCreateRequest {

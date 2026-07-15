@@ -25,6 +25,32 @@ class LectureInstanceDto {
     required this.lectureTemplate,
   });
 
+  LectureInstanceDto copyWith({
+    String? lectureInstanceId,
+    String? lectureTemplateId,
+    DateTime? lectureDate,
+    String? lectureStatus,
+    String? attendanceStatus,
+    String? markedBy,
+    DateTime? markedAt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    LectureTemplateNestedDto? lectureTemplate,
+  }) {
+    return LectureInstanceDto(
+      lectureInstanceId: lectureInstanceId ?? this.lectureInstanceId,
+      lectureTemplateId: lectureTemplateId ?? this.lectureTemplateId,
+      lectureDate: lectureDate ?? this.lectureDate,
+      lectureStatus: lectureStatus ?? this.lectureStatus,
+      attendanceStatus: attendanceStatus ?? this.attendanceStatus,
+      markedBy: markedBy ?? this.markedBy,
+      markedAt: markedAt ?? this.markedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lectureTemplate: lectureTemplate ?? this.lectureTemplate,
+    );
+  }
+
   factory LectureInstanceDto.fromJson(Map<String, dynamic> json) {
     return LectureInstanceDto(
       lectureInstanceId: json['lecture_instance_id'] as String,

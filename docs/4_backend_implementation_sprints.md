@@ -393,6 +393,20 @@ Synchronize the local SQLite database with the PostgreSQL database on the backen
 
 ---
 
+# Sprint 14C — State Management Modernization (Completed)
+
+## Goal
+Modernize state management in the Flutter application by migrating to Riverpod, decoupling read (state query) and write (mutation action) operations, and improving layout components to prevent keyboard overlay issues on auth screens.
+
+## Deliverables
+- **Riverpod Migration**: Refactor Todo and Timetable screens to `ConsumerStatefulWidget` / `ConsumerWidget` with central providers.
+- **CQRS separation of Read & Write**: Decouple state exposure from action triggers to ensure reactive and reload-free UI flows.
+- **Form Keyboard UX**: Redesign login and signup forms to prevent components or CTA buttons from hiding behind virtual keyboards, with back buttons placed correctly in the app bar.
+
+*Note: Sprint 14C assumes that the Sprint 14B Synchronization Engine is already fully implemented.*
+
+---
+
 # Deployment & Operations (Production Readiness Milestone)
 
 ## Goal

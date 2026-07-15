@@ -169,41 +169,41 @@ After Railway deployment is complete, the following manual verification must be 
 ## Final Deployment Checklist
 
 ### 1. Backend Infrastructure (FastAPI)
-- [ ] Requirements contains `gunicorn`.
-- [ ] `start.sh` entrypoint is marked executable (`chmod +x start.sh`).
-- [ ] Dockerfile binds to dynamic environmental variable `PORT`.
-- [ ] Application configuration sets `openapi_url` to `None` when `APP_ENV=production`.
-- [ ] Security headers (including `Referrer-Policy` and `Permissions-Policy`) are active.
-- [ ] Startup environment validation terminates process if required keys are missing.
-- [ ] Uvicorn proxy parameters (`--proxy-headers` and `--forwarded-allow-ips="*"`) configured.
+- [x] Requirements contains `gunicorn`.
+- [x] `start.sh` entrypoint is marked executable (`chmod +x start.sh`).
+- [x] Dockerfile binds to dynamic environmental variable `PORT`.
+- [x] Application configuration sets `openapi_url` to `None` when `APP_ENV=production`.
+- [x] Security headers (including `Referrer-Policy` and `Permissions-Policy`) are active.
+- [x] Startup environment validation terminates process if required keys are missing.
+- [x] Uvicorn proxy parameters (`--proxy-headers` and `--forwarded-allow-ips="*"`) configured.
 
 ### 2. Database Infrastructure (Supabase / PostgreSQL)
-- [ ] Database credentials (URL) are securely set in Railway environment variables.
+- [x] Database credentials (URL) are securely set in Railway environment variables.
 - [ ] Automatic daily backups are verified active in Supabase project dashboard.
-- [ ] Connection pool sizes and recycle thresholds match environment constraints.
+- [x] Connection pool sizes and recycle thresholds match environment constraints.
 
 ### 3. Authentication & Secrets
-- [ ] `JWT_SECRET` in Railway exactly matches Supabase Project JWT Secret.
-- [ ] `SUPABASE_URL` and `SUPABASE_KEY` are populated.
-- [ ] gitignore contains all `.env` files and local databases.
+- [x] `JWT_SECRET` in Railway exactly matches Supabase Project JWT Secret.
+- [x] `SUPABASE_URL` and `SUPABASE_KEY` are populated.
+- [x] gitignore contains all `.env` files and local databases.
 
 ### 4. Network & Connectivity
-- [ ] CORS allowed origins list is parsed fallback-safely via validation logic.
-- [ ] Proxied headers are supported to handle secure TLS termination schemes.
+- [x] CORS allowed origins list is parsed fallback-safely via validation logic.
+- [x] Proxied headers are supported to handle secure TLS termination schemes.
 
 ### 5. Flutter Client
-- [ ] API base URL resolved via compile-time parameter `API_BASE_URL`.
-- [ ] Supabase connection URL resolved via compile-time parameter `SUPABASE_URL`.
-- [ ] Supabase Anonymous key resolved via compile-time parameter `SUPABASE_ANON_KEY`.
-- [ ] Start-up asserts ensure the compile-time parameters are not empty.
-- [ ] Local SQLite db isolation verified.
+- [x] API base URL resolved via compile-time parameter `API_BASE_URL`.
+- [x] Supabase connection URL resolved via compile-time parameter `SUPABASE_URL`.
+- [x] Supabase Anonymous key resolved via compile-time parameter `SUPABASE_ANON_KEY`.
+- [x] Start-up asserts ensure the compile-time parameters are not empty.
+- [x] Local SQLite db isolation verified.
 
 ### 6. Health Checks & Logs
-- [ ] API `/health` endpoints return success only when database connectivity matches.
-- [ ] Console logging is configured to stdout.
-- [ ] File logging is optional.
+- [x] API `/health` endpoints return success only when database connectivity matches.
+- [x] Console logging is configured to stdout.
+- [x] File logging is optional.
 
 ### 7. DevOps & Release Approval
-- [ ] Pre-release database migration execution command added to deploy config.
+- [x] Pre-release database migration execution command added to deploy config.
 - [ ] Production Smoke Tests run successfully against backend.
 - [ ] Release approval signed off by operations lead.

@@ -1,91 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/app_state.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/services/auth_service.dart';
 import '../../data/dto/settings/app_settings_dto.dart';
-import '../../data/repositories/app_settings_repository.dart';
-import '../../data/dto/activity_log/activity_log_dto.dart';
-import '../../data/repositories/activity_log_repository.dart';
 import '../../data/local/database_helper.dart';
-import 'package:student_buddy/core/services/sync_service.dart';
+import '../../core/providers/app_settings_provider.dart';
+import '../../core/providers/semester_provider.dart';
+import '../../core/providers/sync_provider.dart';
+import '../../core/services/sync_service.dart';
 import 'semester_selection_screen.dart';
 import '../auth/login_screen.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  final _settingsRepo = AppSettingsRepository();
-  final _activityRepo = ActivityLogRepository();
-
-  bool _isLoading = false;
-  List<ActivityLogDto> _activityLogsList = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBackendSettings();
-  }
-
-  ThemeMode _themeModeFromString(String modeStr) {
-    switch (modeStr.toLowerCase()) {
-      case 'light':
-        return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      default:
-        return ThemeMode.system;
-    }
-  }
-
-  Future<void> _loadBackendSettings() async {
-    setState(() => _isLoading = true);
-    try {
-      final s = await _settingsRepo.getSettings();
-      AppState.instance.themeMode.value = _themeModeFromString(s.themeMode);
-      AppState.instance.isFinanceEnabled.value = s.financeEnabled;
-      AppState.instance.morningDigest.value = s.morningDigestEnabled;
-      AppState.instance.nightDigest.value = s.nightDigestEnabled;
-      AppState.instance.beforeLectureNotif.value = s.attendancePromptEnabled;
-      AppState.instance.afterLectureNotif.value = s.attendancePromptEnabled;
-
-      final logs = await _activityRepo.getActivityLogs(limit: 5);
-      setState(() {
-        _activityLogsList = logs;
-      });
-    } catch (e) {
-      // Failed to load backend settings, fallback to local/defaults
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _updateSetting(AppSettingsUpdateRequest request) async {
-    try {
-      await _settingsRepo.updateSettings(request);
-    } catch (e) {
-      if (mounted) {
-        AppSnackbar.error(context, 'Failed to update setting: $e');
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Settings'), centerTitle: true),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settingsAsync = ref.watch(appSettingsProvider);
+    final activityLogsAsync = ref.watch(activityLogsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -96,56 +30,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Settings'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Semester Card Selection
-            _buildSemesterCard(),
-            const SizedBox(height: 20),
+      body: settingsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Error loading settings: $err')),
+        data: (settings) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Semester Card Selection
+                _buildSemesterCard(context, ref),
+                const SizedBox(height: 20),
 
-            // Theme toggle
-            _buildSectionHeader('APPEARANCE'),
-            const SizedBox(height: 10),
-            _buildThemeToggleCard(),
-            const SizedBox(height: 24),
+                // Theme toggle
+                _buildSectionHeader('APPEARANCE'),
+                const SizedBox(height: 10),
+                _buildThemeToggleCard(context, ref, settings),
+                const SizedBox(height: 24),
 
-            // Module Toggles
-            _buildSectionHeader('APP MODULES'),
-            const SizedBox(height: 10),
-            _buildModuleTogglesCard(),
-            const SizedBox(height: 24),
+                // Module Toggles
+                _buildSectionHeader('APP MODULES'),
+                const SizedBox(height: 10),
+                _buildModuleTogglesCard(context, ref, settings),
+                const SizedBox(height: 24),
 
-            // Digest / Notifications Toggles
-            _buildSectionHeader('DIGESTS & NOTIFICATIONS'),
-            const SizedBox(height: 10),
-            _buildNotificationsCard(),
-            const SizedBox(height: 24),
+                // Digest / Notifications Toggles
+                _buildSectionHeader('DIGESTS & NOTIFICATIONS'),
+                const SizedBox(height: 10),
+                _buildNotificationsCard(context, ref, settings),
+                const SizedBox(height: 24),
 
-            // Synchronization
-            _buildSectionHeader('OFFLINE SYNCHRONIZATION'),
-            const SizedBox(height: 10),
-            _buildSyncCard(),
-            const SizedBox(height: 24),
+                // Synchronization
+                _buildSectionHeader('OFFLINE SYNCHRONIZATION'),
+                const SizedBox(height: 10),
+                _buildSyncCard(context, ref),
+                const SizedBox(height: 24),
 
-            // Activity Timeline
-            _buildSectionHeader('ACTIVITY TIMELINE'),
-            const SizedBox(height: 10),
-            _buildActivityTimelineCard(),
-            const SizedBox(height: 24),
+                // Activity Timeline
+                _buildSectionHeader('ACTIVITY TIMELINE'),
+                const SizedBox(height: 10),
+                _buildActivityTimelineCard(activityLogsAsync),
+                const SizedBox(height: 24),
 
-            // About Card
-            _buildSectionHeader('ABOUT'),
-            const SizedBox(height: 10),
-            _buildAboutCard(),
-            const SizedBox(height: 24),
+                // About Card
+                _buildSectionHeader('ABOUT'),
+                const SizedBox(height: 10),
+                _buildAboutCard(),
+                const SizedBox(height: 24),
 
-            // Sign Out
-            _buildSignOutCard(),
-            const SizedBox(height: 32),
-          ],
-        ),
+                // Sign Out
+                _buildSignOutCard(context),
+                const SizedBox(height: 32),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -162,44 +102,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildThemeToggleCard() {
+  Widget _buildThemeToggleCard(BuildContext context, WidgetRef ref, AppSettingsDto settings) {
+    final isDark = settings.themeMode == 'dark';
     return Card(
-      child: ValueListenableBuilder<ThemeMode>(
-        valueListenable: AppState.instance.themeMode,
-        builder: (context, mode, _) {
-          final isDark = mode == ThemeMode.dark;
-          return SwitchListTile(
-            activeColor: AppTheme.primary,
-            secondary: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Icon(
-                isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                key: ValueKey(isDark),
-                color: isDark ? AppTheme.secondary : AppTheme.warning,
-                size: 26,
-              ),
-            ),
-            title: Text(
-              isDark ? 'Dark Mode' : 'Light Mode',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-            subtitle: Text(
-              isDark ? 'Switch to a brighter interface' : 'Switch to a darker interface',
-              style: const TextStyle(fontSize: 11),
-            ),
-            value: isDark,
-            onChanged: (val) {
-              final mode = val ? ThemeMode.dark : ThemeMode.light;
-              AppState.instance.themeMode.value = mode;
-              _updateSetting(AppSettingsUpdateRequest(themeMode: val ? 'dark' : 'light'));
-            },
-          );
+      child: SwitchListTile(
+        activeColor: AppTheme.primary,
+        secondary: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Icon(
+            isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+            key: ValueKey(isDark),
+            color: isDark ? AppTheme.secondary : AppTheme.warning,
+            size: 26,
+          ),
+        ),
+        title: Text(
+          isDark ? 'Dark Mode' : 'Light Mode',
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        subtitle: Text(
+          isDark ? 'Switch to a brighter interface' : 'Switch to a darker interface',
+          style: const TextStyle(fontSize: 11),
+        ),
+        value: isDark,
+        onChanged: (val) async {
+          try {
+            await ref.read(appSettingsProvider.notifier).updateSetting(
+                  AppSettingsUpdateRequest(themeMode: val ? 'dark' : 'light'),
+                );
+          } catch (e) {
+            AppSnackbar.error(context, 'Failed to update theme setting: $e');
+          }
         },
       ),
     );
   }
 
-  Widget _buildSemesterCard() {
+  Widget _buildSemesterCard(BuildContext context, WidgetRef ref) {
+    final activeSem = ref.watch(activeSemesterProvider);
+    final String semesterText = activeSem != null ? 'Semester ${activeSem.semesterNumber}' : 'No Active Semester';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -227,12 +169,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  ValueListenableBuilder<String>(
-                    valueListenable: AppState.instance.activeSemester,
-                    builder: (context, sem, _) => Text(
-                      'Currently viewing: $sem',
-                      style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                    ),
+                  Text(
+                    'Currently viewing: $semesterText',
+                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                   ),
                 ],
               ),
@@ -256,157 +195,172 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildModuleTogglesCard() {
+  Widget _buildModuleTogglesCard(BuildContext context, WidgetRef ref, AppSettingsDto settings) {
+    final enabled = settings.financeEnabled;
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: ValueListenableBuilder<bool>(
-          valueListenable: AppState.instance.isFinanceEnabled,
-          builder: (context, enabled, _) {
-            return SwitchListTile(
-              activeColor: AppTheme.primary,
-              title: const Text(
-                'Enable Finance Module',
-                style: TextStyle(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-              subtitle: const Text(
-                'Track wallets, UPI expenses, stipend income, and transactions.',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-              ),
-              value: enabled,
-              onChanged: (val) {
-                AppState.instance.isFinanceEnabled.value = val;
-                _updateSetting(AppSettingsUpdateRequest(financeEnabled: val));
-              },
-            );
+        child: SwitchListTile(
+          activeColor: AppTheme.primary,
+          title: const Text(
+            'Enable Finance Module',
+            style: TextStyle(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text(
+            'Track wallets, UPI expenses, stipend income, and transactions.',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+          ),
+          value: enabled,
+          onChanged: (val) async {
+            try {
+              await ref.read(appSettingsProvider.notifier).updateSetting(
+                    AppSettingsUpdateRequest(financeEnabled: val),
+                  );
+            } catch (e) {
+              AppSnackbar.error(context, 'Failed to update module setting: $e');
+            }
           },
         ),
       ),
     );
   }
 
-  Widget _buildNotificationsCard() {
+  Widget _buildNotificationsCard(BuildContext context, WidgetRef ref, AppSettingsDto settings) {
     return Card(
       child: Column(
         children: [
-          ValueListenableBuilder<bool>(
-            valueListenable: AppState.instance.morningDigest,
-            builder: (context, val, _) => SwitchListTile(
-              activeColor: AppTheme.primary,
-              title: const Text('Morning Digest', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              subtitle: const Text('Daily schedules & notifications sent at 8:00 AM.', style: TextStyle(fontSize: 11)),
-              value: val,
-              onChanged: (v) {
-                AppState.instance.morningDigest.value = v;
-                _updateSetting(AppSettingsUpdateRequest(morningDigestEnabled: v));
-              },
-            ),
+          SwitchListTile(
+            activeColor: AppTheme.primary,
+            title: const Text('Morning Digest', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: const Text('Daily schedules & notifications sent at 8:00 AM.', style: TextStyle(fontSize: 11)),
+            value: settings.morningDigestEnabled,
+            onChanged: (v) async {
+              try {
+                await ref.read(appSettingsProvider.notifier).updateSetting(
+                      AppSettingsUpdateRequest(morningDigestEnabled: v),
+                    );
+              } catch (e) {
+                AppSnackbar.error(context, 'Failed to update morning digest setting: $e');
+              }
+            },
           ),
           const Divider(color: Color(0xFF1E293B), height: 1),
-          ValueListenableBuilder<bool>(
-            valueListenable: AppState.instance.nightDigest,
-            builder: (context, val, _) => SwitchListTile(
-              activeColor: AppTheme.primary,
-              title: const Text('Night Digest', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              subtitle: const Text('Daily summary of classes and transactions at 9:00 PM.', style: TextStyle(fontSize: 11)),
-              value: val,
-              onChanged: (v) {
-                AppState.instance.nightDigest.value = v;
-                _updateSetting(AppSettingsUpdateRequest(nightDigestEnabled: v));
-              },
-            ),
+          SwitchListTile(
+            activeColor: AppTheme.primary,
+            title: const Text('Night Digest', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: const Text('Daily summary of classes and transactions at 9:00 PM.', style: TextStyle(fontSize: 11)),
+            value: settings.nightDigestEnabled,
+            onChanged: (v) async {
+              try {
+                await ref.read(appSettingsProvider.notifier).updateSetting(
+                      AppSettingsUpdateRequest(nightDigestEnabled: v),
+                    );
+              } catch (e) {
+                AppSnackbar.error(context, 'Failed to update night digest setting: $e');
+              }
+            },
           ),
           const Divider(color: Color(0xFF1E293B), height: 1),
-          ValueListenableBuilder<bool>(
-            valueListenable: AppState.instance.beforeLectureNotif,
-            builder: (context, val, _) => SwitchListTile(
-              activeColor: AppTheme.primary,
-              title: const Text('Before Lecture Reminders', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              value: val,
-              onChanged: (v) {
-                AppState.instance.beforeLectureNotif.value = v;
-                _updateSetting(AppSettingsUpdateRequest(attendancePromptEnabled: v));
-              },
-            ),
+          SwitchListTile(
+            activeColor: AppTheme.primary,
+            title: const Text('Before Lecture Reminders', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            value: settings.attendancePromptEnabled,
+            onChanged: (v) async {
+              try {
+                await ref.read(appSettingsProvider.notifier).updateSetting(
+                      AppSettingsUpdateRequest(attendancePromptEnabled: v),
+                    );
+              } catch (e) {
+                AppSnackbar.error(context, 'Failed to update reminder settings: $e');
+              }
+            },
           ),
           const Divider(color: Color(0xFF1E293B), height: 1),
-          ValueListenableBuilder<bool>(
-            valueListenable: AppState.instance.afterLectureNotif,
-            builder: (context, val, _) => SwitchListTile(
-              activeColor: AppTheme.primary,
-              title: const Text('After Lecture Log Prompts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              value: val,
-              onChanged: (v) {
-                AppState.instance.afterLectureNotif.value = v;
-                _updateSetting(AppSettingsUpdateRequest(attendancePromptEnabled: v));
-              },
-            ),
+          SwitchListTile(
+            activeColor: AppTheme.primary,
+            title: const Text('After Lecture Log Prompts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            value: settings.attendancePromptEnabled,
+            onChanged: (v) async {
+              try {
+                await ref.read(appSettingsProvider.notifier).updateSetting(
+                      AppSettingsUpdateRequest(attendancePromptEnabled: v),
+                    );
+              } catch (e) {
+                AppSnackbar.error(context, 'Failed to update log prompt settings: $e');
+              }
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActivityTimelineCard() {
-    if (_activityLogsList.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: const Center(
-            child: Text(
-              'No activity timeline events recorded.',
-              style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+  Widget _buildActivityTimelineCard(AsyncValue<List<dynamic>> activityLogsAsync) {
+    return activityLogsAsync.when(
+      loading: () => const Card(child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: CircularProgressIndicator()))),
+      error: (err, _) => Card(child: Padding(padding: const EdgeInsets.all(16.0), child: Center(child: Text('Failed to load timeline: $err')))),
+      data: (logs) {
+        if (logs.isEmpty) {
+          return const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(
+                child: Text(
+                  'No activity timeline events recorded.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: logs.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final item = logs[index];
+                final timeStr = DateFormat('d MMM yyyy, h:mm a').format(item.createdAt);
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppTheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.activityMessage,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            timeStr,
+                            style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
-        ),
-      );
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _activityLogsList.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final item = _activityLogsList[index];
-            final timeStr = DateFormat('d MMM yyyy, h:mm a').format(item.createdAt);
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.activityMessage,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        timeStr,
-                        style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -456,7 +410,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSignOutCard() {
+  Widget _buildSignOutCard(BuildContext context) {
     return Card(
       color: AppTheme.danger.withOpacity(0.08),
       shape: RoundedRectangleBorder(
@@ -490,16 +444,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child:
-                      Text('Sign Out', style: TextStyle(color: AppTheme.danger)),
+                  child: Text('Sign Out', style: TextStyle(color: AppTheme.danger)),
                 ),
               ],
             ),
           );
-          if (confirmed == true && mounted) {
+          if (confirmed == true) {
             await AuthService.instance.signOut();
             await DatabaseHelper.instance.closeDatabase();
-            if (mounted) {
+            if (context.mounted) {
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
@@ -511,144 +464,141 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSyncCard() {
-    return ValueListenableBuilder<SyncState>(
-      valueListenable: SyncService.instance.stateNotifier,
-      builder: (context, syncState, _) {
-        Color statusColor;
-        IconData statusIcon;
-        String statusText;
+  Widget _buildSyncCard(BuildContext context, WidgetRef ref) {
+    final syncState = ref.watch(syncStateProvider);
 
-        switch (syncState.status) {
-          case SyncStatus.idle:
-            statusColor = Colors.grey;
-            statusIcon = Icons.sync_disabled_rounded;
-            statusText = 'Idle';
-            break;
-          case SyncStatus.syncing:
-            statusColor = Colors.blue;
-            statusIcon = Icons.sync_rounded;
-            statusText = 'Syncing...';
-            break;
-          case SyncStatus.success:
-            statusColor = Colors.green;
-            statusIcon = Icons.cloud_done_rounded;
-            statusText = 'Synced';
-            break;
-          case SyncStatus.error:
-            statusColor = Colors.red;
-            statusIcon = Icons.cloud_off_rounded;
-            statusText = 'Sync Error';
-            break;
-        }
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
 
-        final lastSyncStr = syncState.lastSyncTime != null
-            ? DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(syncState.lastSyncTime!).toLocal())
-            : 'Never';
+    switch (syncState.status) {
+      case SyncStatus.idle:
+        statusColor = Colors.grey;
+        statusIcon = Icons.sync_disabled_rounded;
+        statusText = 'Idle';
+        break;
+      case SyncStatus.syncing:
+        statusColor = Colors.blue;
+        statusIcon = Icons.sync_rounded;
+        statusText = 'Syncing...';
+        break;
+      case SyncStatus.success:
+        statusColor = Colors.green;
+        statusIcon = Icons.cloud_done_rounded;
+        statusText = 'Synced';
+        break;
+      case SyncStatus.error:
+        statusColor = Colors.red;
+        statusIcon = Icons.cloud_off_rounded;
+        statusText = 'Sync Error';
+        break;
+    }
 
-        final isSyncing = syncState.status == SyncStatus.syncing;
+    final lastSyncStr = syncState.lastSyncTime != null
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(syncState.lastSyncTime!).toLocal())
+        : 'Never';
 
-        return Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey.shade800),
-          ),
-          color: Colors.grey.shade900,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+    final isSyncing = syncState.status == SyncStatus.syncing;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade800),
+      ),
+      color: Colors.grey.shade900,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Icon(statusIcon, color: statusColor, size: 24),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            statusText,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                Icon(statusIcon, color: statusColor, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        statusText,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      if (syncState.errorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            syncState.errorMessage!,
+                            style: const TextStyle(color: Colors.redAccent, fontSize: 12),
                           ),
-                          if (syncState.errorMessage != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
-                              child: Text(
-                                syncState.errorMessage!,
-                                style: const TextStyle(color: Colors.redAccent, fontSize: 12),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: isSyncing
-                          ? null
-                          : () {
-                              SyncService.instance.sync();
-                            },
-                      icon: isSyncing
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.sync_rounded, size: 16),
-                      label: Text(isSyncing ? 'Syncing' : 'Sync Now'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.accent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const Divider(height: 24, color: Colors.grey),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Last Successful Sync',
-                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                ElevatedButton.icon(
+                  onPressed: isSyncing
+                      ? null
+                      : () {
+                          ref.read(syncStateProvider.notifier).triggerSync();
+                        },
+                  icon: isSyncing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.sync_rounded, size: 16),
+                  label: Text(isSyncing ? 'Syncing' : 'Sync Now'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    Text(
-                      lastSyncStr,
-                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Pending Operations',
-                      style: TextStyle(color: Colors.grey, fontSize: 13),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: syncState.pendingCount > 0 ? Colors.amber.shade900 : Colors.grey.shade800,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${syncState.pendingCount}',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-        );
-      },
+            const Divider(height: 24, color: Colors.grey),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Last Successful Sync',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                Text(
+                  lastSyncStr,
+                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Pending Operations',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: syncState.pendingCount > 0 ? Colors.amber.shade900 : Colors.grey.shade800,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${syncState.pendingCount}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,7 +1,6 @@
 import '../../local/database_helper.dart';
 import '../lecture_instance_repository.dart';
 import '../../dto/lecture/lecture_instance_dto.dart';
-import '../../dto/subject/subject_dto.dart';
 import '../../../core/utils/uuid_generator.dart';
 
 class SqliteLectureInstanceRepository implements LectureInstanceRepository {

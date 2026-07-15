@@ -1488,3 +1488,53 @@ This log tracks architectural decisions, feature implementations, and refinement
   - Created [`docs/audit/audit_11_deployment_operations.md`](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/audit_11_deployment_operations.md).
   - Created [`docs/audit/implementation_plan_audit_11_deployment_operations.md`](file:///home/vismay.shah/VISMAY/student_buddy/docs/audit/implementation_plan_audit_11_deployment_operations.md) specifying required changes for dynamic ports/endpoints, security headers, reverse-proxy configurations, fail-fast validations, and a 18-step manual post-deployment smoke test suite.
   - Updated roadmaps in `docs/context.md`, `docs/4_backend_implementation_sprints.md`, and `docs/2_STUDENT BUDDY DEVELOPMENT ROADMAP DCOUMENT DRD.md`.
+
+---
+
+## 2026-07-14 (Sprint 14C: State Management Modernization — Riverpod Integration)
+
+### Decisions
+1. **Riverpod Migration**: Successfully migrated state management to `flutter_riverpod` (v2.5.1) for the Todo and Timetable modules.
+2. **CQRS separation of Read & Write**: Decoupled state exposure (Read Providers via AsyncNotifier/FutureProvider) from mutations (Action Providers) to ensure automatic reactivity without manual triggers, reloaders, or blank-screen spinners.
+3. **Auth Screen Overhaul**: Resolved dynamic keyboard overlay and layout problems on `LoginScreen` and `SignUpScreen` by restructuring them with `CustomScrollView` and `SliverFillRemaining`. Moved the "Back" button to the `AppBar` in `SignUpScreen` to prevent layout shifts.
+
+### Implementation Details
+* **State Management**:
+  - Refactored `TodoScreen` and `AddTodoScreen` to consume `todosProvider` (Read) and `todoActionsProvider` (Write).
+  - Refactored `TimetableScreen` and `AddClassScreen` to watch `allLectureTemplatesProvider` and trigger actions via subjects and templates action providers.
+* **UI & Keyboard Layout**:
+  - Restructured auth forms scroll physics and replaced rigid `IntrinsicHeight` wrappers with flexible scrollable layouts.
+  - Standardized all UI components to use the centralized Riverpod structure.
+* **Verification & Validation**:
+  - Verified project compilation passes `flutter analyze` cleanly with zero compilation errors.
+
+---
+
+## 2026-07-15 (Sprint 14C Completion: Full Riverpod CQRS Migration — All Modules)
+
+### Decisions
+1. **Complete Riverpod Coverage**: Extended the Riverpod CQRS migration beyond the initially completed Todo and Timetable modules to cover every remaining persistent module: Semester Selection, Finance, Notes, Review Queue, Overview, and the root `StudentBuddyApp` widget.
+2. **AppState Elimination**: Removed all `AppState.instance` references from the active codebase. `AppState` is now dead code (only its own definition file remains), ready for safe deletion in a future cleanup pass.
+3. **main.dart Modernization**: Converted `StudentBuddyApp` from `StatelessWidget` with `ValueListenableBuilder<ThemeMode>` on `AppState.instance.themeMode` to a clean `ConsumerWidget` watching `themeProvider`. Removed the `AppState.instance.init()` call from `main()`.
+
+### Implementation Details
+* **New Provider Files Created**:
+  - `lib/core/providers/notes_provider.dart`: `notesHierarchyProvider` (Read), `notesSubjectsProvider` (Read), `notesSectionsProvider` (Read), `notesActionsProvider` (CQRS Action).
+  - `lib/core/providers/review_queue_provider.dart`: `pendingReviewQueueProvider` (Read), `reviewQueueActionsProvider` (CQRS Action).
+* **Screen Migrations Completed**:
+  - `SemesterSelectionScreen` → `ConsumerStatefulWidget` watching `semestersProvider` and `activeSemesterProvider`.
+  - `FinanceScreen` → `ConsumerStatefulWidget` watching `financeSettingsProvider`.
+  - `NotesScreen` → `ConsumerStatefulWidget` watching `activeSemesterProvider`, `semestersProvider`, and `notesHierarchyProvider`.
+  - `AddResourceScreen` → `ConsumerStatefulWidget` using `notesSubjectsProvider`, `notesSectionsProvider`, and `notesActionsProvider`.
+  - `ReviewQueueScreen` → `ConsumerWidget` watching `pendingReviewQueueProvider`.
+  - `ReviewQueueEditScreen` → `ConsumerStatefulWidget` using `reviewQueueActionsProvider`.
+  - `StudentBuddyApp` (main.dart) → `ConsumerWidget` watching `themeProvider`.
+* **Bug Fixes**:
+  - Fixed `SyncStatus` undefined error in `settings_screen.dart` by adding missing `sync_service.dart` import.
+  - Fixed `HolidayDto` sentinel constructor in `day_history_screen.dart` to include required `createdAt` and `updatedAt` fields.
+  - Fixed `SemesterUpdateRequest` undefined error in `attendance_settings_tab.dart` by adding missing `semester_dto.dart` import.
+  - Fixed `reviewQueueProvider` reference in `overview_screen.dart` to use `pendingReviewQueueProvider`.
+* **Final Audit Results**:
+  - Zero `AppState.instance` references outside `app_state.dart`.
+  - Zero direct `Repository()` instantiations in any screen file.
+  - `flutter analyze`: 0 errors, 168 info-level warnings (pre-existing `withOpacity` deprecation).

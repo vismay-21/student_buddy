@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../data/dto/notes/notes_dto.dart';
 import '../../data/dto/subject/subject_dto.dart';
-import '../../data/repositories/notes_repository.dart';
-import '../../data/repositories/subject_repository.dart';
+import '../../core/providers/notes_provider.dart';
+import '../../core/providers/subject_provider.dart';
 
-class AddResourceScreen extends StatefulWidget {
+class AddResourceScreen extends ConsumerStatefulWidget {
   final NotesResourceDto? resourceToEdit;
   final String? initialSubjectId;
   final String? initialSectionId;
@@ -21,15 +22,12 @@ class AddResourceScreen extends StatefulWidget {
   });
 
   @override
-  State<AddResourceScreen> createState() => _AddResourceScreenState();
+  ConsumerState<AddResourceScreen> createState() => _AddResourceScreenState();
 }
 
-class _AddResourceScreenState extends State<AddResourceScreen> {
+class _AddResourceScreenState extends ConsumerState<AddResourceScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-
-  final NotesRepository _notesRepo = NotesRepository();
-  final SubjectRepository _subjectRepo = SubjectRepository();
 
   List<NotesSubjectDto> _subjects = [];
   List<NotesSectionDto> _sections = [];
@@ -50,7 +48,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
     try {
-      final subs = await _notesRepo.getSubjects(widget.semesterId);
+      final subs = await ref.read(notesSubjectsProvider(widget.semesterId).future);
       setState(() {
         _subjects = subs;
       });
@@ -90,7 +88,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
 
   Future<void> _loadSections(String subjectId) async {
     try {
-      final secs = await _notesRepo.getSections(subjectId);
+      final secs = await ref.read(notesSectionsProvider(subjectId).future);
       setState(() {
         _sections = secs;
       });
@@ -130,13 +128,14 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                 if (name.isNotEmpty) {
                   setState(() => _isLoading = true);
                   try {
-                    await _subjectRepo.createSubject(
-                      SubjectCreateRequest(
-                        semesterId: widget.semesterId,
-                        subjectName: name,
-                      ),
-                    );
-                    final subs = await _notesRepo.getSubjects(widget.semesterId);
+                    await ref.read(subjectActionsProvider).createSubject(
+                          SubjectCreateRequest(
+                            semesterId: widget.semesterId,
+                            subjectName: name,
+                          ),
+                        );
+                    ref.invalidate(notesSubjectsProvider(widget.semesterId));
+                    final subs = await ref.read(notesSubjectsProvider(widget.semesterId).future);
                     final newSub = subs.firstWhere((s) => s.notesSubjectName.toLowerCase() == name.toLowerCase());
                     setState(() {
                       _subjects = subs;
@@ -196,13 +195,14 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                 if (name.isNotEmpty) {
                   setState(() => _isLoading = true);
                   try {
-                    await _notesRepo.createSection(
-                      NotesSectionCreateRequest(
-                        notesSubjectId: _selectedSubjectId!,
-                        sectionName: name,
-                      ),
-                    );
-                    final secs = await _notesRepo.getSections(_selectedSubjectId!);
+                    await ref.read(notesActionsProvider).createSection(
+                          NotesSectionCreateRequest(
+                            notesSubjectId: _selectedSubjectId!,
+                            sectionName: name,
+                          ),
+                        );
+                    ref.invalidate(notesSectionsProvider(_selectedSubjectId!));
+                    final secs = await ref.read(notesSectionsProvider(_selectedSubjectId!).future);
                     final newSec = secs.firstWhere((s) => s.sectionName.toLowerCase() == name.toLowerCase());
                     setState(() {
                       _sections = secs;
@@ -257,7 +257,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
       } else if (['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext)) {
         detectedType = 'IMAGE';
         mimeType = 'image/png';
-      } else if (ext.startsWith('http') || ext.contains('www')) {
+      } else if (ext.startsWith('http') || ext.contains('pointer')) {
         detectedType = 'LINK';
         mimeType = 'text/html';
       }
@@ -268,27 +268,27 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
     try {
       if (widget.resourceToEdit != null) {
         // Edit existing resource
-        await _notesRepo.updateResource(
-          widget.resourceToEdit!.resourceId,
-          NotesResourceUpdateRequest(
-            resourceName: name,
-            fileName: name.contains('.') ? name : '$name.${detectedType.toLowerCase()}',
-            mimeType: mimeType,
-          ),
-        );
+        await ref.read(notesActionsProvider).updateResource(
+              widget.resourceToEdit!.resourceId,
+              NotesResourceUpdateRequest(
+                resourceName: name,
+                fileName: name.contains('.') ? name : '$name.${detectedType.toLowerCase()}',
+                mimeType: mimeType,
+              ),
+            );
       } else {
         // Create new resource
-        await _notesRepo.createResource(
-          NotesResourceCreateRequest(
-            sectionId: _selectedSectionId!,
-            resourceName: name,
-            fileName: name.contains('.') ? name : '$name.${detectedType.toLowerCase()}',
-            mimeType: mimeType,
-            fileSizeLinesOrBytes: 2048 * 1024, // 2MB default
-            storagePath: '/notes/$name',
-            uploadedVia: 'app',
-          ),
-        );
+        await ref.read(notesActionsProvider).createResource(
+              NotesResourceCreateRequest(
+                sectionId: _selectedSectionId!,
+                resourceName: name,
+                fileName: name.contains('.') ? name : '$name.${detectedType.toLowerCase()}',
+                mimeType: mimeType,
+                fileSizeLinesOrBytes: 2048 * 1024, // 2MB default
+                storagePath: '/notes/$name',
+                uploadedVia: 'app',
+              ),
+            );
       }
 
       if (mounted) {
@@ -307,7 +307,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
 
   void _deleteResource() {
     if (widget.resourceToEdit == null) return;
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -324,7 +324,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
                 Navigator.of(context).pop(); // Dismiss Dialog
                 setState(() => _isLoading = true);
                 try {
-                  await _notesRepo.deleteResource(widget.resourceToEdit!.resourceId);
+                  await ref.read(notesActionsProvider).deleteResource(widget.resourceToEdit!.resourceId);
                   if (mounted) {
                     Navigator.of(context).pop(true); // Dismiss Screen
                   }

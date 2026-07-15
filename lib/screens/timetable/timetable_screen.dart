@@ -1,37 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/dummy_data.dart';
 import '../attendance/widgets/lecture_card.dart';
 import 'add_class_screen.dart';
+import '../../core/utils/dummy_data.dart';
 
 import 'package:student_buddy/core/utils/color_helper.dart';
 import 'package:student_buddy/data/dto/subject/subject_dto.dart';
-import 'package:student_buddy/data/dto/lecture/lecture_template_dto.dart';
-import 'package:student_buddy/data/repositories/subject_repository.dart';
-import 'package:student_buddy/data/repositories/lecture_template_repository.dart';
-import '../../core/widgets/app_snackbar.dart';
-import '../../core/utils/app_state.dart';
+import 'package:student_buddy/core/providers/semester_provider.dart';
+import 'package:student_buddy/core/providers/timetable_provider.dart';
+import 'package:student_buddy/core/providers/subject_provider.dart';
 
-class TimetableScreen extends StatefulWidget {
+class TimetableScreen extends ConsumerStatefulWidget {
   const TimetableScreen({super.key});
 
   @override
-  State<TimetableScreen> createState() => _TimetableScreenState();
+  ConsumerState<TimetableScreen> createState() => _TimetableScreenState();
 }
 
-class _TimetableScreenState extends State<TimetableScreen> {
+class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   int _selectedDayIndex = 0;
   late PageController _pageController;
 
   final List<String> _daysShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-  final _subjectRepo = SubjectRepository();
-  final _templateRepo = LectureTemplateRepository();
-
-  bool _isLoading = false;
-  List<LectureTemplateDto> _allTemplates = [];
-  Map<String, SubjectDto> _subjectsMap = {};
 
   @override
   void initState() {
@@ -39,49 +31,12 @@ class _TimetableScreenState extends State<TimetableScreen> {
     final int todayIndex = (DateTime.now().weekday - 1) % 7;
     _selectedDayIndex = todayIndex;
     _pageController = PageController(initialPage: _selectedDayIndex);
-    _loadData();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadData() async {
-    final activeSem = AppState.instance.activeSemesterDto.value;
-    if (activeSem == null) {
-      setState(() {
-        _allTemplates = [];
-        _subjectsMap = {};
-        _isLoading = false;
-      });
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      final subjects = await _subjectRepo.getSubjects(activeSem.semesterId);
-      final Map<String, SubjectDto> subMap = {};
-      final List<LectureTemplateDto> templates = [];
-
-      for (final sub in subjects) {
-        subMap[sub.subjectId] = sub;
-        final temps = await _templateRepo.getTemplates(sub.subjectId);
-        templates.addAll(temps);
-      }
-
-      setState(() {
-        _subjectsMap = subMap;
-        _allTemplates = templates;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        AppSnackbar.error(context, 'Failed to load timetable: $e');
-      }
-    }
   }
 
   String _getFullDayName() {
@@ -92,7 +47,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final activeSem = AppState.instance.activeSemesterDto.value;
+    final activeSem = ref.watch(activeSemesterProvider);
     if (activeSem == null) {
       return Scaffold(
         body: Center(
@@ -124,6 +79,22 @@ class _TimetableScreenState extends State<TimetableScreen> {
       );
     }
 
+    final templatesAsync = ref.watch(allLectureTemplatesProvider);
+    final subjectsAsync = ref.watch(subjectsProvider);
+
+    if (templatesAsync.isLoading || subjectsAsync.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final allTemplates = templatesAsync.value ?? [];
+    final subjects = subjectsAsync.value ?? [];
+
+    final Map<String, SubjectDto> subjectsMap = {
+      for (final sub in subjects) sub.subjectId: sub
+    };
+
     return Scaffold(
       body: Column(
         children: [
@@ -147,95 +118,83 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
           // ── Lecture list pager ─────────────────────────────────────────────
           Expanded(
-            child: Stack(
-              children: [
-                PageView.builder(
-                  controller: _pageController,
-                  itemCount: 7,
-                  onPageChanged: (index) => setState(() => _selectedDayIndex = index),
-                  itemBuilder: (context, dayIndex) {
-                    final templatesForDay = _allTemplates.where((t) => t.dayOfWeek == (dayIndex + 1)).toList();
-                    templatesForDay.sort((a, b) => a.startTime.compareTo(b.startTime));
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: 7,
+              onPageChanged: (index) => setState(() => _selectedDayIndex = index),
+              itemBuilder: (context, dayIndex) {
+                final templatesForDay = allTemplates.where((t) => t.dayOfWeek == (dayIndex + 1)).toList();
+                templatesForDay.sort((a, b) => a.startTime.compareTo(b.startTime));
 
-                    if (templatesForDay.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.calendar_today_rounded,
-                              size: 64,
-                              color: AppTheme.textMuted.withAlpha(100),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'No classes scheduled',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Enjoy your free day!',
-                              style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                            ),
-                          ],
+                if (templatesForDay.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 64,
+                          color: AppTheme.textMuted.withAlpha(100),
                         ),
-                      );
-                    }
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No classes scheduled',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Enjoy your free day!',
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      itemCount: templatesForDay.length,
-                      itemBuilder: (context, index) {
-                        final template = templatesForDay[index];
-                        final subject = _subjectsMap[template.subjectId];
-                        final lectureMock = LectureMock(
-                          id: template.lectureTemplateId,
-                          name: subject?.subjectName ?? 'Unknown Subject',
-                          startTime: template.startTime.substring(0, 5),
-                          endTime: template.endTime.substring(0, 5),
-                          teacher: subject?.facultyName ?? 'N/A',
-                          room: template.room ?? 'N/A',
-                          colorValue: parseHexColor(subject?.themeColor).value,
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: templatesForDay.length,
+                  itemBuilder: (context, index) {
+                    final template = templatesForDay[index];
+                    final subject = subjectsMap[template.subjectId];
+                    final lectureMock = LectureMock(
+                      id: template.lectureTemplateId,
+                      name: subject?.subjectName ?? 'Unknown Subject',
+                      startTime: template.startTime.substring(0, 5),
+                      endTime: template.endTime.substring(0, 5),
+                      teacher: subject?.facultyName ?? 'N/A',
+                      room: template.room ?? 'N/A',
+                      colorValue: parseHexColor(subject?.themeColor).value,
+                    );
+                    return LectureCard(
+                      lecture: lectureMock,
+                      showAttendance: false,
+                      onEdit: () async {
+                        final result = await Navigator.of(context).push<int>(
+                          MaterialPageRoute(
+                            builder: (_) => AddClassScreen(
+                              template: template,
+                              subject: subject,
+                            ),
+                          ),
                         );
-                        return LectureCard(
-                          lecture: lectureMock,
-                          showAttendance: false,
-                          onEdit: () async {
-                            final result = await Navigator.of(context).push<int>(
-                              MaterialPageRoute(
-                                builder: (_) => AddClassScreen(
-                                  template: template,
-                                  subject: subject,
-                                ),
-                              ),
-                            );
-                            _loadData();
-                            if (result != null && mounted) {
-                              setState(() {
-                                _selectedDayIndex = result;
-                              });
-                              if (_pageController.hasClients) {
-                                _pageController.jumpToPage(result);
-                              }
-                            }
-                          },
-                        );
+                        if (result != null && mounted) {
+                          setState(() {
+                            _selectedDayIndex = result;
+                          });
+                          if (_pageController.hasClients) {
+                            _pageController.jumpToPage(result);
+                          }
+                        }
                       },
                     );
                   },
-                ),
-                if (_isLoading)
-                  Container(
-                    color: Theme.of(context).scaffoldBackgroundColor.withAlpha(150),
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  ),
-              ],
+                );
+              },
             ),
           ),
 
@@ -310,7 +269,6 @@ class _TimetableScreenState extends State<TimetableScreen> {
             final result = await Navigator.of(context).push<int>(
               MaterialPageRoute(builder: (_) => const AddClassScreen()),
             );
-            _loadData();
             if (result != null && mounted) {
               setState(() {
                 _selectedDayIndex = result;

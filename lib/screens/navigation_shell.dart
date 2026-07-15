@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
-import '../core/utils/app_state.dart';
+import '../core/providers/app_settings_provider.dart';
 import 'attendance/attendance_screen.dart';
 import 'finance/finance_screen.dart';
 import 'notes/notes_screen.dart';
@@ -9,14 +10,14 @@ import 'settings/settings_screen.dart';
 import 'timetable/timetable_screen.dart';
 import 'todo/todo_screen.dart';
 
-class NavigationShell extends StatefulWidget {
+class NavigationShell extends ConsumerStatefulWidget {
   const NavigationShell({super.key});
 
   @override
-  State<NavigationShell> createState() => _NavigationShellState();
+  ConsumerState<NavigationShell> createState() => _NavigationShellState();
 }
 
-class _NavigationShellState extends State<NavigationShell> {
+class _NavigationShellState extends ConsumerState<NavigationShell> {
   int _selectedIndex = 1; // Default index is 1 (Overview)
 
   // Pages structure based on whether Finance is enabled
@@ -74,60 +75,56 @@ class _NavigationShellState extends State<NavigationShell> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: AppState.instance.isFinanceEnabled,
-      builder: (context, isFinanceEnabled, child) {
-        final pages = _getPages(isFinanceEnabled);
-        
-        // Safety check if index becomes out of bounds after disabling finance
-        if (_selectedIndex >= pages.length) {
-          _selectedIndex = pages.length - 1;
-        }
+    final isFinanceEnabled = ref.watch(financeSettingsProvider.select((s) => s.isFinanceEnabled));
+    final pages = _getPages(isFinanceEnabled);
+    
+    // Safety check if index becomes out of bounds after disabling finance
+    if (_selectedIndex >= pages.length) {
+      _selectedIndex = pages.length - 1;
+    }
 
-        return Scaffold(
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            title: Text(_getPageTitle(_selectedIndex, isFinanceEnabled)),
-            actions: [
-              _buildTopRightAction(
-                context,
-                icon: Icons.folder_shared_rounded,
-                label: 'Notes',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const NotesScreen()),
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              _buildTopRightAction(
-                context,
-                icon: Icons.settings_rounded,
-                label: 'Settings',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                  );
-                },
-              ),
-              const SizedBox(width: 16),
-            ],
-          ),
-          body: IndexedStack(
-            index: _selectedIndex,
-            children: pages,
-          ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: (index) {
-              setState(() {
-                _selectedIndex = index;
-              });
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: Text(_getPageTitle(_selectedIndex, isFinanceEnabled)),
+        actions: [
+          _buildTopRightAction(
+            context,
+            icon: Icons.folder_shared_rounded,
+            label: 'Notes',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const NotesScreen()),
+              );
             },
-            items: _getBottomNavBarItems(isFinanceEnabled),
           ),
-        );
-      },
+          const SizedBox(width: 8),
+          _buildTopRightAction(
+            context,
+            icon: Icons.settings_rounded,
+            label: 'Settings',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: pages,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        items: _getBottomNavBarItems(isFinanceEnabled),
+      ),
     );
   }
 

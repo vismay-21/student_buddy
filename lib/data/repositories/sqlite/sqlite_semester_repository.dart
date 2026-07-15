@@ -2,7 +2,6 @@ import '../../local/database_helper.dart';
 import '../../../core/utils/uuid_generator.dart';
 import '../semester_repository.dart';
 import '../../dto/semester/semester_dto.dart';
-import 'package:sqflite/sqflite.dart';
 
 class SqliteSemesterRepository implements SemesterRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;

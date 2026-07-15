@@ -1,30 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../data/dto/todo/todo_dto.dart';
-import '../../data/repositories/todo_repository.dart';
+import '../../core/providers/todo_provider.dart';
 import 'add_todo_screen.dart';
 
-class TodoScreen extends StatefulWidget {
+class TodoScreen extends ConsumerStatefulWidget {
   const TodoScreen({super.key});
 
   @override
-  State<TodoScreen> createState() => _TodoScreenState();
+  ConsumerState<TodoScreen> createState() => _TodoScreenState();
 }
 
-class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateMixin {
+class _TodoScreenState extends ConsumerState<TodoScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final TodoRepository _todoRepository = TodoRepository();
-  
-  List<TodoDto> _todoItems = [];
-  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadTodos();
   }
 
   @override
@@ -33,34 +29,12 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  Future<void> _loadTodos() async {
-    if (_todoItems.isEmpty) {
-      setState(() => _isLoading = true);
-    }
-    try {
-      final items = await _todoRepository.getTodos();
-      setState(() {
-        _todoItems = items;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        AppSnackbar.error(context, 'Failed to load tasks: $e');
-      }
-    }
-  }
-
   Future<void> _toggleTodoCompletion(TodoDto todo) async {
-    final newStatus = todo.status == 'completed' ? 'pending' : 'completed';
     try {
-      await _todoRepository.updateTodo(
-        todo.todoId,
-        TodoUpdateRequest(status: newStatus),
-      );
-      _loadTodos();
+      await ref.read(todoActionsProvider).toggleTodo(todo);
       if (mounted) {
-        AppSnackbar.success(context, 'Task marked as $newStatus');
+        final nextStatus = todo.status == 'completed' ? 'pending' : 'completed';
+        AppSnackbar.success(context, 'Task marked as $nextStatus');
       }
     } catch (e) {
       if (mounted) {
@@ -81,24 +55,16 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
     }
   }
 
-  Future<void> _navigateToAddTodo() async {
-    final result = await Navigator.of(context).push<bool>(
+  void _navigateToAddTodo() {
+    Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const AddTodoScreen()),
     );
-
-    if (result == true) {
-      _loadTodos();
-    }
   }
 
-  Future<void> _navigateToEditTodo(TodoDto todoItem) async {
-    final result = await Navigator.of(context).push<bool>(
+  void _navigateToEditTodo(TodoDto todoItem) {
+    Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => AddTodoScreen(todoToEdit: todoItem)),
     );
-
-    if (result == true) {
-      _loadTodos();
-    }
   }
 
   String _formatDueDate(DateTime? date) {
@@ -123,45 +89,51 @@ class _TodoScreenState extends State<TodoScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
+    final todosAsync = ref.watch(todosProvider);
+
+    return todosAsync.when(
+      loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
-      );
-    }
+      ),
+      error: (err, stack) => Scaffold(
+        body: Center(child: Text('Error loading tasks: $err')),
+      ),
+      data: (todos) {
+        final pending = todos.where((a) => a.status != 'completed').toList();
+        final completed = todos.where((a) => a.status == 'completed').toList();
 
-    final pending = _todoItems.where((a) => a.status != 'completed').toList();
-    final completed = _todoItems.where((a) => a.status == 'completed').toList();
-
-    return Scaffold(
-      body: Column(
-        children: [
-          TabBar(
-            controller: _tabController,
-            labelColor: AppTheme.primary,
-            unselectedLabelColor: AppTheme.textSecondary,
-            indicatorColor: AppTheme.primary,
-            dividerColor: Colors.transparent,
-            tabs: [
-              Tab(text: 'Pending (${pending.length})'),
-              Tab(text: 'Completed (${completed.length})'),
+        return Scaffold(
+          body: Column(
+            children: [
+              TabBar(
+                controller: _tabController,
+                labelColor: AppTheme.primary,
+                unselectedLabelColor: AppTheme.textSecondary,
+                indicatorColor: AppTheme.primary,
+                dividerColor: Colors.transparent,
+                tabs: [
+                  Tab(text: 'Pending (${pending.length})'),
+                  Tab(text: 'Completed (${completed.length})'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildTodoList(pending, isPending: true),
+                    _buildTodoList(completed, isPending: false),
+                  ],
+                ),
+              ),
             ],
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildTodoList(pending, isPending: true),
-                _buildTodoList(completed, isPending: false),
-              ],
-            ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: _navigateToAddTodo,
+            backgroundColor: AppTheme.primary,
+            child: const Icon(Icons.add, color: Colors.white),
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _navigateToAddTodo,
-        backgroundColor: AppTheme.primary,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+        );
+      },
     );
   }
 

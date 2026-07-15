@@ -1,66 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/app_state.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../../data/dto/semester/semester_dto.dart';
-import '../../../data/repositories/semester_repository.dart';
+import '../../core/providers/semester_provider.dart';
 
-class SemesterSelectionScreen extends StatefulWidget {
+class SemesterSelectionScreen extends ConsumerStatefulWidget {
   const SemesterSelectionScreen({super.key});
 
   @override
-  State<SemesterSelectionScreen> createState() => _SemesterSelectionScreenState();
+  ConsumerState<SemesterSelectionScreen> createState() => _SemesterSelectionScreenState();
 }
 
-class _SemesterSelectionScreenState extends State<SemesterSelectionScreen> {
-  final SemesterRepository _semesterRepository = SemesterRepository();
-  List<SemesterDto> _semesters = [];
+class _SemesterSelectionScreenState extends ConsumerState<SemesterSelectionScreen> {
   SemesterDto? _selectedSemester;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSemesters();
-  }
-
-  Future<void> _loadSemesters() async {
-    setState(() {
-      _isLoading = true;
-    });
-    try {
-      final list = await _semesterRepository.getSemesters();
-      setState(() {
-        _semesters = list;
-        final activeSem = AppState.instance.activeSemesterDto.value;
-        if (activeSem != null && _semesters.isNotEmpty) {
-          _selectedSemester = _semesters.firstWhere(
-            (s) => s.semesterId == activeSem.semesterId,
-            orElse: () => _semesters.first,
-          );
-        } else if (_semesters.isNotEmpty) {
-          _selectedSemester = _semesters.first;
-        } else {
-          _selectedSemester = null;
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        AppSnackbar.error(context, 'Failed to load semesters: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
+  bool _isInit = true;
 
   void _applySelection() {
     if (_selectedSemester != null) {
-      AppState.instance.setActiveSemester(_selectedSemester!);
+      ref.read(semesterActionsProvider).selectActiveSemester(_selectedSemester);
       AppSnackbar.success(context, 'Active semester changed to Semester ${_selectedSemester!.semesterNumber}!');
       Navigator.of(context).pop();
     }
@@ -167,33 +126,21 @@ class _SemesterSelectionScreenState extends State<SemesterSelectionScreen> {
                       }
 
                       Navigator.of(context).pop(); // Close dialog
-                      
-                      setState(() {
-                        _isLoading = true;
-                      });
 
                       try {
-                        await _semesterRepository.createSemester(
-                          SemesterCreateRequest(
-                            semesterNumber: semesterNumber!,
-                            startDate: startDate!,
-                            endDate: endDate!,
-                          ),
-                        );
+                        final created = await ref.read(semesterActionsProvider).createSemester(
+                              SemesterCreateRequest(
+                                semesterNumber: semesterNumber!,
+                                startDate: startDate!,
+                                endDate: endDate!,
+                              ),
+                            );
                         if (context.mounted) {
-                          AppSnackbar.success(context, 'Semester $semesterNumber created successfully!');
-                        }
-                        if (mounted) {
-                          await _loadSemesters();
+                          AppSnackbar.success(context, 'Semester ${created.semesterNumber} created successfully!');
                         }
                       } catch (e) {
                         if (context.mounted) {
                           AppSnackbar.error(context, 'Failed to create semester: $e');
-                        }
-                        if (mounted) {
-                          setState(() {
-                            _isLoading = false;
-                          });
                         }
                       }
                     }
@@ -210,6 +157,9 @@ class _SemesterSelectionScreenState extends State<SemesterSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final semestersAsync = ref.watch(semestersProvider);
+    final activeSem = ref.watch(activeSemesterProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Select Semester'),
@@ -243,107 +193,128 @@ class _SemesterSelectionScreenState extends State<SemesterSelectionScreen> {
               const SizedBox(height: 32),
 
               Expanded(
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                child: semestersAsync.when(
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                    ),
+                  ),
+                  error: (err, _) => Center(
+                    child: Text(
+                      'Failed to load semesters: $err',
+                      style: const TextStyle(color: AppTheme.textSecondary),
+                    ),
+                  ),
+                  data: (semesters) {
+                    if (semesters.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No semesters available. Click "+" to add one!',
+                          style: TextStyle(color: AppTheme.textSecondary),
                         ),
-                      )
-                    : _semesters.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No semesters available. Click "+" to add one!',
-                              style: TextStyle(color: AppTheme.textSecondary),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _semesters.length,
-                            itemBuilder: (context, index) {
-                              final sem = _semesters[index];
-                              final isSelected = _selectedSemester?.semesterId == sem.semesterId;
+                      );
+                    }
 
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedSemester = sem;
-                                  });
-                                },
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.all(20),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? AppTheme.primary.withOpacity(0.08) : AppTheme.surface,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: isSelected ? AppTheme.primary : const Color(0xFF1E293B),
-                                      width: isSelected ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              color: isSelected ? AppTheme.primary.withOpacity(0.12) : AppTheme.surfaceLight,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Icon(
-                                              Icons.school_rounded,
-                                              color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-                                              size: 20,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 14),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'Semester ${sem.semesterNumber}',
-                                                style: TextStyle(
-                                                  color: isSelected ? AppTheme.primary : AppTheme.textPrimary,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 15,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '${DateFormat('MMM yyyy').format(sem.startDate)} - ${DateFormat('MMM yyyy').format(sem.endDate)}',
-                                                style: const TextStyle(
-                                                  color: AppTheme.textSecondary,
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
+                    if (_isInit) {
+                      _selectedSemester = activeSem ?? semesters.first;
+                      _isInit = false;
+                    }
+
+                    return ListView.builder(
+                      itemCount: semesters.length,
+                      itemBuilder: (context, index) {
+                        final sem = semesters[index];
+                        final isSelected = _selectedSemester?.semesterId == sem.semesterId;
+
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedSemester = sem;
+                            });
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppTheme.primary.withOpacity(0.08) : AppTheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isSelected ? AppTheme.primary : const Color(0xFF1E293B),
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? AppTheme.primary.withOpacity(0.12) : AppTheme.surfaceLight,
+                                        shape: BoxShape.circle,
                                       ),
-                                      if (isSelected)
-                                        const Icon(
-                                          Icons.check_circle_rounded,
-                                          color: AppTheme.primary,
-                                          size: 24,
+                                      child: Icon(
+                                        Icons.school_rounded,
+                                        color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Semester ${sem.semesterNumber}',
+                                          style: TextStyle(
+                                            color: isSelected ? AppTheme.primary : AppTheme.textPrimary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
                                         ),
-                                    ],
-                                  ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${DateFormat('MMM yyyy').format(sem.startDate)} - ${DateFormat('MMM yyyy').format(sem.endDate)}',
+                                          style: const TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              );
-                            },
+                                if (isSelected)
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: AppTheme.primary,
+                                    size: 24,
+                                  ),
+                              ],
+                            ),
                           ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
 
               // Apply button
-              if (!_isLoading && _semesters.isNotEmpty)
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _applySelection,
-                    child: const Text('Apply Selection'),
-                  ),
-                ),
+              semestersAsync.maybeWhen(
+                data: (semesters) {
+                  if (semesters.isEmpty) return const SizedBox.shrink();
+                  return SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _applySelection,
+                      child: const Text('Apply Selection'),
+                    ),
+                  );
+                },
+                orElse: () => const SizedBox.shrink(),
+              ),
             ],
           ),
         ),

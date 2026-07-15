@@ -2,7 +2,6 @@ import '../../local/database_helper.dart';
 import '../subject_repository.dart';
 import '../../dto/subject/subject_dto.dart';
 import '../../../core/utils/uuid_generator.dart';
-import 'package:sqflite/sqflite.dart';
 
 class SqliteSubjectRepository implements SubjectRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;

@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../data/dto/todo/todo_dto.dart';
-import '../../data/repositories/todo_repository.dart';
+import '../../core/providers/todo_provider.dart';
 
-class AddTodoScreen extends StatefulWidget {
+class AddTodoScreen extends ConsumerStatefulWidget {
   final TodoDto? todoToEdit;
   const AddTodoScreen({super.key, this.todoToEdit});
 
   @override
-  State<AddTodoScreen> createState() => _AddTodoScreenState();
+  ConsumerState<AddTodoScreen> createState() => _AddTodoScreenState();
 }
 
-class _AddTodoScreenState extends State<AddTodoScreen> {
+class _AddTodoScreenState extends ConsumerState<AddTodoScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final TodoRepository _todoRepository = TodoRepository();
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
@@ -45,7 +45,6 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
       }
     }
   }
-
 
   @override
   void dispose() {
@@ -192,7 +191,7 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
 
     try {
       if (widget.todoToEdit != null) {
-        await _todoRepository.updateTodo(
+        await ref.read(todoActionsProvider).updateTodo(
           widget.todoToEdit!.todoId,
           TodoUpdateRequest(
             title: _titleController.text.trim(),
@@ -201,7 +200,7 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
           ),
         );
       } else {
-        await _todoRepository.createTodo(
+        await ref.read(todoActionsProvider).createTodo(
           TodoCreateRequest(
             title: _titleController.text.trim(),
             priority: priorityToSave,
@@ -606,7 +605,7 @@ class _AddTodoScreenState extends State<AddTodoScreen> {
                                   ),
                                   Transform.scale(
                                     scale: 0.8,
-                                    child: Switch(
+                                    child: const Switch(
                                       value: false,
                                       onChanged: null,
                                     ),

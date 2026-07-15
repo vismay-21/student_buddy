@@ -1,24 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/app_state.dart';
-import '../../core/services/auth_service.dart';
-import '../../core/services/bootstrap_service.dart';
-import '../../data/local/database_helper.dart';
-import '../../data/api/user_api.dart';
-import '../../data/repositories/semester_repository.dart';
-import '../../core/exceptions/sync_exceptions.dart';
+import '../../core/providers/common_providers.dart';
+import '../../core/providers/auth_provider.dart';
 import '../auth/login_screen.dart';
 import '../navigation_shell.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -45,81 +41,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    _bootstrap();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkStatusAndNavigate();
+    });
   }
 
-  Future<void> _bootstrap() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+  Future<void> _checkStatusAndNavigate() async {
     final startTime = DateTime.now();
 
-    // Check if the user already has an active Supabase session.
-    final hasSession = AuthService.instance.isSignedIn;
-    final userId = AuthService.instance.currentUser?.id;
-    Widget destination;
-
-    if (hasSession && userId != null) {
-      bool bootstrapSucceeded = false;
-      try {
-        // Initialize SQLite Database
-        await DatabaseHelper.instance.initDatabase(userId);
-        
-        // Check if database is already bootstrapped locally
-        final isBootstrapped = await DatabaseHelper.instance.isBootstrapped();
-        if (!isBootstrapped) {
-          // Perform idempotent user initialization on backend
-          try {
-            await UserApi().initializeUser();
-          } catch (_) {
-            // Best-effort user initialization, bootstrap will proceed
-          }
-          
-          // Seed local database from backend
-          await BootstrapService.instance.bootstrapUser(userId);
-        }
-        bootstrapSucceeded = true;
-      } on UnsupportedSyncProtocolException catch (e) {
-        debugPrint('Bootstrap failed due to protocol version mismatch: $e');
-        setState(() {
-          _errorMessage = 'This version of Student Buddy is no longer compatible with the server. Please update the application.';
-          _isLoading = false;
-        });
-        return;
-      } catch (e) {
-        debugPrint('Bootstrap failed during splash screen: $e');
-        setState(() {
-          _errorMessage = 'Failed to load offline data. Please check your internet connection and try again.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      if (bootstrapSucceeded) {
-        try {
-          final list = await SemesterRepository().getSemesters();
-          if (list.isNotEmpty) {
-            final savedId = AppState.instance.savedActiveSemesterId;
-            final found = list.firstWhere(
-              (s) => s.semesterId == savedId,
-              orElse: () => list.first,
-            );
-            AppState.instance.setActiveSemester(found);
-          } else {
-            AppState.instance.setActiveSemester(null);
-          }
-        } catch (e) {
-          debugPrint('Failed to load semesters after bootstrap: $e');
-          AppState.instance.setActiveSemester(null);
-        }
-      }
-      destination = const NavigationShell();
-    } else {
-      // No session — go to login.
-      destination = const LoginScreen();
-    }
+    final bootstrapVal = await ref.read(bootstrapStatusProvider.future);
 
     final elapsed = DateTime.now().difference(startTime);
     final remaining = const Duration(seconds: 2) - elapsed;
@@ -127,17 +57,35 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       await Future.delayed(remaining);
     }
 
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => destination,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
+    if (!mounted) return;
+
+    if (bootstrapVal == BootstrapState.success) {
+      _navigateTo(const NavigationShell());
+    } else if (bootstrapVal == BootstrapState.uninitialized) {
+      _navigateTo(const LoginScreen());
+    } else if (bootstrapVal == BootstrapState.protocolMismatch) {
+      setState(() {
+        _errorMessage = 'This version of Student Buddy is no longer compatible with the server. Please update the application.';
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _errorMessage = 'Failed to load offline data. Please check your internet connection and try again.';
+        _isLoading = false;
+      });
     }
+  }
+
+  void _navigateTo(Widget destination) {
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => destination,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
   }
 
   Future<void> _handleSignOut() async {
@@ -145,8 +93,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       _isLoading = true;
     });
     try {
-      await AuthService.instance.signOut();
-      await DatabaseHelper.instance.closeDatabase();
+      await ref.read(authServiceProvider).signOut();
+      await ref.read(databaseHelperProvider).closeDatabase();
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -161,6 +109,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         });
       }
     }
+  }
+
+  Future<void> _retryBootstrap() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    await ref.read(bootstrapStatusProvider.notifier).retryBootstrap();
+    _checkStatusAndNavigate();
   }
 
   @override
@@ -281,7 +238,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           ElevatedButton.icon(
-                            onPressed: _bootstrap,
+                            onPressed: _retryBootstrap,
                             icon: const Icon(Icons.refresh),
                             label: const String.fromEnvironment('test') != ''
                                 ? const Text('Retry')

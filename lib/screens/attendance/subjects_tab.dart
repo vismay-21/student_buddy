@@ -1,86 +1,154 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/color_helper.dart';
-import '../../../core/utils/dummy_data.dart';
 import '../../../core/widgets/attendance_ring_label.dart';
+import '../../../core/providers/subject_provider.dart';
+import '../../../core/providers/attendance_provider.dart';
+import '../../../core/providers/timetable_provider.dart';
+import '../../../data/dto/subject/subject_dto.dart';
 import 'subject_history_screen.dart';
 
-class SubjectsTab extends StatelessWidget {
-  final double overallPercentage;
-  final int targetPercentage;
-  final String criteriaMode;
-  final List<Map<String, dynamic>> belowTargetSubjects;
-  final List<Map<String, dynamic>> subjectsList; // list of subject metrics
-  final DateTime semesterStartDate;
-  final DateTime semesterEndDate;
-  final List<Map<String, dynamic>> holidays;
-  final Map<String, Map<String, String>> dateActions;
-  final Function(DateTime date, LectureMock lecture, String action) onLectureActionChanged;
+class SubjectsTab extends ConsumerWidget {
+  const SubjectsTab({super.key});
 
-  const SubjectsTab({
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subjectsAsync = ref.watch(subjectsProvider);
+    final settingsAsync = ref.watch(attendanceSettingsProvider);
+
+    return Scaffold(
+      body: settingsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Error loading settings: $err')),
+        data: (settings) {
+          final criteriaMode = settings.criteriaMode == 'subject' ? 'subject_wise' : settings.criteriaMode;
+          final overallGoal = settings.overallAttendanceGoal;
+
+          return subjectsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => Center(child: Text('Error loading subjects: $err')),
+            data: (subjects) {
+              if (subjects.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No subjects added yet.',
+                    style: TextStyle(color: AppTheme.textMuted),
+                  ),
+                );
+              }
+              return ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  const Text(
+                    'SEMESTER SUBJECTS ANALYTICS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textMuted,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ...subjects.map((sub) => SubjectCardWidget(
+                        subject: sub,
+                        criteriaMode: criteriaMode,
+                        overallGoal: overallGoal,
+                      )),
+                  const SizedBox(height: 20),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class SubjectCardWidget extends ConsumerWidget {
+  final SubjectDto subject;
+  final String criteriaMode;
+  final int overallGoal;
+
+  const SubjectCardWidget({
     super.key,
-    required this.overallPercentage,
-    required this.targetPercentage,
+    required this.subject,
     required this.criteriaMode,
-    required this.belowTargetSubjects,
-    required this.subjectsList,
-    required this.semesterStartDate,
-    required this.semesterEndDate,
-    required this.holidays,
-    required this.dateActions,
-    required this.onLectureActionChanged,
+    required this.overallGoal,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(subjectAttendanceStatsProvider(subject.subjectId));
+    final templatesAsync = ref.watch(timetableTemplatesProvider(subject.subjectId));
 
-          // Subjects Title
-          const Text(
-            'SEMESTER SUBJECTS ANALYTICS',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textMuted,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // List of Subject Cards (Clickable)
-          ...subjectsList.map((sub) {
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              color: Colors.transparent,
-              elevation: 0,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SubjectHistoryScreen(
-                        subjectId: sub['id'] as String,
-                        subjectName: sub['name'] as String,
-                        criteriaPercentage: sub['target'] as int,
-                        facultyName: sub['faculty'] as String? ?? 'Faculty TBD',
-                        roomName: sub['room'] as String? ?? 'Room TBD',
-                        onLectureActionChanged: onLectureActionChanged,
-                      ),
-                    ),
-                  );
-                },
-                child: _buildSubjectCard(context, sub),
-              ),
-            );
-          }),
-          const SizedBox(height: 20),
-        ],
+    return statsAsync.when(
+      loading: () => const SizedBox(
+        height: 100,
+        child: Center(child: CircularProgressIndicator()),
       ),
+      error: (err, _) => const SizedBox(
+        height: 100,
+        child: Center(child: Text('Failed to load stats', style: TextStyle(color: AppTheme.textMuted))),
+      ),
+      data: (stats) {
+        final room = (templatesAsync.value != null &&
+                templatesAsync.value!.isNotEmpty &&
+                templatesAsync.value!.first.room != null)
+            ? templatesAsync.value!.first.room!
+            : 'Room TBD';
+
+        int target = overallGoal;
+        if (criteriaMode == 'custom') {
+          target = subject.attendanceGoal;
+        }
+
+        final bool isAboveTarget = stats.attendancePercentage >= target;
+
+        final subMap = {
+          'id': subject.subjectId,
+          'name': subject.subjectName,
+          'percent': stats.attendancePercentage,
+          'target': target,
+          'attended': stats.presentLectures,
+          'absent': stats.absentLectures,
+          'total': stats.totalLectures,
+          'statusMessage': stats.statusMessage,
+          'isAboveTarget': isAboveTarget,
+          'color': subject.themeColor,
+          'faculty': subject.facultyName ?? 'Faculty TBD',
+          'room': room,
+        };
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          color: Colors.transparent,
+          elevation: 0,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SubjectHistoryScreen(
+                    subjectId: subject.subjectId,
+                    subjectName: subject.subjectName,
+                    criteriaPercentage: target,
+                    facultyName: subject.facultyName ?? 'Faculty TBD',
+                    roomName: room,
+                    onLectureActionChanged: (date, lecture, action) {
+                      // Handled reactively
+                    },
+                  ),
+                ),
+              );
+            },
+            child: _buildSubjectCard(context, subMap),
+          ),
+        );
+      },
     );
   }
 
@@ -158,7 +226,6 @@ class SubjectsTab extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
-          // Right: circular progress
           // Right: circular progress
           SizedBox(
             width: 44,

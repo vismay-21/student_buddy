@@ -1,31 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/app_state.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/utils/color_helper.dart';
 import '../../data/dto/subject/subject_dto.dart';
 import '../../data/dto/lecture/lecture_template_dto.dart';
-import '../../data/repositories/subject_repository.dart';
-import '../../data/repositories/lecture_template_repository.dart';
+import '../../core/providers/semester_provider.dart';
+import '../../core/providers/subject_provider.dart';
+import '../../core/providers/timetable_provider.dart';
 
 /// Full-screen form for adding a lecture to the timetable.
-/// Supports:
-///  - Template: pick an existing subject to pre-fill Room/Teacher/Color
-///  - Subject, Room, Teacher fields
-///  - Day dropdown
-///  - Begin / End time via system clock picker (dial mode)
-///  - Color swatch popup
-class AddClassScreen extends StatefulWidget {
+class AddClassScreen extends ConsumerStatefulWidget {
   final LectureTemplateDto? template;
   final SubjectDto? subject;
 
   const AddClassScreen({super.key, this.template, this.subject});
 
   @override
-  State<AddClassScreen> createState() => _AddClassScreenState();
+  ConsumerState<AddClassScreen> createState() => _AddClassScreenState();
 }
 
-class _AddClassScreenState extends State<AddClassScreen> {
+class _AddClassScreenState extends ConsumerState<AddClassScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _subjectController = TextEditingController();
@@ -37,17 +32,13 @@ class _AddClassScreenState extends State<AddClassScreen> {
   TimeOfDay? _endTime;
   int      _selectedColor = 0xFF3B82F6; // default blue
 
-  final _subjectRepo = SubjectRepository();
-  final _templateRepo = LectureTemplateRepository();
-  List<SubjectDto> _existingSubjects = [];
-  bool _isLoadingSubjects = false;
   SubjectDto? _selectedSubject;
+  bool _isSaving = false;
 
   static const List<String> _days = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
   ];
 
-  // Available swatch colors for lecture cards
   static const List<_ColorOption> _colorOptions = [
     _ColorOption(0xFF3B82F6, 'Blue'),
     _ColorOption(0xFF8B5CF6, 'Violet'),
@@ -66,7 +57,6 @@ class _AddClassScreenState extends State<AddClassScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSubjects();
     _initEditFields();
   }
 
@@ -104,21 +94,6 @@ class _AddClassScreenState extends State<AddClassScreen> {
     super.dispose();
   }
 
-  Future<void> _loadSubjects() async {
-    final activeSem = AppState.instance.activeSemesterDto.value;
-    if (activeSem == null) return;
-    setState(() => _isLoadingSubjects = true);
-    try {
-      final list = await _subjectRepo.getSubjects(activeSem.semesterId);
-      setState(() {
-        _existingSubjects = list;
-        _isLoadingSubjects = false;
-      });
-    } catch (e) {
-      setState(() => _isLoadingSubjects = false);
-    }
-  }
-
   void _applySubject(SubjectDto subject) {
     setState(() {
       _selectedSubject = subject;
@@ -129,18 +104,16 @@ class _AddClassScreenState extends State<AddClassScreen> {
     _fetchDetailsForSubject(subject);
   }
 
-  Future<void> _fetchDetailsForSubject(SubjectDto subject) async {
+  void _fetchDetailsForSubject(SubjectDto subject) async {
     try {
-      final temps = await _templateRepo.getTemplates(subject.subjectId);
-      if (temps.isNotEmpty) {
+      final templates = ref.read(timetableTemplatesProvider(subject.subjectId)).value ?? [];
+      if (templates.isNotEmpty) {
         setState(() {
-          _roomController.text = temps.first.room ?? '';
+          _roomController.text = templates.first.room ?? '';
         });
       }
     } catch (_) {}
   }
-
-  // ── Time picker ───────────────────────────────────────────────────────────
 
   Future<void> _pickTime({required bool isBegin}) async {
     final initial = isBegin
@@ -258,8 +231,6 @@ class _AddClassScreenState extends State<AddClassScreen> {
     return '$h:$m $period';
   }
 
-  // ── Color picker ──────────────────────────────────────────────────────────
-
   void _showColorPicker() {
     showDialog<void>(
       context: context,
@@ -312,8 +283,6 @@ class _AddClassScreenState extends State<AddClassScreen> {
     );
   }
 
-  // ── Submit ────────────────────────────────────────────────────────────────
-
   void _handleAdd() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -326,7 +295,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
       return;
     }
 
-    final activeSem = AppState.instance.activeSemesterDto.value;
+    final activeSem = ref.read(activeSemesterProvider);
     if (activeSem == null) {
       _showError('No active semester configured.');
       return;
@@ -336,13 +305,13 @@ class _AddClassScreenState extends State<AddClassScreen> {
     final startStr = '${_beginTime!.hour.toString().padLeft(2, '0')}:${_beginTime!.minute.toString().padLeft(2, '0')}';
     final endStr = '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}';
 
-    setState(() => _isLoadingSubjects = true);
+    setState(() => _isSaving = true);
 
     try {
       final typedName = _subjectController.text.trim();
       if (widget.template != null && widget.subject != null) {
         // 1. Update Subject Details
-        await _subjectRepo.updateSubject(
+        await ref.read(subjectActionsProvider).updateSubject(
           widget.subject!.subjectId,
           SubjectUpdateRequest(
             subjectName: typedName,
@@ -352,7 +321,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
         );
 
         // 2. Update Template Details
-        await _templateRepo.updateTemplate(
+        await ref.read(timetableActionsProvider).updateTemplate(
           widget.template!.lectureTemplateId,
           LectureTemplateUpdateRequest(
             dayOfWeek: dayIndex,
@@ -360,6 +329,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
             endTime: endStr,
             room: _roomController.text.trim().isEmpty ? null : _roomController.text.trim(),
           ),
+          widget.subject!.subjectId,
         );
 
         if (mounted) {
@@ -371,8 +341,9 @@ class _AddClassScreenState extends State<AddClassScreen> {
         }
       } else {
         // Add mode
+        final existingSubjects = ref.read(subjectsProvider).value ?? [];
         SubjectDto? match;
-        for (final s in _existingSubjects) {
+        for (final s in existingSubjects) {
           if (s.subjectName.toLowerCase() == typedName.toLowerCase()) {
             match = s;
             break;
@@ -383,7 +354,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
         if (match != null) {
           subjectId = match.subjectId;
         } else {
-          final newSub = await _subjectRepo.createSubject(SubjectCreateRequest(
+          final newSub = await ref.read(subjectActionsProvider).createSubject(SubjectCreateRequest(
             semesterId: activeSem.semesterId,
             subjectName: typedName,
             facultyName: _teacherController.text.trim().isEmpty ? null : _teacherController.text.trim(),
@@ -392,7 +363,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
           subjectId = newSub.subjectId;
         }
 
-        await _templateRepo.createTemplate(LectureTemplateCreateRequest(
+        await ref.read(timetableActionsProvider).createTemplate(LectureTemplateCreateRequest(
           subjectId: subjectId,
           dayOfWeek: dayIndex,
           startTime: startStr,
@@ -409,7 +380,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
         }
       }
     } catch (e) {
-      setState(() => _isLoadingSubjects = false);
+      setState(() => _isSaving = false);
       _showError('Failed to save class: $e');
     }
   }
@@ -446,15 +417,18 @@ class _AddClassScreenState extends State<AddClassScreen> {
 
   void _handleDelete() async {
     if (widget.template == null) return;
-    setState(() => _isLoadingSubjects = true);
+    setState(() => _isSaving = true);
     try {
-      await _templateRepo.deleteTemplate(widget.template!.lectureTemplateId);
+      await ref.read(timetableActionsProvider).deleteTemplate(
+        widget.template!.lectureTemplateId,
+        widget.template!.subjectId,
+      );
       if (mounted) {
         AppSnackbar.success(context, 'Class deleted successfully.');
         Navigator.of(context).pop(widget.template!.dayOfWeek - 1);
       }
     } catch (e) {
-      setState(() => _isLoadingSubjects = false);
+      setState(() => _isSaving = false);
       _showError('Failed to delete class: $e');
     }
   }
@@ -463,11 +437,19 @@ class _AddClassScreenState extends State<AddClassScreen> {
     AppSnackbar.error(context, msg);
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final existingSubjects = ref.watch(subjectsProvider).value ?? [];
+
+    if (_isSaving) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.template != null ? 'Edit Class' : 'Add Class'),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -503,7 +485,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
             if (widget.template == null) ...[
               _SectionCard(
                 label: 'TEMPLATE',
-                children: [_buildTemplateRow()],
+                children: [_buildTemplateRow(existingSubjects)],
               ),
               const SizedBox(height: 16),
             ],
@@ -574,15 +556,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
     );
   }
 
-  // ── Row builders ──────────────────────────────────────────────────────────
-
-  Widget _buildTemplateRow() {
-    if (_isLoadingSubjects) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
-      );
-    }
+  Widget _buildTemplateRow(List<SubjectDto> existingSubjects) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
@@ -595,7 +569,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
           ),
-          if (_existingSubjects.isEmpty)
+          if (existingSubjects.isEmpty)
             const Text('None yet', style: TextStyle(color: AppTheme.textMuted, fontSize: 13))
           else
             DropdownButton<SubjectDto>(
@@ -606,7 +580,7 @@ class _AddClassScreenState extends State<AddClassScreen> {
               style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
               borderRadius: BorderRadius.circular(12),
               dropdownColor: Theme.of(context).cardColor,
-              items: _existingSubjects.map((s) {
+              items: existingSubjects.map((s) {
                 return DropdownMenuItem<SubjectDto>(
                   value: s,
                   child: Row(
@@ -796,8 +770,6 @@ class _AddClassScreenState extends State<AddClassScreen> {
     );
   }
 }
-
-// ── Helper widgets ─────────────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
   final String label;
