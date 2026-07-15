@@ -631,6 +631,20 @@ class SyncService {
       }
     }
 
+
+    if (table == 'activity_logs') {
+      final String? entityType = remoteData['entity_type'];
+      final String? entityId = remoteData['entity_id'];
+      final String? actionType = remoteData['action_type'];
+      if (entityType != null && entityId != null && actionType != null) {
+        await txn.delete(
+          'activity_logs',
+          where: 'entity_type = ? AND entity_id = ? AND action_type = ? AND activity_id != ?',
+          whereArgs: [entityType, entityId, actionType, id],
+        );
+      }
+    }
+
     final existing = await txn.query(table, where: '$pkColumn = ?', whereArgs: [id]);
     final normalizedRemote = _normalizeForSqlite(table, remoteData);
 

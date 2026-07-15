@@ -82,7 +82,8 @@ class TodoService:
             entity_type=EntityType.TODO,
             entity_id=todo.todo_id,
             action_type=ActionType.CREATED,
-            activity_message=f"Created todo task: '{todo.title}'."
+            activity_message=f"Created todo task: '{todo.title}'.",
+            user_id=todo.user_id
         )
 
         await self.db.commit()
@@ -139,7 +140,8 @@ class TodoService:
             entity_type=EntityType.TODO,
             entity_id=todo.todo_id,
             action_type=action_type,
-            activity_message=msg
+            activity_message=msg,
+            user_id=todo.user_id
         )
 
         await self.db.commit()
@@ -163,7 +165,8 @@ class TodoService:
             entity_type=EntityType.TODO,
             entity_id=todo_id,
             action_type=ActionType.DELETED,
-            activity_message=f"Deleted todo task: '{todo.title}'."
+            activity_message=f"Deleted todo task: '{todo.title}'.",
+            user_id=todo.user_id
         )
 
         await self.db.commit()

@@ -996,6 +996,7 @@ Activity Logs are append-only.
 Existing records are never updated.
 Existing records are never deleted.
 Synchronization only inserts missing records.
+*Deduplication Rule*: During synchronization, when the client merges remote activity logs downloaded from the server, it deletes any local activity log with a different UUID that matches the remote log's `entity_type`, `entity_id`, and `action_type`. This ensures that local placeholder logs generated for offline responsiveness are cleanly replaced by the official backend-generated logs, preventing duplication.
 
 ---
 

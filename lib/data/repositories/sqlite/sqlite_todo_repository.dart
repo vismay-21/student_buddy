@@ -132,6 +132,18 @@ class SqliteTodoRepository implements TodoRepository {
       }
 
       // Log activity
+      String actionType = 'updated';
+      String activityMessage = "Updated todo task details: '${request.title ?? todo.title}'.";
+      if (request.status != null) {
+        if (request.status == 'completed' && todo.status != 'completed') {
+          actionType = 'completed';
+          activityMessage = "Completed todo task: '${request.title ?? todo.title}'.";
+        } else if (request.status == 'pending' && todo.status != 'pending') {
+          actionType = 'updated';
+          activityMessage = "Marked todo task as pending: '${request.title ?? todo.title}'.";
+        }
+      }
+
       final activityId = generateUuid();
       await txn.insert('activity_logs', {
         'activity_id': activityId,
@@ -139,8 +151,8 @@ class SqliteTodoRepository implements TodoRepository {
         'actor_type': 'user',
         'entity_type': 'todo',
         'entity_id': todoId,
-        'action_type': 'updated',
-        'activity_message': "Updated todo '${request.title ?? todo.title}'.",
+        'action_type': actionType,
+        'activity_message': activityMessage,
         'correlation_id': null,
         'created_at': nowStr,
       });

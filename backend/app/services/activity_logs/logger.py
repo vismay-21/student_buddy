@@ -23,6 +23,13 @@ async def log_activity(
     If activity logging fails, only the savepoint is rolled back; the parent transaction
     continues successfully, and the error is logged to the application logger.
     """
+    if user_id is None:
+        try:
+            from app.core.context import request_user_id
+            user_id = request_user_id.get()
+        except Exception:
+            pass
+
     try:
         async with db.begin_nested():
             log = ActivityLog(

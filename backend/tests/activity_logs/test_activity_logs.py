@@ -222,3 +222,27 @@ async def test_bulk_populate_activity_summaries(db_session: AsyncSession):
     assert log_settings.entity_summary == "App Settings"
     assert log_finance.entity_summary == "Finance Record"
 
+
+@pytest.mark.asyncio
+async def test_log_activity_context_var_user_id(db_session: AsyncSession):
+    # Set request_user_id in context
+    from app.core.context import request_user_id
+    test_user_id = TEST_USER_ID
+    token = request_user_id.set(test_user_id)
+
+    try:
+        # Log a valid activity without passing user_id explicitly
+        log = await log_activity(
+            db=db_session,
+            actor_type=ActorType.USER,
+            entity_type=EntityType.TODO,
+            entity_id=uuid.uuid4(),
+            action_type=ActionType.CREATED,
+            activity_message="Test context user_id message"
+        )
+        assert log is not None
+        assert log.user_id == test_user_id
+    finally:
+        request_user_id.reset(token)
+
+
