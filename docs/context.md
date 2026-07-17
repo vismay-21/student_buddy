@@ -127,284 +127,377 @@ Always prefer deterministic systems first.
 
 ## 8. Current Folder Structure
 
-*Recommended folder structure (may evolve in future phases).*
+Below is the complete file and folder structure of the Student Buddy project down to the leaf nodes (end files), detailing the specific purpose of each file:
 
 ```text
 student_buddy/
-├── android/
-├── ios/
-├── windows/
-├── macos/
-├── linux/
-├── web/
-├── backend/                  # FastAPI backend module
-│   ├── app/                  # FastAPI application package
-│   │   ├── api/              # API Routers for health check, settings, academic, notes, and todos modules
-│   │   │   ├── v1/
-│   │   │   │   ├── academic/
-│   │   │   │   │   ├── semesters.py            # Semester REST endpoints
-│   │   │   │   │   ├── subjects.py             # Subject REST endpoints
-│   │   │   │   │   ├── lecture_templates.py    # Lecture Template REST endpoints
-│   │   │   │   │   ├── lecture_instances.py    # Lecture Instance REST endpoints
-│   │   │   │   │   ├── attendance_settings.py  # Attendance Settings REST endpoints
-│   │   │   │   │   └── holidays.py             # Holiday REST endpoints
-│   │   │   │   │   └── __init__.py
-│   │   │   │   ├── settings/
-│   │   │   │   │   ├── app_settings.py         # App Settings REST endpoints
-│   │   │   │   │   └── __init__.py
-│   │   │   │   ├── todo/
-│   │   │   │   │   ├── todos.py                # Todo REST endpoints
-│   │   │   │   │   └── __init__.py
-│   │   │   │   ├── notes/
-│   │   │   │   │   ├── notes.py                # Notes REST endpoints
-│   │   │   │   │   └── __init__.py
-│   │   │   │   ├── activity_logs/
-│   │   │   │   │   └── __init__.py             # Activity logs endpoint placeholders
-│   │   │   │   ├── review_queue/
-│   │   │   │   │   ├── review_queue.py         # Review queue REST endpoints
-│   │   │   │   │   └── __init__.py
-│   │   │   │   ├── health.py                   # Health check endpoint
-│   │   │   │   └── __init__.py
-│   │   │   └── __init__.py
-│   │   ├── core/             # Configuration, database connection, exception handling, and logging
-│   │   │   ├── config.py                       # Global settings loader
-│   │   │   ├── constants.py                    # Static global constants
-│   │   │   ├── database.py                     # Database connection pool setup
-│   │   │   ├── exceptions.py                   # Custom exceptions and handlers
-│   │   │   ├── logging.py                      # Structured logging configuration
-│   │   │   ├── security.py                     # Password/token security helpers
-│   │   │   └── __init__.py
-│   │   ├── dependencies/     # FastAPI Dependency injection providers
-│   │   │   ├── database.py                     # Database session injector
-│   │   │   └── __init__.py
-│   │   ├── models/           # Database SQLAlchemy models
-│   │   │   ├── academic/
-│   │   │   │   ├── semester.py                 # Semester model
-│   │   │   │   ├── subject.py                  # Subject model
-│   │   │   │   ├── lecture_template.py         # LectureTemplate model
-│   │   │   │   ├── lecture_instance.py         # LectureInstance model
-│   │   │   │   ├── attendance_settings.py      # AttendanceSettings model
-│   │   │   │   ├── holiday.py                  # Holiday model
-│   │   │   │   └── __init__.py
-│   │   │   ├── settings/
-│   │   │   │   ├── app_settings.py             # AppSettings singleton model
-│   │   │   │   └── __init__.py
-│   │   │   ├── todo/
-│   │   │   │   ├── todo.py                     # Todo model
-│   │   │   │   └── __init__.py
-│   │   │   ├── notes/
-│   │   │   │   ├── notes_subject.py            # NotesSubject model
-│   │   │   │   ├── notes_section.py            # NotesSection model
-│   │   │   │   ├── notes_resource.py           # NotesResource model
-│   │   │   │   └── __init__.py
-│   │   │   ├── activity_logs/
-│   │   │   │   └── __init__.py                 # Activity logs models placeholder
-│   │   │   ├── review_queue/
-│   │   │   │   ├── review_queue.py             # Review queue model
-│   │   │   │   └── __init__.py
-│   │   │   └── __init__.py
-│   │   ├── schemas/          # Pydantic validation models
-│   │   │   ├── academic/
-│   │   │   │   ├── semester.py                 # Semester validation schemas
-│   │   │   │   ├── subject.py                  # Subject validation schemas
-│   │   │   │   ├── lecture_template.py         # LectureTemplate validation schemas
-│   │   │   │   ├── lecture_instance.py         # LectureInstance validation schemas
-│   │   │   │   ├── attendance_settings.py      # AttendanceSettings validation schemas
-│   │   │   │   ├── holiday.py                  # Holiday validation schemas
-│   │   │   │   └── __init__.py
-│   │   │   ├── settings/
-│   │   │   │   ├── app_settings.py             # AppSettings validation schemas
-│   │   │   │   └── __init__.py
-│   │   │   ├── todo/
-│   │   │   │   ├── todo.py                     # Todo validation schemas
-│   │   │   │   └── __init__.py
-│   │   │   ├── notes/
-│   │   │   │   ├── notes_subject.py            # NotesSubject validation schemas
-│   │   │   │   ├── notes_section.py            # NotesSection validation schemas
-│   │   │   │   ├── notes_resource.py           # NotesResource validation schemas
-│   │   │   │   └── __init__.py
-│   │   │   ├── activity_logs/
-│   │   │   │   └── __init__.py                 # Activity logs schemas placeholder
-│   │   │   ├── review_queue/
-│   │   │   │   ├── review_queue.py             # Review queue validation schemas
-│   │   │   │   └── __init__.py
-│   │   │   ├── common.py                       # Global standard API response schemas
-│   │   │   └── __init__.py
-│   │   ├── repositories/     # Database queries and operations (CRUD)
-│   │   │   ├── academic/
-│   │   │   │   ├── semester.py                 # Semester DB query operations
-│   │   │   │   ├── subject.py                  # Subject DB query operations
-│   │   │   │   ├── lecture_template.py         # LectureTemplate DB query operations
-│   │   │   │   ├── lecture_instance.py         # LectureInstance DB query operations
-│   │   │   │   ├── attendance_settings.py      # AttendanceSettings DB query operations
-│   │   │   │   ├── holiday.py                  # Holiday DB query operations
-│   │   │   │   └── __init__.py
-│   │   │   ├── settings/
-│   │   │   │   ├── app_settings.py             # AppSettings DB query operations
-│   │   │   │   └── __init__.py
-│   │   │   ├── todo/
-│   │   │   │   ├── todo.py                     # Todo DB query operations
-│   │   │   │   └── __init__.py
-│   │   │   ├── notes/
-│   │   │   │   ├── notes_subject.py            # NotesSubject DB query operations
-│   │   │   │   ├── notes_section.py            # NotesSection DB query operations
-│   │   │   │   ├── notes_resource.py           # NotesResource DB query operations
-│   │   │   │   └── __init__.py
-│   │   │   ├── activity_logs/
-│   │   │   │   └── __init__.py                 # Activity logs repository placeholder
-│   │   │   ├── review_queue/
-│   │   │   │   ├── review_queue.py             # Review queue DB query operations
-│   │   │   │   └── __init__.py
-│   │   │   └── __init__.py
-│   │   ├── services/         # Business logic and transaction rules orchestrations
-│   │   │   ├── academic/
-│   │   │   │   ├── semester.py                 # Semester business logic
-│   │   │   │   ├── subject.py                  # Subject business logic & notes sync
-│   │   │   │   ├── lecture_template.py         # LectureTemplate business logic
-│   │   │   │   ├── lecture_instance.py         # LectureInstance business logic
-│   │   │   │   ├── attendance_settings.py      # AttendanceSettings business logic
-│   │   │   │   ├── attendance_statistics.py    # Ratios and safe skip logic
-│   │   │   │   ├── holiday.py                  # Holiday transactional updates
-│   │   │   │   └── __init__.py
-│   │   │   ├── settings/
-│   │   │   │   ├── app_settings.py             # AppSettings business logic
-│   │   │   │   └── __init__.py
-│   │   │   ├── todo/
-│   │   │   │   ├── todo.py                     # Todo business logic and status state transitions
-│   │   │   │   └── __init__.py
-│   │   │   ├── notes/
-│   │   │   │   ├── notes.py                    # Notes service orchestrator
-│   │   │   │   └── __init__.py
-│   │   │   ├── activity_logs/
-│   │   │   │   └── __init__.py                 # Activity logs service placeholder
-│   │   │   ├── review_queue/
-│   │   │   │   ├── review_queue.py             # Review queue business logic & dispatcher
-│   │   │   │   ├── resolvers/                  # Entity-specific resolver classes
-│   │   │   │   │   ├── base.py                 # BaseResolver interface
-│   │   │   │   │   ├── todo.py                 # TodoResolver - applies TodoUpdate changes
-│   │   │   │   │   ├── lecture_instance.py     # LectureInstanceResolver - applies attendance/status changes
-│   │   │   │   │   ├── finance.py              # FinanceResolver - frozen no-op placeholder
-│   │   │   │   │   ├── registry.py             # RESOLVERS map: EntityType -> resolver class
-│   │   │   │   │   └── __init__.py
-│   │   │   │   └── __init__.py
-│   │   │   └── __init__.py
-│   │   ├── utils/            # Helper utilities and shared formulas
-│   │   │   ├── attendance_calculator.py        # Core attendance mathematical formulas
-│   │   │   └── __init__.py
-│   │   ├── main.py           # FastAPI entrypoint, router registers, exception handler registers
-│   │   └── __init__.py
-│   ├── alembic/              # Alembic database migration tool configurations
-│   │   ├── versions/         # Alembic database migration version scripts
-│   │   │   ├── 192b4793464e_create_semester_and_attendance_settings_.py
-│   │   │   ├── 1a9ff58b8423_create_subjects_and_notes_subjects_.py
-│   │   │   ├── 2db1602c28b4_create_lecture_template_instance_.py
-│   │   │   ├── ca2a9e095c10_create_app_settings_table.py
-│   │   │   ├── 6e718cd5065a_create_todos_table.py
-│   │   │   └── e4ffe7e8e71b_create_notes_tables.py
-│   │   ├── env.py            # Migration target registration env
-│   │   └── script.py.mako    # Alembic revision template script
-│   ├── tests/                # Unit and integration test suites
-│   │   ├── academic/
-│   │   │   ├── test_semesters.py               # Semester test cases
-│   │   │   ├── test_subjects.py                # Subject CRUD and notes sync test cases
-│   │   │   ├── test_lecture_templates.py       # LectureTemplate validation test cases
-│   │   │   ├── test_lecture_instances.py       # LectureInstance CRUD test cases
-│   │   │   ├── test_attendance_settings.py     # AttendanceSettings constraints tests
-│   │   │   └── test_holidays.py                # Holiday transaction rollback tests
-│   │   ├── settings/
-│   │   │   └── test_app_settings.py            # AppSettings theme/path normalization tests
-│   │   ├── todo/
-│   │   │   └── test_todos.py                   # Todo status-transition & sorting tests
-│   │   ├── notes/
-│   │   │   └── test_notes.py                   # Notes CRUD, validators, hierarchy and search tests
-│   │   ├── test_health.py                      # Health endpoint verification
-│   │   ├── conftest.py                         # Test database session fixtures and cleanup setups
-│   │   └── __init__.py
-│   ├── requirements.txt      # Python dependencies list
-│   ├── README.md             # Development documentation setup
-│   └── .env.example          # Environment variables template
-
-├── docs/                     # Documentation files
-│   ├── database/             # Database design documents
+├── android/                             # Android native platform folder
+├── ios/                                 # iOS native platform folder
+├── windows/                             # Windows native platform folder
+├── macos/                               # macOS native platform folder
+├── linux/                               # Linux native platform folder
+├── web/                                 # Web native platform folder
+│
+├── docs/                                # Documentation files (Project Memory & System Specs)
+│   ├── audit/                           # Phase-by-phase quality and security audit reports
+│   │   ├── audit_01_architecture.md
+│   │   ├── audit_02_database.md
+│   │   ├── audit_03_business_logic.md
+│   │   ├── audit_04_api.md
+│   │   ├── audit_05_performance.md
+│   │   ├── audit_06_security.md
+│   │   ├── audit_07_flutter_integration.md
+│   │   ├── audit_08_code_quality.md
+│   │   ├── audit_09_testing.md
+│   │   ├── audit_10_production_readiness.md
+│   │   ├── audit_11_deployment_operations.md
+│   │   ├── audit_summary.md
+│   │   └── implementation_plan_audit_11_deployment_operations.md
+│   ├── database/                        # Database design documents
 │   │   ├── 04_entity_relationship_diagram.md
 │   │   ├── 1_database_schema.md
 │   │   ├── 2_database_business_flow.md
-│   │   └── 3_database_sync_strategy.md
-│   ├── STUDENT BUDDY DEVELOPMENT ROADMAP DCOUMENT DRD.md
-│   ├── STUDENT BUDDY MASTER REQUIREMENTS DOCUMENT MRD.txt
-│   ├── backend_development_plan.md
-│   ├── context.md            # This file (Project Memory)
-│   └── history.md            # Project decisions & implementation history log
-├── lib/                      # Flutter source directory
-│   ├── core/
+│   │   └── 3_database_sync_strategy.md   # Sync protocol and queue coalescing rules
+│   ├── 1_STUDENT BUDDY MASTER REQUIREMENTS DOCUMENT MRD.txt
+│   ├── 2_STUDENT BUDDY DEVELOPMENT ROADMAP DCOUMENT DRD.md
+│   ├── 3_backend_architecture_and_development_plan.md
+│   ├── 4_backend_implementation_sprints.md
+│   ├── 5_mvp_backend_audit_plan.md
+│   ├── context.md                       # This file (Project Memory / Context)
+│   └── history.md                       # Project decisions & implementation history log
+│
+├── test/                                # Frontend unit and integration tests
+│   ├── sync_coalesce_test.dart          # Verifies sync coalescing rules (Rules 1-4)
+│   ├── sync_lifecycle_test.dart         # Integration tests for upload/download pipelines and error backoffs
+│   └── uuid_generator_test.dart         # Validates local client-side UUID generator uniqueness
+│
+├── lib/                                 # Flutter Frontend codebase
+│   ├── main.dart                        # Flutter application entry point, wraps app in ProviderScope
+│   ├── core/                            # Shared core configurations and logic utilities
+│   │   ├── exceptions/
+│   │   │   └── sync_exceptions.dart     # Custom exceptions mapping synchronization and protocol issues
 │   │   ├── models/
-│   │   │   └── subject_template.dart   # Template model for pre-filling recurring classes
+│   │   │   └── subject_template.dart    # Holds templates for recurring subject slots
+│   │   ├── network/                     # Dio HTTP client setup and interceptors
+│   │   │   ├── api_constants.dart       # Maps all REST endpoint paths and routes
+│   │   │   ├── api_response.dart        # Unified HTTP Response mapping class
+│   │   │   ├── base_api.dart            # Base class for API service wrappers
+│   │   │   ├── dio_client.dart          # Custom Dio client wrapper configuration
+│   │   │   └── interceptors.dart        # Authentication/token injector and network error handler
+│   │   ├── providers/                   # Riverpod State Management Providers
+│   │   │   ├── app_settings_provider.dart # Manages light/dark theme state & configurations
+│   │   │   ├── attendance_provider.dart  # Manages analytics, skipping recommendation state, and holiday checks
+│   │   │   ├── auth_provider.dart        # Manages login sessions, authentication requests, and tokens
+│   │   │   ├── common_providers.dart     # Holds shared providers (DB Helper, API modules)
+│   │   │   ├── notes_provider.dart       # Manages section hierarchies and resource download states
+│   │   │   ├── provider_observer.dart    # Debug observer logging Riverpod state transitions
+│   │   │   ├── review_queue_provider.dart # Manages unresolved OCR conflicts review state
+│   │   │   ├── semester_provider.dart    # Handles active semesters and cascading invalidation updates
+│   │   │   ├── subject_provider.dart     # Manages academic courses and subjects list
+│   │   │   ├── sync_provider.dart        # Controls live sync states, status cards, and manual sync action
+│   │   │   ├── timetable_provider.dart   # Manages weekly class schedule calendar state
+│   │   │   └── todo_provider.dart        # Manages task checklists, due dates, and priority lists
+│   │   ├── services/                    # Business Service layer coordinating SQLite and remote sync
+│   │   │   ├── attendance_service.dart
+│   │   │   ├── auth_service.dart
+│   │   │   ├── bootstrap_service.dart    # Manages remote snapshot downloads and offline DB seeding
+│   │   │   ├── notes_service.dart
+│   │   │   ├── review_queue_service.dart
+│   │   │   ├── semester_service.dart
+│   │   │   ├── subject_service.dart
+│   │   │   ├── sync_service.dart         # Central coordinator for offline operations and synchronization
+│   │   │   └── todo_service.dart
 │   │   ├── theme/
-│   │   │   └── app_theme.dart          # Light and Dark theme specifications
+│   │   │   └── app_theme.dart           # Unified app themes, gradients, and fonts
 │   │   ├── utils/
-│   │   │   ├── app_state.dart
-│   │   │   └── dummy_data.dart
-│   │   ├── network/                    # API Networking Layer
-│   │   │   ├── api_constants.dart      # Base URLs and API route endpoints
-│   │   │   ├── dio_client.dart         # Singleton Dio client instance
-│   │   │   └── interceptors.dart       # Error interceptors and ApiException parsing
-│   │   └── widgets/
-│   │       ├── app_snackbar.dart                  # Premium global floating SnackBar notification helper
-│   │       ├── expandable_section.dart            # Reusable collapsible dashboard section widget
-│   │       └── attendance_ring_label.dart         # Custom percentage fraction indicator widget
-│   ├── screens/
-│   │   ├── attendance/
-│   │   │   ├── widgets/
-│   │   │   │   ├── attendance_calendar_legend.dart    # Colored dot visual indicator key for the monthly calendar view
-│   │   │   │   ├── attendance_analytics_card.dart     # Consolidated card displaying monthly day summary and lecture statistics
-│   │   │   │   ├── attendance_overview_card.dart      # Dashboard header element showing general attendance percentages
-│   │   │   │   └── lecture_card.dart                  # Reusable unified card displaying timetable layout and attendance metrics
-│   │   │   ├── attendance_screen.dart        # Container hosting sub-navigation tabs (History, Subjects, Settings)
-│   │   │   ├── attendance_settings_tab.dart  # Preferences pane configuring criteria modes, percentages, semester ranges, and holidays
-│   │   │   ├── day_history_screen.dart       # Dedicated logging details screen for a specific selected date
-│   │   │   ├── history_tab.dart              # Month-view pageable calendar covering past school days
-│   │   │   ├── subject_history_screen.dart   # Dedicated history log and action list for a specific academic course
-│   │   │   └── subjects_tab.dart             # Analytics dashboard list showing targets, rates, and recommendations
-│   │   ├── auth/
-│   │   │   ├── login_screen.dart             # Authentication gateway using phone/WhatsApp input
-│   │   │   └── otp_screen.dart               # Verification page to confirm the user OTP code
-│   │   ├── finance/
-│   │   │   └── finance_screen.dart           # Wallet manager showing card layouts, transaction records, and budgets
-│   │   ├── navigation_shell.dart             # Core layout scaffolding handling app navigation, tab routing, and top-right header actions
+│   │   │   ├── color_helper.dart        # Maps hex strings to Flutter Colors
+│   │   │   ├── dummy_data.dart          # Holds placeholder static debug items
+│   │   │   └── uuid_generator.dart      # Generates local unique IDs (UUIDv4) offline
+│   │   └── widgets/                     # Reusable layout widgets
+│   │       ├── app_snackbar.dart        # Central notification banner configuration
+│   │       ├── attendance_ring_label.dart # Ring graphic rendering attendance statistics
+│   │       └── expandable_section.dart  # Collapsible card widget for dashboard pages
+│   │
+│   ├── data/                            # Data Access Layer
+│   │   ├── local/
+│   │   │   └── database_helper.dart     # SQLite helper initializer, migration sets, and sync queue writer
+│   │   ├── api/                         # Low-level network endpoints wrappers
+│   │   │   ├── activity_log_api.dart
+│   │   │   ├── app_settings_api.dart
+│   │   │   ├── attendance_settings_api.dart
+│   │   │   ├── holiday_api.dart
+│   │   │   ├── lecture_instance_api.dart
+│   │   │   ├── lecture_template_api.dart
+│   │   │   ├── notes_api.dart
+│   │   │   ├── review_queue_api.dart
+│   │   │   ├── semester_api.dart
+│   │   │   ├── subject_api.dart
+│   │   │   ├── todo_api.dart
+│   │   │   └── user_api.dart
+│   │   ├── dto/                         # JSON Serialization/Deserialization models
+│   │   │   ├── activity_log/
+│   │   │   │   └── activity_log_dto.dart
+│   │   │   ├── attendance/
+│   │   │   │   └── attendance_settings_dto.dart
+│   │   │   ├── holiday/
+│   │   │   │   └── holiday_dto.dart
+│   │   │   ├── lecture/
+│   │   │   │   ├── lecture_instance_dto.dart
+│   │   │   │   └── lecture_template_dto.dart
+│   │   │   ├── notes/
+│   │   │   │   └── notes_dto.dart
+│   │   │   ├── review_queue/
+│   │   │   │   └── review_queue_dto.dart
+│   │   │   ├── semester/
+│   │   │   │   └── semester_dto.dart
+│   │   │   ├── settings/
+│   │   │   │   └── app_settings_dto.dart
+│   │   │   ├── subject/
+│   │   │   │   └── subject_dto.dart
+│   │   │   └── todo/
+│   │   │       └── todo_dto.dart
+│   │   └── repositories/                # Repository interface definitions and SQLite implementations
+│   │       ├── sqlite/                  # Concrete local SQLite database queries
+│   │       │   ├── sqlite_activity_log_repository.dart
+│   │       │   ├── sqlite_app_settings_repository.dart
+│   │       │   ├── sqlite_attendance_settings_repository.dart
+│   │       │   ├── sqlite_holiday_repository.dart
+│   │       │   ├── sqlite_lecture_instance_repository.dart
+│   │       │   ├── sqlite_lecture_template_repository.dart
+│   │       │   ├── sqlite_notes_repository.dart
+│   │       │   ├── sqlite_review_queue_repository.dart
+│   │       │   ├── sqlite_semester_repository.dart   # Runs date cascading updates locally
+│   │       │   ├── sqlite_subject_repository.dart
+│   │       │   └── sqlite_todo_repository.dart
+│   │       ├── activity_log_repository.dart
+│   │       ├── app_settings_repository.dart
+│   │       ├── attendance_settings_repository.dart
+│   │       ├── holiday_repository.dart
+│   │       ├── lecture_instance_repository.dart
+│   │       ├── lecture_template_repository.dart
+│   │       ├── notes_repository.dart
+│   │       ├── review_queue_repository.dart
+│   │       ├── semester_repository.dart
+│   │       ├── subject_repository.dart
+│   │       └── todo_repository.dart
+│   │
+│   └── screens/                         # UI Screens & Layouts
+│       ├── navigation_shell.dart        # Main layout frame carrying tabs and side nav
+│       ├── attendance/                  # Attendance and analytics tabs
+│       │   ├── widgets/
+│       │   │   ├── attendance_analytics_card.dart
+│       │   │   ├── attendance_calendar_legend.dart
+│       │   │   ├── attendance_day_summary_card.dart
+│       │   │   ├── attendance_overview_card.dart
+│       │   │   └── lecture_card.dart
+│       │   ├── attendance_screen.dart
+│       │   ├── attendance_settings_tab.dart
+│       │   ├── day_history_screen.dart
+│       │   ├── history_tab.dart
+│       │   ├── subject_history_screen.dart
+│       │   └── subjects_tab.dart
+│       ├── auth/                        # Registration / Login forms
+│       │   ├── forgot_password_screen.dart
+│       │   ├── login_screen.dart
+│       │   └── signup_screen.dart
+│       ├── finance/
+│       │   └── finance_screen.dart       # Finance module UI (disabled/frozen by default)
+│       ├── notes/                       # Uploaded files and study materials organizer
+│       │   ├── add_resource_screen.dart
+│       │   ├── notes_config.dart
+│       │   ├── notes_screen.dart
+│       │   └── resource_card.dart
+│       ├── overview/
+│       │   └── overview_screen.dart     # Core app dashboard
+│       ├── review_queue/                # Timetable import review
+│       │   ├── review_queue_edit_screen.dart
+│       │   └── review_queue_screen.dart
+│       ├── settings/
+│       │   ├── semester_selection_screen.dart
+│       │   └── settings_screen.dart     # System settings and sync cards
+│       ├── splash/
+│       │   └── splash_screen.dart       # Verifies local storage setup on launch
+│       ├── timetable/                   # Recurring classes grid
+│       │   ├── add_class_screen.dart
+│       │   └── timetable_screen.dart
+│       └── todo/                        # Task manager list
+│           ├── add_todo_screen.dart
+│           └── todo_screen.dart
+│
+├── backend/                             # Python FastAPI Backend
+│   ├── requirements.txt                 # Python dependencies
+│   ├── Dockerfile                       # Production container setup
+│   ├── docker-compose.yaml              # Local PostgreSQL + FastAPI orchestration config
+│   ├── README.md                        # Backend documentation guide
+│   ├── alembic.ini                      # Migration settings
+│   ├── alembic/                         # Alembic database migration scripts
+│   │   ├── env.py
+│   │   ├── script.py.mako
+│   │   └── versions/
+│   │       ├── 192b4793464e_create_semester_and_attendance_settings_.py
+│   │       ├── 1a9ff58b8423_create_subjects_and_notes_subjects_.py
+│   │       ├── 2db1602c28b4_create_lecture_template_instance_.py
+│   │       ├── ca2a9e095c10_create_app_settings_table.py
+│   │       ├── 6e718cd5065a_create_todos_table.py
+│   │       └── e4ffe7e8e71b_create_notes_tables.py
+│   ├── tests/                           # Python pytest verification suite
+│   │   ├── conftest.py                  # Seeding, cleanup, and DB connection overrides
+│   │   ├── academic/
+│   │   │   ├── test_attendance_settings.py
+│   │   │   ├── test_holidays.py
+│   │   │   ├── test_lecture_instances.py
+│   │   │   ├── test_lecture_templates.py
+│   │   │   ├── test_semesters.py
+│   │   │   └── test_subjects.py
+│   │   ├── activity_logs/
+│   │   │   └── test_activity_logs.py
 │   │   ├── notes/
-│   │   │   ├── add_resource_screen.dart      # Dedicated screen to add/edit resources with dynamic subjects, units, types, and placeholders
-│   │   │   ├── notes_config.dart             # Storage config and architecture placeholders detailing Supabase/local download caches
-│   │   │   ├── notes_screen.dart             # Class materials organizer grouping resources by Semester, Subject, and Unit with a FAB
-│   │   │   └── resource_card.dart            # Custom component displaying a resource item with download status and edit buttons
-│   │   ├── overview/
-│   │   │   └── overview_screen.dart          # Main dashboard summary showing lectures, attendance warnings, tasks, and financial updates
+│   │   │   └── test_notes.py
 │   │   ├── review_queue/
-│   │   │   ├── review_queue_screen.dart      # Interface resolving OCR timetable parser conflicts and low-confidence logs
-│   │   │   └── review_queue_edit_screen.dart # Dedicated full-screen form-based editor for resolving low confidence items
+│   │   │   └── test_review_queue.py
+│   │   ├── security/
+│   │   │   └── test_security.py
 │   │   ├── settings/
-│   │   │   ├── semester_selection_screen.dart # Preference selector updating the active school semester
-│   │   │   └── settings_screen.dart          # Global toggles for theme selector, active modules, and notification settings
-│   │   ├── splash/
-│   │   │   └── splash_screen.dart            # Initial loading screen verifying configuration and theme choices
-│   │   ├── timetable/
-│   │   │   ├── add_class_screen.dart         # Dedicated screen to add class schedules with templates and clock pickers
-│   │   │   └── timetable_screen.dart         # Interactive weekly calendar detailing daily classroom routines
+│   │   │   ├── test_app_settings.py
+│   │   │   ├── test_bootstrap.py
+│   │   │   └── test_user_service.py
+│   │   ├── todo/
+│   │   │   └── test_todos.py
+│   │   └── test_health.py
+│   └── app/                             # Core FastAPI application module
+│       ├── main.py                      # Router mapping, CORS configurations, and startup events register
+│       ├── api/                         # Router routes configuration
+│       │   ├── v1/
+│       │   │   ├── academic/
+│       │   │   │   ├── attendance_settings.py # Endpoints mapping attendance targets
+│       │   │   │   ├── holidays.py            # Endpoints mapping academic holidays
+│       │   │   │   ├── lecture_instances.py   # Endpoints marking daily lecture attendance status
+│       │   │   │   ├── lecture_templates.py   # Endpoints mapping class schedules
+│       │   │   │   ├── semesters.py           # Endpoints managing school semesters
+│       │   │   │   └── subjects.py            # Endpoints managing subject lists
+│       │   │   ├── activity_logs/
+│       │   │   │   └── activity_logs.py       # Endpoints retrieving log timelines
+│       │   │   ├── notes/
+│       │   │   │   └── notes.py               # Endpoints managing notes upload/download
+│       │   │   ├── review_queue/
+│       │   │   │   └── review_queue.py        # Endpoints reviewing parser results
+│       │   │   ├── settings/
+│       │   │   │   └── app_settings.py        # Endpoints retrieving user app preferences
+│       │   │   ├── todo/
+│       │   │   │   └── todos.py               # Endpoints performing todo CRUD
+│       │   │   ├── users/
+│       │   │   │   └── users.py               # Endpoints provisioning profile settings & downloads
+│       │   │   └── health.py                  # Endpoint verifying DB health
+│   │   │   └── __init__.py
+│       ├── core/                        # Central system settings and DB engine definitions
+│       │   ├── config.py                  # Environment variables parser
+│       │   ├── constants.py               # Central version constants (Sync versions, etc.)
+│       │   ├── context.py                 # Thread-scoped context variables (e.g. current actor user ID)
+│       │   ├── database.py                # SQL Alchemy engine setup
+│       │   ├── exceptions.py              # Custom exceptions mapping
+│       │   ├── logging.py                 # Logger utilities config
+│       │   └── security.py                # JWT validator & Bearer token processor
+│       ├── dependencies/                # Injection hooks for handlers
+│       │   ├── auth.py                    # Resolves user context from tokens
+│       │   └── database.py                # Resolves current active db session
+│       ├── models/                      # SQLAlchemy Database models (PostgreSQL structure mapping)
+│       │   ├── academic/
+│       │   │   ├── attendance_settings.py
+│       │   │   ├── holiday.py
+│       │   │   ├── lecture_instance.py
+│       │   │   ├── lecture_template.py
+│       │   │   ├── semester.py
+│       │   │   └── subject.py
+│       │   ├── activity_logs/
+│       │   │   └── activity_log.py
+│       │   ├── notes/
+│   │   │   ├── notes_resource.py
+│   │   │   ├── notes_section.py
+│   │   │   └── notes_subject.py
+│   │   ├── review_queue/
+│   │   │   └── review_queue.py
+│   │   ├── settings/
+│   │   │   └── app_settings.py
+│   │   ├── todo/
+│   │   │   └── todo.py
+│   │   └── user.py
+│   ├── repositories/                # Clean CRUD abstraction files
+│   │   ├── academic/
+│   │   │   ├── attendance_settings.py
+│   │   │   ├── holiday.py
+│   │   │   ├── lecture_instance.py
+│   │   │   ├── lecture_template.py
+│   │   │   ├── semester.py
+│   │   │   └── subject.py
+│   │   ├── activity_logs/
+│   │   │   └── activity_log.py
+│   │   ├── notes/
+│   │   │   ├── notes_resource.py
+│   │   │   ├── notes_section.py
+│   │   │   └── notes_subject.py
+│   │   ├── review_queue/
+│   │   │   └── review_queue.py
+│   │   ├── settings/
+│   │   │   └── app_settings.py
 │   │   └── todo/
-│   │       ├── add_todo_screen.dart          # Screen for creating new tasks with title, due dates, and priority
-│   │       └── todo_screen.dart              # Screen listing, sorting, and managing due tasks and reminders
-│   ├── data/                                 # Clean Architecture Data Access Layer
-│   │   ├── api/
-│   │   │   └── semester_api.dart             # API wrapper for Semester endpoints
-│   │   ├── dto/
-│   │   │   └── semester/
-│   │   │       └── semester_dto.dart         # DTO serialization and deserialization classes
-│   │   └── repositories/
-│   │       └── semester_repository.dart      # Clean interface mapping endpoints to state
-│   └── main.dart
-├── pubspec.yaml
-└── README.md
+│   │       └── todo.py
+│   ├── schemas/                     # Pydantic request/response validation schemas
+│   │   ├── academic/
+│   │   │   ├── attendance_settings.py
+│   │   │   ├── holiday.py
+│   │   │   ├── lecture_instance.py
+│   │   │   ├── lecture_template.py
+│   │   │   ├── semester.py
+│   │   │   └── subject.py
+│   │   ├── activity_logs/
+│   │   │   └── activity_log.py
+│   │   ├── notes/
+│   │   │   ├── notes_resource.py
+│   │   │   ├── notes_section.py
+│   │   │   └── notes_subject.py
+│   │   ├── review_queue/
+│   │   │   └── review_queue.py
+│   │   ├── settings/
+│   │   │   └── app_settings.py
+│   │   ├── todo/
+│   │   │   └── todo.py
+│   │   ├── users/
+│   │   │   └── bootstrap.py           # Remote seed database structure mapping
+│   │   └── common.py                  # Holds standard API returns format
+│   ├── services/                    # Business and Transaction execution logic rules
+│   │   ├── academic/
+│   │   │   ├── attendance_settings.py
+│   │   │   ├── attendance_statistics.py # Skips target recalculations formulas
+│   │   │   ├── holiday.py
+│   │   │   ├── lecture_instance.py
+│   │   │   ├── lecture_template.py
+│   │   │   ├── semester.py
+│   │   │   └── subject.py
+│   │   ├── activity_logs/
+│   │   │   ├── activity_log.py
+│   │   │   ├── logger.py              # Savepoint activity logging orchestrator
+│   │   │   └── summary.py
+│   │   ├── auth/
+│   │   │   └── authentication_service.py
+│   │   ├── notes/
+│   │   │   └── notes.py
+│   │   ├── review_queue/
+│   │   │   ├── review_queue.py
+│   │   │   └── resolvers/             # Specific parser item conflict resolvers
+│   │   │       ├── base.py
+│   │   │       ├── finance.py
+│   │   │       ├── lecture_instance.py
+│   │   │       ├── registry.py
+│   │   │       └── todo.py
+│   │   ├── settings/
+│   │   │   └── app_settings.py
+│   │   ├── todo/
+│   │   │   └── todo.py
+│   │   └── users/
+│   │       └── user.py                # User initialization & bootstrap packaging
+│   └── utils/
+│       └── attendance_calculator.py   # Core math equations for attendance rates
 ```
-
 ---
 
 ## 9. Current Backend Status
