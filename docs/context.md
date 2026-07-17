@@ -636,6 +636,19 @@ We have completed the **SQLite Synchronization Engine (Sprint 14B)**, having suc
   - Developed an automated unit testing suite for the coalescing and sorting engine and verified all test assertions pass.
   - Implemented **Sync Protocol Versioning**: Introduced central version constants in the backend (`SYNC_PROTOCOL_VERSION = 1`) and client (`minSupportedSyncVersion = 1`, `maxSupportedSyncVersion = 1`), isolated bootstrap response schema (`backend/app/schemas/users/bootstrap.py`), validated the protocol range in both `BootstrapService` and `SyncService` before SQLite writes, and added professional mismatch warnings in the UI.
 
+* **What was implemented (Sprint 14C - State Management Modernization — Riverpod Integration)**:
+  - Migrated the remaining persistent modules (Todo, Timetable, Attendance, Notes, Review Queue, Settings, Semester Selection, and root StudentBuddyApp) to Riverpod CQRS architecture.
+  - Fully eliminated `AppState.instance` references from the active codebase.
+  - Implemented read providers and write action providers to separate query logic from mutations.
+
+* **What was implemented (Synchronization & Semester Stabilization)**:
+  - Implemented cascading updates in the SQLite repository for semester updates, automatically pruning out-of-bounds scheduled lecture instances and generating missing ones based on existing templates.
+  - Refactored `SemesterActions` provider to trigger explicit Riverpod downstream invalidation (for attendance settings, timetable schedules, stats, and date-specific lecture lists) to ensure immediate UI updates upon semester dates modification.
+  - Hardened `SyncService` to transition the sync status state to `SyncStatus.error` if any operations remain pending (e.g. backoff retry delays) after a sync attempt, showing correct error messages in the offline sync settings.
+  - Standardized Activity Logs synchronization, ensuring remote backend logs are merged down during bootstrap and local responsiveness placeholder logs are cleanly deduplicated based on matching entity details.
+  - Fixed activity log user ID mapping issues on the backend by explicitly passing `user_id` inside services and fallback retrieval from `request_user_id` context.
+  - Added unique `heroTag` specifications to FABs in Notes, Timetable, and Todo screens to prevent duplicate Hero tag errors on view transitions.
+
 * **What was intentionally NOT implemented (postponed)**:
   * WhatsApp bot webhook and Meta Cloud API integration (postponed to Sprint 15)
   * AI engine and OCR timetable parser (postponed to Sprint 16)

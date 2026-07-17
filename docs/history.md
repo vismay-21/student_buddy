@@ -1538,3 +1538,28 @@ This log tracks architectural decisions, feature implementations, and refinement
   - Zero `AppState.instance` references outside `app_state.dart`.
   - Zero direct `Repository()` instantiations in any screen file.
   - `flutter analyze`: 0 errors, 168 info-level warnings (pre-existing `withOpacity` deprecation).
+
+---
+
+## 2026-07-15 (Synchronization & Semester Pipeline Stabilization)
+
+### Decisions
+1. **Local Semester Date Cascading**: SQLite `updateSemester` transaction must now automatically prune invalid lecture instances outside the new semester date bounds and regenerate missing ones for templates to maintain consistency.
+2. **Cascading State Invalidation**: Downstream Riverpod providers (attendance settings, timetable schedules, statistics, and date-based lecture lists) must be explicitly invalidated upon semester updates to propagate changes immediately.
+3. **Queue Error Visibility**: Hardened the sync state machine to report `SyncStatus.error` when the pending operations queue is non-empty after a sync attempt (e.g. due to retry count backoffs), avoiding false-success indicators.
+4. **Activity Logs Deduplication**: Standardized synchronization of Activity Logs by merging remote logs and deleting local placeholder logs that share the same entity details but different UUIDs to avoid duplication.
+5. **UI Hero Tag Safety**: Fixed duplicate Hero tag navigation crashes by specifying unique tags on floating action buttons across notes, timetable, and todo views.
+
+### Implementation Details
+* **SQLite Repository**:
+  - `lib/data/repositories/sqlite/sqlite_semester_repository.dart`: Updated `updateSemester` to run date-cascade recalculations (pruning outside range, regenerating inside range).
+  - `lib/data/repositories/sqlite/sqlite_todo_repository.dart`: Fixed action type recording to write 'completed' or 'updated' activity logs on todo transitions.
+* **Provider Layer**:
+  - `lib/core/providers/semester_provider.dart`: Configured `SemesterActions` to explicitly refresh and invalidate downstream providers on semester changes.
+  - `lib/core/providers/app_settings_provider.dart`: Updated `activityLogsProvider` to watch `syncStateProvider` to rebuild when remote logs are synced down.
+* **Sync Engine & Services**:
+  - `lib/core/services/sync_service.dart`: Added merge logic for activity logs, deduplication of placeholder logs, and error detection for pending/skipped queue items.
+  - `backend/app/services/activity_logs/logger.py`: Added context fallback to automatically resolve `user_id` from `request_user_id` when missing.
+  - `backend/app/services/todo/todo.py`: Passed `user_id` explicitly inside service logs.
+* **Testing & Verification**:
+  - `test/sync_lifecycle_test.dart`: Added test cases for queue cleanliness (coalesced update pruning, create + delete immediate discard, and sync error status reporting).
